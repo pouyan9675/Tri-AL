@@ -1,0 +1,22 @@
+.ql-container {
+    min-height: 10rem;
+    min-height: 55vh;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+  
+.ql-editor {
+    height: 100%;
+    flex: 1;
+    overflow-y: auto;
+    width: 100%;
+}
+
+.no-draft {
+    opacity: 0.75;
+}
+
+h1 {
+    font-weight: bold;
+}

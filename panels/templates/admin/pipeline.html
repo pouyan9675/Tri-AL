@@ -1,0 +1,210 @@
+{% extends 'admin/base_site.html' %}
+
+{% block extrastyle %}{% endblock %}
+
+
+{% block tab-tools %}
+<div class="tab-tools">
+    <h3 class="tab-title">Pipeline Report</h3>
+
+
+    <span class="custom-dropdown small">
+        <select>
+            <option>2022</option>
+            <option>2021</option>
+            <option>2020</option>  
+            <option>2019</option>
+            <option>2018</option>
+        </select>
+    </span>
+
+
+    <span>
+        <a href="">Action</a>
+        <i class="fas fa-angle-right"></i>
+        <a href="">Pipeline Report</a>
+        <i class="fas fa-angle-right"></i>
+        <p>{{ 2022 }}</p>
+    </span>
+</div>
+{% endblock %}
+
+
+{% block container %}
+<div class="grid-two">
+
+    <div class="grid-three two-cols">
+        
+        <div class="card three-cols">
+            <div class="card-title">
+                <a>Trials Status Summary</a>
+            </div>
+                
+            {{ status_summary|safe }}
+        </div>
+        
+        <div class="card">
+            <div class="card-title">
+                <a>Trials Phase Summary</a>
+            </div>
+                
+            {{ trials_summary|safe }}
+        </div>
+        
+        <div class="card">
+            <div class="card-title">
+                <a>Agents Summary</a>
+            </div>
+            
+            {{ agents_summary|safe }}
+        </div>
+        
+        <div class="card">
+            <div class="card-title">
+                <a>Alzheimer's Pipeline (<span class="keyword important">{{ current_year }}</span>)</a>
+            </div> 
+            
+            <h2>Trials</h2>
+            <ul class="card-list">
+                <li>
+                    <span class="card-text"># of New Trials: <span class="keyword important">{{ pipeline_new }}</span></span>
+                </li>
+                
+                <li>
+                    <span class="card-text"># of Trials from Pipeline {{ current_year|add:"-1" }}: <span class="keyword important">{{ pipeline_last }}</span>
+                </li>
+
+                <li>
+                    <span class="card-text">Total # of Trials: <span class="keyword important">{{ pipeline_total }}</span></span>
+                </li>
+                
+                <li>
+                    <span class="card-text"># of Completed from Last Pipeline: <span class="keyword important">{{ pipeline_completed }}</span></span>
+                </li>
+
+                <li>
+                    <span class="card-text"># of Trials from Last Pipeline Updated: <span class="keyword important">{{ pipeline_updated }}</span></span>
+                </li>
+                
+                <li>
+                    <span class="card-text"># of Completed in {{ current_year|add:"-1" }}: <span class="keyword important">{{ pipeline_completed }}</span></span>
+                </li>
+
+            </ul>
+
+            <h2>Drugs</h2>
+            <ul class="card-list">
+                <li>
+                    <span class="card-text"># of Drugs in New Trials: <span class="keyword important">{{ pipeline_drug_new }}</span></span>
+                </li>
+
+                <li>
+                    <span class="card-text"># of Drugs in Updated Trials: <span class="keyword important">{{ pipeline_drug_update }}</span></span>
+                </li>
+            </ul>
+
+            <div class="button card-button">
+                <a style="color: white;" href="api/pipeline/{{ current_year }}" target="_blank" rel="noopener noreferrer">
+                    <i class="fas fa-cloud-download-alt"></i>
+                    <span> Download Spreadsheet</span>
+                </a>
+            </div>
+
+        </div>  
+
+
+
+    </div>
+    
+
+    <div class="card two-cols">
+        <div class="card-title">
+            <a>MoA of agents in Phase 3</a>
+        </div>
+        
+        {{ phase3moa|safe }}
+    </div>
+    
+    <div class="card two-cols">
+        <div class="card-title">
+            <a>Agents in Phase 3 of Alzheimer’s disease drug development</a>
+        </div>
+        
+        {{ phase3agents|safe }}
+    </div>
+
+    <div class="card two-cols">
+        <div class="card-title">
+            <a>MoA of agents in Phase 2</a>
+        </div>
+        
+        {{ phase2moa|safe }}
+    </div>
+    
+    <div class="card two-cols">
+        <div class="card-title">
+            <a>Agents in Phase 2 of Alzheimer’s disease drug development</a>
+        </div>
+        
+        {{ phase2agents|safe }}
+    </div>
+
+    <div class="card two-cols">
+        <div class="card-title">
+            <a>Agents in Phase 1 of Alzheimer’s disease drug development</a>
+        </div>
+        
+        {{ phase1agents|safe }}
+    </div>
+    
+    <div class="card two-cols">
+        <div class="card-title">
+            <a>Stem cell therapy in clinical trials for Alzheimer’s disease</a>
+        </div>
+        
+        {{ stemcell_trials|safe }}
+    </div>
+    
+    <div class="card two-cols">
+        <div class="card-title">
+            <a>Trial sponsor for each phase of AD drug development and the number of trials of repurposed agents supported by each entity</a>
+        </div>
+        
+        {{ sponsor|safe }}
+    </div>
+    
+    <div class="card">
+        <div class="card-title">
+            <a>Biomarkers as outcome measures or as entry criteria in Phase 2 and Phase 3 DMT trials</a>
+        </div>
+        
+        {{ biomarkers|safe }}
+    </div>
+    
+    <div class="card">
+        <div class="card-title">
+            <a>Global distribution of trials</a>
+        </div>
+        
+        {{ location|safe }}
+    </div>
+
+    <div class="card two-cols">
+        <div class="card-title">
+            <a>Total person weeks contributed by participants for each type of trial</a>
+        </div>
+        
+        {{ participants|safe }}
+    </div>
+    
+    <div class="card two-cols">
+        <div class="card-title">
+            <a>Mechanisms of action of disease-modifying agents in all phases of clinical trials grouped according to the Common Alzheimer’s Disease Research Ontology (CADRO)</a>
+        </div>
+        
+        {{ dmt_cadro|safe }}
+    </div>
+
+    
+</div> 
+{% endblock %}

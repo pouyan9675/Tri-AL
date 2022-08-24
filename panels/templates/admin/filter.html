@@ -1,0 +1,6 @@
+<ul class="list-group list-group-flush m-0 p-0">
+{% for choice in choices %}
+    <li class="list-group-item list-group-item-action {% if choice.selected %}active text-white{% endif %}">
+    <a href="{{ choice.query_string|iriencode }}">{{ choice.display }}</a></li>
+{% endfor %}
+</ul>

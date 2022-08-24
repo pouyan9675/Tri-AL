@@ -1,0 +1,72 @@
+<body class="bg-light">
+  <div class="container">
+    {% load static %}
+    <img class="ax-center mt-4 mb-2 w-32" src="https://alz.cs.unlv.edu{% static 'notification/action-logo.png'%}" />
+
+    <preview>You have {{ trials_num }} new trials added to the database.</preview>
+
+    <div class="card mb-6 mt-4">
+      <div class="card-body">
+        <h1 class="ax-center h3 mb-2 fw-700">Clinical Trials Update</h1>
+        <h5 class="ax-center text-gray-600">We have something new!</h5>
+        <img class="ax-center mt-8 mb-4 w-32" src="https://alz.cs.unlv.edu{% static 'notification/server-database.png'%}" />
+        
+
+        <div class="row">
+
+          <div class="col-lg-4 ax-center">
+            <div class="text-sm text-gray-500 my-1">Updated Trials</div> 
+            <div class="text-base text-gray-700">{{trials_num}} Trials</div>
+          </div>
+
+          <div class="col-lg-4 ax-center">
+            <div class="text-sm text-gray-500 my-1">Update Date</div> 
+            <div class="text-base text-gray-700">{{update_date}}</div>
+          </div>
+
+          <div class="col-lg-4 ax-center">
+            <div class="text-sm text-gray-500 my-1">Update Time</div> 
+            <div class="text-base text-gray-700">{{update_time}}</div> 
+          </div>
+        </div>
+
+        <p class="text-gray-700 my-5">Here is a summary of the new trials:</p>
+
+        <table class="table thead-light">
+          <thead>
+            <tr>
+              <th>NCT #</th>
+              <th>Intervention(s)</th>
+            </tr>
+          </thead>
+          <tbody>
+            
+            {% for t in trials %}
+              <tr>
+                <td><a href="https://alz.cs.unlv.edu/admin/panels/trial/{{ t.pk }}/change/" target="_blank">{{ t.nct_id }}</a></td>
+                <td>
+                  <ul style="margin: 0; padding: 0;">
+                  {% if t.agent|length > 1 %}
+                    {% for a in t.agent %}
+                    <li>{{ a.name }}<span class="text-blue-400">({{ a.type }})</span></li>
+                    {% endfor %}
+                  </ul>
+                  {% else %}
+                  {% for a in t.agent %}{{ a.name }}<span class="text-blue-400"> ({{ a.type }})</span>{% endfor %}
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+
+          </tbody>
+        </table>
+
+        <div class="ax-center mt-6">
+          <a class="btn btn-primary w-48" href="https://alz.cs.unlv.edu/admin">Login to Admin Panel</a>
+        </div>
+
+      </div>
+    </div>
+    <div class="mb-4 row"><span class="text-xs text-gray-700 ax-center">ACTION | UNLV © 2022</span></div>
+  </div>
+</body>

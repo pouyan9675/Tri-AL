@@ -1,0 +1,15 @@
+{% load i18n admin_urls %}
+
+{% block object-tools-items %}
+  {% if has_add_permission %}
+  <div class="row justify-content-end px-2 my-2">
+        {% url cl.opts|admin_urlname:'add' as add_url %}
+        <div class="col text-end">
+            <a href="{% add_preserved_filters add_url is_popup to_field %}" class="btn btn-outline-secondary rounded-3 addlink">
+              <i class='bx bx-plus align-middle fs-5'></i>
+                ADD {{ cl.opts.verbose_name|upper }}
+            </a>
+        </div>
+  </div>
+  {% endif %}
+{% endblock %}

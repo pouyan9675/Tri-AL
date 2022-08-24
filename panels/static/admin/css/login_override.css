@@ -1,0 +1,249 @@
+body,html {
+    margin: 0;
+    padding: 0;
+}
+* {
+    box-sizing: border-box;
+}
+
+label, h2, h3, h4, p, input[type="submit"]  {
+    font-family: 'Raleway', sans-serif;
+    font-weight: 500;
+}
+
+#header {
+    display: none; 
+    visibility: hidden;
+}
+
+.login-title {
+    font-family: 'Intro', sans-serif;
+    font-weight: 800;
+    font-size: 38px;
+}
+
+.login-title + div {
+    height: 38px;
+}
+
+.login #container {
+    margin: 0;
+    width: 100%;
+    border: 0;
+}
+
+.login #content {
+    padding: 0;
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.wrap-login {
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    flex-direction: row-reverse;
+}
+
+#login-form {
+    width: 620px;
+    min-height: 100vh;
+    display: block;
+    padding: 173px 85px 55px;
+}
+
+.background-layer {
+    background-image: url("/static/admin/img/login.jpg"); 
+    width: calc(100% - 620px);
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center;
+    z-index: 1;
+    /* border-radius: 0 40px 40px 0;
+    box-shadow: 5px 0 20px #bbb; */
+    text-align: center;
+}
+
+.login-banner {
+    margin: 173px 12px 100px 12px;
+    padding: 24px;
+    width: 500px;
+    height: 400px;
+    display: inline-block;
+    background-color: rgba(0, 0, 0, 0.75);
+    border-radius: 18px;
+    text-align: left;
+}
+  
+  @supports ((-webkit-backdrop-filter: none) or (backdrop-filter: none)) {
+    .login-banner {
+        margin: 173px 12px 100px 12px;
+        padding: 24px;
+        width: 500px;
+        height: 400px;
+        display: inline-block;
+        background-color: rgba(0, 0, 0, 0.2);
+        backdrop-filter: blur(50px);
+        -webkit-backdrop-filter: blur(10px);
+        border-radius: 18px;
+        text-align: left;
+    }
+  }
+
+.login-banner .banner-title {
+    display: inline-block;
+    padding: 8px 14px;
+    /* margin: 24px; */
+    background: rgba(250, 250, 250, 0.15);
+    color: white;
+}
+
+.banner-title hr {
+    background: white;
+}
+
+.login-banner .banner-title .upper {
+    font-size: 16px;
+    font-weight: 900;
+}
+
+.login-banner .banner-title .lower {
+    font-weight: 500;
+}
+
+.banner-title + hr {
+    width: 40px;
+    height: 2px;
+    background-color: rgba(250, 250, 250, 0.3);
+    margin: 24px 0;
+}
+
+.login-banner h3 {
+    color: white;
+    font-weight: 700;
+    font-size: 26px;
+}
+
+.login-banner h4 {
+    color: white;
+    font-weight: 900;
+    font-size: 20px;
+}
+
+.login-banner p {
+    color: white;
+    font-weight: 500;
+    font-size: 14px;
+    margin: 0;
+}
+
+
+.submit-row .login-button {
+    margin-top: 24px;
+    width: 100%;
+    padding: 16px;
+    font-weight: 900;
+    border-radius: 10px;
+    -webkit-transition: all .5s;
+    -moz-transition: all .5s;
+    -o-transition: all .5s;
+    transition: all .5s;
+}
+
+.submit-row .login-button:hover {
+    -webkit-transition: all .5s;
+    -moz-transition: all .5s;
+    -o-transition: all .5s;
+    transition: all .5s;
+}
+
+.form-row input {
+    font-size: 16px;
+    outline: none;
+    border-top: 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 2px solid var(--input-border);
+    border-radius: 0;
+    -webkit-transition: all .5s;
+    -moz-transition: all .5s;
+    -o-transition: all .5s;
+    transition: all .5s;
+}
+
+.form-row input:focus {
+    -webkit-transition: all .5s;
+    -moz-transition: all .5s;
+    -o-transition: all .5s;
+    transition: all .5s;
+    border-bottom: 2px solid var(--input-focus-border);
+} 
+
+#login-separator {
+    width: 100%;
+    text-align: center;
+    margin-top: 52px;
+}
+
+#login-separator label {
+    color: var(--input-border);
+    font-weight: 800;
+}
+
+.mini-line {
+    margin: 0 24px;
+    vertical-align: middle;
+    display: inline-block;
+    height: 2px;
+    width: 80px;
+    background: var(--input-border);
+}
+
+.google-button {
+    border: 0px;
+    vertical-align: middle;
+}
+
+.google-button label {
+    cursor: pointer;
+    font-weight: 900;
+    display: inline-block;
+    vertical-align: middle;
+    color: var(--button-bg);
+}
+
+.google-button img {
+    cursor: pointer;
+    width: 20px;
+    height: 20px;
+    margin: 0 8px;
+    vertical-align: middle;
+    display: inline-block;
+}
+
+.google-button {
+    cursor: pointer;
+    padding: 12px;
+    border: 2px solid var(--button-bg);
+    background: transparent;
+    text-align: center;
+    margin-top: 52px;
+    border-radius: 10px;
+    -webkit-transition: all .5s;
+    -moz-transition: all .5s;
+    -o-transition: all .5s;
+    transition: all .5s;
+}
+
+.google-button:hover {
+    -webkit-transition: all .5s;
+    -moz-transition: all .5s;
+    -o-transition: all .5s;
+    transition: all .5s;
+    background: rgba(0, 0, 0, 0.3);
+}

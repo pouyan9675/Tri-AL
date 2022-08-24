@@ -1,0 +1,31 @@
+<div class="row mx-0">
+    {% for t in page %}
+        {% include "admin/panels/trial/search_item.html" with trial=t %}
+    {% endfor %}
+</div>
+
+{% if paginator.num_pages > 1 %}
+<nav class="mx-2 my-4" aria-label="...">
+    <ul class="pagination">
+
+      <li class="page-item {% if page.has_previous %}search-submit{% else %}disabled{% endif %}" {% if page.has_previous %}value="{{ page.number|add:"-1" }}"{%endif%}>
+        <span class="page-link">Previous</span>
+      </li>
+
+      {% for num in paginator.page_range %}
+      {% if page.number == num %}
+        <li class="page-item active" aria-current="page">
+            <a class="page-link">{{num}}</a>
+        </li>
+      {% elif page.number|add:"3" > num and page.number|add:"-3" < num %}
+        <li class="page-item search-submit"value="{{num}}"><a class="page-link">{{num}}</a></li>
+      {% endif %}
+      {% endfor %}
+
+      <li class="page-item">
+        <a class="page-link {% if page.has_next %}search-submit{%else%}disabled{%endif%}" {% if page.has_previous %}value="{{ page.number|add:"+1"}} "{% endif %}>Next</a>
+      </li>
+
+    </ul>
+</nav>
+{% endif %}

@@ -1,0 +1,17 @@
+# VisuAL: Visual Alzheimer's Disease
+
+Django app for Backend of Alzheimer's Disease Pipeline.
+
+Project Structure
+------
+
+    .
+    ├── panels                  # Internal app for visual project that contains core of the server
+    │   ├── api                 # Files that are responsible for REST-API to communicate with front-end
+    │   └── utils               # Scripts to download and parse clinicaltrials.gov data and insert them into database
+    ├── visual                  # Configuration files for Django app
+    ├── initdb.sh               # Script to reset the database and make a new one with default values
+    ├── httpd.conf              # Backup file of apache configuration for app
+    ├── data_manager.py         # Main script to maintain database and download and fill database
+    ├── manage.py               # Django script to perform different actions for app
+    └── .gitignore

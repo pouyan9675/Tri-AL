@@ -1,0 +1,44 @@
+[
+    {
+      "model": "panels.funder",
+      "pk": 1,
+      "fields": {
+        "name": "Biopharmaceutical Company"
+      }
+    },
+    {
+      "model": "panels.funder",
+      "pk": 2,
+      "fields": {
+        "name": "NIH"
+      }
+    },
+    {
+      "model": "panels.funder",
+      "pk": 3,
+      "fields": {
+        "name": "Academic Medical Center"
+      }
+    },
+    {
+      "model": "panels.funder",
+      "pk": 4,
+      "fields": {
+        "name": "Public Partnership"
+      }
+    },
+    {
+      "model": "panels.funder",
+      "pk": 5,
+      "fields": {
+        "name": "Private Partnership"
+      }
+    },
+    {
+      "model": "panels.funder",
+      "pk": 6,
+      "fields": {
+        "name": "Other"
+      }
+    }
+  ]

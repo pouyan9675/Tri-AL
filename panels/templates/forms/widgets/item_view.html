@@ -1,0 +1,8 @@
+<input type="hidden" name="{{ widget.name }}"{% if widget.value != None %} value="{{ widget.value|stringformat:'s' }}"{% endif %}{% include "django/forms/widgets/attrs.html" %}>
+<ol style="margin-top:1em; margin-bottom:1em; padding-top:1.75em;" name="{{ widget.name }}">
+    {% for item in widget.attrs.list_items %}
+        {% if item|length > 0 and item != ' ' %} 
+            <li style="margin-top:1.5em;">{{ item }}</li>
+        {% endif %}
+    {% endfor %}
+</ol>

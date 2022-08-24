@@ -1,0 +1,78 @@
+<div class="nav" id="navbar">
+    <nav class="nav__container">
+        <div>
+            <a href="{% url 'admin:index' %}" class="nav__link nav__logo active">
+                <i class='bx bxs-clinic nav__icon' ></i>
+                <span class="nav__logo-name">TriAL</span>
+            </a>
+
+            <div class="nav__list">
+                <div class="nav__items">
+                    <h3 class="nav__subtitle">Navigation</h3>
+
+                    <a href="{% url 'index' %}" class="nav__link {% if page_name and page_name == 'index' %}active{% endif %}">
+                        <i class='bx bx-home nav__icon' ></i>
+                        <span class="nav__name">Dashboard</span>
+                    </a>
+
+
+                    <a href="{% url 'admin:advanced_search' %}" class="nav__link {% if page_name and page_name == 'advanced' %}active{% endif %}">
+                        <i class='bx bx-search nav__icon' ></i>
+                        <span class="nav__name">Advanced Search</span>
+                    </a>
+
+                </div>
+
+
+                <div class="nav__items">
+                    <h3 class="nav__subtitle">Browse</h3>
+
+                    <div class="nav__dropdown">
+                        <a href="#" class="nav__link {% if not page_name %}active{% endif %}">
+                            <i class='bx bx-data nav__icon' ></i>
+                            <span class="nav__name">Database</span>
+                            <i class='bx bx-chevron-down nav__icon nav__dropdown-icon'></i>
+                        </a>
+
+                        <div class="nav__dropdown-collapse">
+                            <div class="nav__dropdown-content">
+                                <a href="{% url 'change_list' %}" class="nav__dropdown-item" {% if model.admin_url in request.path %} aria-current="page"{% endif %}>Trials</a>
+                                <a href="" class="nav__dropdown-item" {% if model.admin_url in request.path %} aria-current="page"{% endif %}>Agents</a>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                
+                {% if user.is_active %}
+                <div class="nav__items">
+                    <h3 class="nav__subtitle">User</h3>
+
+                    <a href="#" class="nav__link">
+                        <i class='bx bx-wrench nav__icon' ></i>
+                        <span class="nav__name">Settings</span>
+                    </a>
+
+                    <a href="#" class="nav__link">
+                        <i class='bx bx-user nav__icon' ></i>
+                        <span class="nav__name">Profile</span>
+                    </a>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+
+        {% if user.is_active %}
+        <form id="logout-form" method="post" action="{% url 'admin:logout' %}">
+        {% csrf_token %}
+        <a href="{% url 'admin:logout' %}" class="nav__link nav__logout">
+            <i class='bx bx-log-out nav__icon' ></i>
+            <span class="nav__name">Log Out</span>
+        </a>
+        </form>
+        {% endif %}
+
+    </nav>
+</div>

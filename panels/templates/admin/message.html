@@ -1,0 +1,22 @@
+{% extends 'admin/base.html' %}
+
+
+{% block content %}
+
+    <div class="container p-4">
+        
+        
+        {% if type == 'success' %}
+            <div class="alert alert-success" role="alert">
+                {{ message }}
+            </div>
+        {% elif type == 'error' %}
+            <div class="alert alert-danger" role="alert">
+                {{ message }}
+            </div>
+        {% endif %}
+
+
+    </div>
+
+{% endblock %}

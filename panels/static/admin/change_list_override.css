@@ -1,0 +1,247 @@
+#toolbar {
+    background: transparent;
+    border: 0;
+    margin-bottom: 0;
+    display: inline-block;
+}
+
+
+#toolbar #search {
+  display: inline-block;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  padding: 0.15rem;
+  padding-left: 0.5rem;
+  -webkit-transition:border-color 1s ease;    
+  -moz-transition:border-color 1s ease;      
+  -o-transition:border-color 1s ease;         
+  transition: border-color 1s ease;
+}
+
+#toolbar #search i {
+  color: rgba(0, 0, 0, 0.3);
+}
+
+#toolbar #search:hover, #toolbar #search:focus {
+  border: 2px solid rgb(13,110,253);  
+  outline: none;
+  -webkit-transition:border-color 0.5s ease;    
+  -moz-transition:border-color 0.5s ease;      
+  -o-transition:border-color 0.5s ease;         
+  transition: border-color 0.5s ease;
+}
+
+#toolbar #search input[type=text]{
+  font-size: 0.8rem;
+  border: 0;
+  background-color: rgba(0, 0, 0, 0);
+  padding-left: 0.5rem;
+}
+
+#toolbar #search input[type=text]:focus{
+  outline: none;
+}
+
+
+#toolbar #search button{
+  border: 0;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+#toolbar #search button i {
+  color: rgb(13,110,253);
+}
+
+
+::placeholder {
+    color: var(--table-content);
+    opacity: 0.5;
+}
+
+
+/* Table List */
+/* 
+#result_list tr {
+    height: 48px;
+  }
+  
+  #result_list tbody tr:hover {
+    background: var(--hover-bg);
+  }
+  
+  #result_list tbody:before {
+    content:"@";
+    display:block;
+    line-height:16px;
+    text-indent:-99999px;
+  }
+  
+  table td {
+    color: var(--table-content);
+  }
+  */
+
+table#result_list tbody {
+  font-size: 0.8rem;
+}
+  
+table#result_list td,  table#result_list th{
+      vertical-align: middle;
+}
+
+table thead th, table thead th a {
+  color: rgb(126, 126, 126);
+  font-size: 0.9rem;
+}
+
+  /*
+
+  
+  #result_list thead tr {
+    background: var(--table-header);
+  }
+  
+  #result_list tr:nth-child(even) {
+    background: var(--body-bg);
+  }
+  
+  #result_list thead a, #result_list thead span {
+    color: var(--table-title);
+    font-weight: 500;
+    text-transform: none;
+    font-size: 13px;
+  } */
+  
+  table th:first-child{
+    border-radius:10px 0 0 10px;
+    margin-right: 0.5rem;
+  }
+  
+  table th:last-child{
+    border-radius:0 10px 10px 0;
+    padding-bottom: 20px;
+  }
+  
+  table td.field-phase, table th.column-phase {
+    width: 1%;
+    white-space: nowrap;
+    text-align: center;
+  }
+  
+  table td.field-last_update, table th.column-last_update {
+    text-align: right;
+  }
+  
+  /*
+  table th {
+    border-top: none;
+  }
+  
+  table#result_list td, table#result_list th {
+    border: none;
+  }
+  
+  thead th.sorted {
+    background: var(--table-header);
+  }
+  
+  #result_list thead th div.text a:hover {
+    background: var(--table-header);
+    color: var(--table-content);
+  }
+  
+  #result_list thead th.sorted a{
+    color: var(--table-content);
+    font-weight: 600;
+  }
+  
+  thead th.sorted .text {
+    padding-right: 28px;
+  }
+  
+  table thead th.sorted .sortoptions a.descending {
+    top: 0;
+    color: var(--table-content);
+  }
+  
+  table thead th.sorted .sortoptions a.ascending {
+    bottom: 2px;
+    color: var(--table-content);
+  }
+
+input[type=Checkbox] {
+  -moz-appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  border: 2px solid var(--table-content);
+  padding: 5px;
+  border-radius: 3px;
+}
+
+input[type=Checkbox]:checked {
+  background: var(--table-content);
+  transition: background 0.5s ease;
+} */
+
+.column-custom_status, 
+.column-agents, 
+.field-agents,
+.column-nct_id,
+.field-nct_id{
+  text-align: center;
+}
+
+td.field-custom_status span {
+    white-space:nowrap;
+    vertical-align: middle;
+}
+
+
+.status-text {
+  text-align: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.status-dis {
+  color: var(--status-dis-text);
+  background: rgba(240, 31, 49, 0.5);
+}
+
+
+.status-en {
+  color: var(--status-en-text);
+  background: rgba(118, 173, 143, 0.5);
+}
+
+.status-com {
+  color: var(--status-com-text);
+    background: rgba(29, 147, 222, 0.5);
+}
+
+.status-unk {
+  color: var(--status-unk-text);
+  background: rgba(153, 153, 153, 0.5);
+}
+
+span.agent-type {
+  font-style: italic;
+  color: var(--table-title);
+  font-weight: 300;
+}
+
+
+.accordion .accordion-item h2.accordion-header {
+  background: None;
+  padding: 0;
+}
+
+
+.list-group-item a {
+  color: inherit !important;
+}
+
+.dropdown-menu {
+  min-width: 250px;
+  max-height: 480px;
+  overflow-y: auto;
+}

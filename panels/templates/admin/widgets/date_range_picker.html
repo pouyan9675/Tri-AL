@@ -1,0 +1,6 @@
+<div class="input-group">
+    <input type="text" id="with-append-field" class="form-control" aria-describedby="{{widget.name}}-icon" name="{{widget.name}}" {% if widget.value != None %} placeholder="{{ widget.value|stringformat:'s' }}"{% endif %} {% include "django/forms/widgets/attrs.html" %}>
+    <span class="input-group-text">
+        <i class="bx bx-calendar-alt"></i>
+    </span>
+</div>

@@ -1,0 +1,106 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" type="text/css" href="{% static "admin/css/login.css" %}">
+<link rel="stylesheet" type="text/css" href="{% static 'admin/css/login_override.css' %}" />
+{{ form.media }}
+{% endblock %}
+{% block bodyclass %}{{ block.super }}login{% endblock %}
+
+{% block usertools %}{% endblock %}
+
+{% block nav-global %}{% endblock %}
+
+{% block nav-sidebar %}{% endblock %}
+
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}{% endblock %}
+{% block content %}
+{% if form.errors and not form.non_field_errors %}
+<p class="errornote">
+{% if form.errors.items|length == 1 %}{% translate "Please correct the error below." %}{% else %}{% translate "Please correct the errors below." %}{% endif %}
+</p>
+{% endif %}
+
+{% if form.non_field_errors %}
+{% for error in form.non_field_errors %}
+<p class="errornote">
+    {{ error }}
+</p>
+{% endfor %}
+{% endif %}
+
+<div id="content-main">
+
+{% if user.is_authenticated %}
+<p class="errornote">
+{% blocktranslate trimmed %}
+    You are authenticated as {{ username }}, but are not authorized to
+    access this page. Would you like to login to a different account?
+{% endblocktranslate %}
+</p>
+{% endif %}
+
+<div class="wrap-login">
+
+    <form action="{{ app_path }}" method="post" id="login-form">{% csrf_token %}
+
+    <span class="login-title">Login to continue</span>
+    <div></div>
+
+    <div class="form-row w-100 m-2">
+        {{ form.username.errors }}
+        {{ form.username.label_tag }} {{ form.username }}
+    </div>
+    <div class="form-row w-100 mt-2">
+        {{ form.password.errors }}
+        {{ form.password.label_tag }} {{ form.password }}
+        <input type="hidden" name="next" value="{{ next }}">
+    </div>
+    {% url 'admin_password_reset' as password_reset_url %}
+    {% if password_reset_url %}
+    <div class="password-reset-link">
+        <a href="{{ password_reset_url }}">{% translate 'Forgotten Password?' %}</a>
+    </div>
+    {% endif %}
+    <div class="submit-row">
+        <input class="login-button" type="submit" value="{% translate 'Login' %}">
+    </div>
+
+    <div id="login-separator"> 
+        <div class="mini-line"></div> <label>or</label> <div class="mini-line"></div> 
+    </div>
+
+    <div class="google-button">
+        <img src="{% static 'admin/img/google.svg' %}">
+        <label>Continue with Google</label>
+    </div>
+
+    </form>
+
+    <div class="background-layer">
+
+        <div class="login-banner">
+            <div class="banner-title">
+                <label class="upper">Computer Science</label> 
+                <hr>
+                <label class="lower">UNLV</label>
+            </div>
+            <hr>
+            <h4>This is</h4> 
+            <h3>Tri-AL: VisuAL ClinicAL TriALs</h3>
+            <p>Explore clinical trials posted all over the world.</p>
+            <p>We invite you to join to contribute to our project.</p>
+        </div>
+
+    </div>
+    
+
+</div>
+
+
+</div>
+{% endblock %}
+
+{%block footer%} {% endblock %}

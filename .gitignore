@@ -1,0 +1,15 @@
+/test.py
+db.sqlite3
+.vscode
+data/*
+__pycache__
+.DS_Store
+Lib/*
+Scripts/*
+*.cfg 
+credentials/
+back.sqlite3
+*.ipynb
+.sass-cache/
+.sass-cache/*
+logs/*

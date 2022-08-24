@@ -1,0 +1,135 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_list %}
+{% load string_modifier %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <!-- <link rel="stylesheet" href="{% static "admin/css/base.css" %}">
+  <link rel="stylesheet" href="{% static "admin/css/base_override.css" %}"> -->
+  <link rel="stylesheet" href="{% static "admin/css/changelists.css" %}">
+  <link rel="stylesheet" href="{% static "admin/change_list_override.css" %}"> 
+
+  {% if cl.formset %}
+    <link rel="stylesheet" href="{% static "admin/css/forms.css" %}">
+  {% endif %}
+  {% if cl.formset or action_form %}
+    <script src="{% url 'admin:jsi18n' %}"></script>
+  {% endif %}
+  {{ media.css }}
+  {% if not actions_on_top and not actions_on_bottom %}
+    <style>
+      #changelist table thead th:first-child {width: inherit}
+    </style>
+  {% endif %}
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+{{ media.js }}
+{% endblock %}
+
+{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} change-list{% endblock %}
+
+
+{% block coltype %}{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <!-- here -->
+    {% if cl.formset and cl.formset.errors %}
+        <p class="errornote">
+        {% if cl.formset.total_error_count == 1 %}{% translate "Please correct the error below." %}{% else %}{% translate "Please correct the errors below." %}{% endif %}
+        </p>
+        {{ cl.formset.non_form_errors }}
+    {% endif %}
+    <div class="module{% if cl.has_filters %} filtered{% endif %}" id="changelist">
+      <div class="changelist-form-container">
+        {% block date_hierarchy %}{% if cl.date_hierarchy %}{% date_hierarchy cl %}{% endif %}{% endblock %}
+
+        
+        <div class="card rounded-2 mt-2">
+          <div class="card-body">
+            <div class="row justify-content-center">
+              <div class="col-2"></div>
+              <div class="col-auto">
+                {% block search %}{% search_form cl %}{% endblock %}
+              </div>
+              <div class="col-2 my-auto">
+
+                {% if cl.has_filters %}
+                <div class="dropdown">
+                  <button class="btn {% if cl.has_active_filters %}btn-primary{%else%}btn-outline-primary{%endif%}" type="button" id="filterDropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                    <i class='bx bx-filter'></i> Filters
+                  </button>
+                    <div class="dropdown-menu py-0" aria-labelledby="filterDropdown">
+                        {% if cl.has_active_filters %}
+                        <h3 id="changelist-filter-clear mb-2">
+                            <a href="{{ cl.clear_all_filters_qs }}"><i class='bx bx-x'></i> Clear Filters</a>
+                        </h3>
+                        {% endif %}
+        
+                        <div class="accordion" id="accordationFilter">
+                        {% for spec in cl.filter_specs %}
+                            <div class="accordion-item">
+                              <h2 class="accordion-header" id="heading-{{ spec.title|remove_space }}">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ spec.title|remove_space }}" aria-expanded="False" aria-controls="collapse-{{ spec.title|remove_space }}">
+                                    <span>{{ spec.title|title }}</span>
+                                </button>
+                              </h2>
+                              <div id="collapse-{{ spec.title|remove_space }}" class="accordion-collapse collapse" aria-labelledby="heading-{{ spec.title|remove_space }}" data-bs-parent="#accordationFilter">
+                                <div class="accordion-body p-0">
+                                    {% admin_list_filter cl spec %}
+                                </div>
+                              </div>
+                            </div>
+
+                        {% endfor %}
+                        </div>
+
+                    </div>
+                </div>
+                {%endif %}
+
+              </div>
+            </div>
+
+            <form id="changelist-form" method="post"{% if cl.formset and cl.formset.is_multipart %} enctype="multipart/form-data"{% endif %} novalidate>{% csrf_token %}
+              {% if cl.formset %}
+                <div>{{ cl.formset.management_form }}</div>
+              {% endif %}
+
+          
+            {% block result_list %}
+              <div class="row mb-2">
+
+                <div class="col-6">
+                  {% if action_form and actions_on_top and cl.show_admin_actions %}
+                    {% admin_actions %}
+                  {% endif %}
+                </div>
+
+                <div class="col-6">
+                  {% block object-tools %}
+                    <ul class="object-tools mb-0">
+                      {% block object-tools-items %}
+                        {% change_list_object_tools %}
+                      {% endblock %}
+                    </ul>
+                  {% endblock %}
+                </div>
+
+              </div>
+              {% result_list cl %}
+              {% if action_form and actions_on_bottom and cl.show_admin_actions %}{% admin_actions %}{% endif %}
+            {% endblock %}
+          </div>
+          </form>
+          
+        </div>
+        {% block pagination %}{% pagination cl %}{% endblock %}
+      </div>
+
+
+    </div>
+  </div>
+{% endblock %}

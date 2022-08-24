@@ -1,0 +1,18 @@
+.container {
+    overflow: hidden;
+    width: 90%;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 54px;
+}
+
+.child {
+    margin: 0 10px;
+    position: relative; 
+    width: 15vw;
+    height: 15vw;
+    float:left;
+}
+
+

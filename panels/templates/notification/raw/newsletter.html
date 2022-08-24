@@ -1,0 +1,21 @@
+<body class="bg-light">
+  <div class="container">
+    {% load static %}
+    <img class="ax-center mt-4 mb-2 w-32" src="https://alz.cs.unlv.edu{% static 'notification/action-logo.png'%}" />
+
+    <div class="card mb-6 mt-4 border-primary border-top-4 border-left-0 border-right-0 border-bottom-0 rounded-top">
+      <div class="card-body">
+        <h1 class="ax-center h4 mb-2 fw-700">ACTION: Alzheimer's Clinical Trial InnOvation</h1>
+        <h5 class="ax-center text-gray-600">Dear {{ name }}, we are happy to share a news with you!</h5>
+        
+          {{ content|safe }}
+
+        <div class="ax-center mt-6">
+          <a class="btn btn-primary w-48" href="https://alz.cs.unlv.edu/">Visit ACTION</a>
+        </div>
+
+      </div>
+    </div>
+    <div class="mb-4 row"><span class="text-xs text-gray-700 ax-center">ACTION | UNLV © 2022</span></div>
+  </div>
+</body>

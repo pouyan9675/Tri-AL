@@ -1,0 +1,217 @@
+{% extends 'admin/base_site.html' %}
+
+{% load string_modifier %}
+
+
+{% load static %}
+{% block extrastyle %}
+    <link rel="stylesheet" href="{% static 'admin/css/advanced_search.css'%}">
+    <link rel="stylesheet" href="{% static 'admin/css/loading_animation.css'%}">
+{% endblock %}
+
+{% block extrahead %}
+    <script type="text/javascript">window.CSRF_TOKEN = "{{ csrf_token }}";</script>
+    <script type="text/javascript">window.AJAX_URL = "{% url 'admin:ajax_search' %}";</script>
+    {{ media }}
+{% endblock %}
+
+{% block content %}
+    
+<h4 class="h4 mt-3 mb-4 fw-bold">Advanced Search</h4>
+
+<div class="card rounded-3 bottom-line">
+    <div class="card-body px-4 py-4">
+        
+        <form id="search-filters">
+
+            <div class="row">
+                    <div class="col-xl-4 my-2">
+                        <span class="fw-bold">What are you looking for?</span>
+                        <div class="searchbar bg-light mt-2 rounded d-flex flex-row align-items-center px-2">
+                            <i class='bx bx-search'></i>
+                            <input class="form-control bg-transparent border-0 py-2 fw-light" type="text" placeholder="Search for NCT #, countery, etc.">
+                        </div>
+                    </div>
+
+                    <div class="col-md-3 my-2 d-flex flex-column justify-content-between">
+                        <span class="fw-bold mb-2">Agent(s)</span>
+                        {{ agent_widget }}
+                    </div>
+
+                    <div class="col-md-3 my-2 d-flex flex-column justify-content-between">
+                        <span class="fw-bold">Agent(s) Type</span>
+                        {{ agent_type_widget }}
+                    </div>
+
+                    <div class="col-md-2 d-flex align-items-end my-2 p-0">
+                        <div class="row w-100 mx-0">
+                            <div class="col-sm d-flex justify-content-end px-3">
+                                <button type="button" class="btn btn-light d-flex justify-content-center align-items-center pt-1 px-2 btn-filter-expand" data-bs-toggle="collapse" data-bs-target="#fieldsContainer" aria-expanded="false" aria-controls="fieldsContainer">
+                                <i class='bx bx-chevrons-down fs-3'></i> <span class="ml-2">More Options</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+            </div>
+
+
+            <div class="collapse mt-3" id="fieldsContainer">
+                    <h1 class="mt-4">Fields</h1>
+                    <hr>
+                    <div class="row mt-1 mb-3">
+                        
+                        <div class="col-xl-2 d-flex flex-column justify-content-between my-1">
+                            <span class="fw-bold mb-2">Geography</span>
+                            {{ geography_widget }}
+                        </div>
+
+                        <div class="col-xl-2 d-flex flex-column justify-content-between my-1">
+                            <span class="fw-bold mb-2">Subject Characteristics</span>
+                            {{ charac_widget }}
+                        </div>
+
+                        <div class="col-xl-2 d-flex flex-column justify-content-between my-1">
+                            <span class="fw-bold mb-2">Funder</span>
+                            {{ funder_widget }}
+                        </div>
+
+                        <div class="col-xl-2 d-flex flex-column justify-content-between my-1">
+                            <span class="fw-bold mb-2">CADRO MoA Category</span>
+                            {{ cadro_widget }}
+                        </div>
+
+                        <div class="col-xl-2 d-flex flex-column justify-content-between my-1">
+                            <span class="fw-bold mb-2">Biomarkers</span>
+                            {{ biomarker_widget }}
+                        </div>
+
+                        <div class="col-xl-2 d-flex flex-column justify-content-between my-1">
+                            <span class="fw-bold mb-2">MoA Category</span>
+                            {{ moa_cat_widget }}
+                        </div>
+
+                    </div>
+
+                    <div class="row my-2">
+                        <div class="col-xl-2 d-flex flex-column justify-content-top my-1">
+                            <span class="fw-bold mb-3">Mechanism of Action</span>
+                            {{ moa_widget }}
+                        </div>
+
+                        <div class="col-xl-2 d-flex flex-column justify-content-top my-1">
+                            <span class="fw-bold mb-3">Phase</span>
+                            {{ phase_widget }}
+                        </div>
+
+                        <div class="col-xl-2 d-flex flex-column justify-content-top my-1">
+                            <span class="fw-bold mb-3">Status</span>
+                            {{ status_widget }}
+                        </div>
+
+                        <div class="col-xl-2 d-flex flex-column justify-content-top my-1">
+                            <span class="fw-bold mb-3">Location</span>
+                            <select name="location" class="form-select h-auto">
+                                <option value="">Any</option>
+                                <option value="1">United State Only</option>
+                                <option value="2">Non-United States Only</option>
+                                <option value="3">Both</option>
+                            </select>
+                        </div>
+
+                        <div class="col-xl-2 d-flex flex-column justify-content-top my-1">
+                            <span class="fw-bold mb-4" data-bs-toggle="popover"  title="Repurposed Trials Only" data-bs-content="Checking this option as on, filters the trials that are repurposed.">Repurposed</span>
+                            <div class="row">
+                                <div class="col-6">
+                                    <label class="switch">
+                                        <input type="checkbox" id="switch-checkbox" name="repurposed">
+                                        <div>
+                                            <span></span>
+                                        </div>
+                                    </label>
+                                </div>
+                                
+                                <div class="col-6" id="switch-text">
+                                    <span>No</span>
+                                </div>
+                            </div>
+                        </div>
+
+
+                    </div>
+
+                    <h1 class="mt-4">Dates</h1>
+                    <hr>
+
+                    <div class="row mt-1 mb-3">
+                        
+                        <div class="col-xl-3 d-flex flex-column justify-content-between my-1">
+                            <span class="fw-bold">Start Date</span>
+                            {{start_date_widget}}
+                        </div>
+
+                        <div class="col-xl-3 d-flex flex-column justify-content-between my-1">
+                            <span class="fw-bold">First Posted</span>
+                            {{ first_posted_widget }}
+                        </div>
+
+                        <div class="col-xl-3 d-flex flex-column justify-content-between my-1">
+                            <span class="fw-bold">Last Update</span>
+                            {{last_update_widget}}
+                        </div>
+
+                        <div class="col-xl-3 d-flex flex-column justify-content-between my-1">
+                            <span class="fw-bold">End Date</span>
+                            {{end_date_widget}}
+                        </div>
+
+                        <div class="col-xl-2 d-flex flex-column justify-content-between my-1">
+                            <span class="fw-bold">Study Duration</span>
+                            <div class="input-group">
+                                <input type="text" id="with-append-field" class="form-control" name="study-duration">
+                                <div class="input-group-append">
+                                <label for="with-append-field" class="input-group-text">
+                                    <i class="bx bx-calendar-alt"></i>
+                                </label>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+            </div>
+
+
+            <div class="row mt-4 justify-content-end">
+                    <button type="button" class="btn btn-primary py-2 px-5 w-auto rounded d-flex align-items-center mx-3" id="form-submit"><i class='bx bx-search fs-5'></i> <span class="mx-2">Search</span></button>
+            </div>
+
+        </form>
+
+    </div>
+</div>
+
+
+<div class="my-2" id="search-results">
+
+    <div id="loading" class="d-flex justify-content-center" style="visibility: hidden;">
+        <div class="wave"></div>
+        <div class="wave"></div>
+        <div class="wave"></div>
+        <div class="wave"></div>
+        <div class="wave"></div>
+        <div class="wave"></div>
+        <div class="wave"></div>
+        <div class="wave"></div>
+        <div class="wave"></div>
+        <div class="wave"></div>
+    </div>
+
+</div>
+
+
+{% endblock %}
+
+
+{% block extrascript %}
+    <script src="{% static 'admin/js/advanced_search.js'%}"></script>
+{% endblock %}

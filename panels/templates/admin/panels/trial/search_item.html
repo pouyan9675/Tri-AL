@@ -1,0 +1,21 @@
+{% load string_modifier %}
+
+<div class="col-md-3 p-2">
+    <div class="card p-2 search-card h-100">
+        <div class="card-title"><a href="{% url 'admin:panels_trial_change' trial.id %}"><strong>{{ trial.nct_id }}</strong></a></div>
+        <div class="mb-1 trial-title"><strong> {{trial.title|cap_string }}</strong></div>
+        <div class="card-body">          
+            <div class="mb-1">
+                <strong>Agents:</strong>
+                <span>
+                    {% for agent in t.agent.all|clean_agents %}
+                    {{ agent }}<span style="color: #bbb;">, </span>
+                    {% endfor %}
+                </span>
+            </div>
+            <div class="mb-1"><strong>Phase:</strong> {{trial.get_phase_display }}</div>
+            <div class="mb-1"><strong>Status:</strong> {{trial.get_status_display}}</div> 
+
+        </div>
+    </div>
+</div>

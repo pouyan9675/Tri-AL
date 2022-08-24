@@ -1,0 +1,77 @@
+{% extends 'admin/base_site.html' %}
+
+{% load static %}
+{% block extrastyle %}
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'admin/css/newsletter.css'%}">
+{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid h-100 d-inline-block">
+    <h2 class="h2 my-4">Write Newsletter</h2>
+
+    <form method="post" id="newsform" action="{% url 'admin:news_publish' %}">
+        {% csrf_token %}
+        
+        <div class="row h-100">
+            <div class="col-lg-9 mb-2">
+                <div class="card h-100">
+                        <div id="editor">
+                            <h1><span style="color: rgb(0, 102, 204);">Newsletter</span><span style="color: rgb(68, 68, 68);"> Title Here!</span></h1>
+                            <p><br></p>
+                            <p>Here are some texts about your news! It can contain anything such as image or links.</p>
+                            <p><br></p>
+                            <h3><span class="ql-size-large">Introduction</span></h3>
+                            <p><br></p>
+                            <p>For example here you can write a quick introduction to your message or news</p>
+                            <p><br></p>
+                            <h2>Content</h2>
+                            <p><span style="color: rgb(68, 68, 68);">Lorem Ipsum&nbsp;is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.</span></p>
+                        </div>
+                </div>
+    
+                <div class="row justify-content-end mt-4">
+                    <input type="hidden" id="editor-holder" name="newslettercontent" value="" />
+                    <input type="hidden" id="text-holder" name="textcontent" value="" />
+                    <div class="col-lg-auto">
+                        <button type="submit" class="btn btn-primary" name="action" value="publish">Publish</button>
+                    </div>
+            
+                    <div class="col-lg-auto">
+                        <button type="submit" class="btn btn-outline-secondary" name="action" value="draft">Save as draft</button>
+                    </div>
+                </div>
+    
+            </div>
+    
+            <div class="col-lg-3 mb-2">
+                <div class="card h-100 overflow-scroll">
+                    <div class="card-body d-flex flex-column">
+                        <h1 class="card-title">Drafts</h1>
+                        <div class="card-text h-100">
+                            {% if drafts %}
+                                Drafts here!!
+                            {% else %}
+    
+                                <div class="h-100 d-flex flex-column justify-content-center align-items-center no-draft">
+                                    <img class="w-25 mb-2" src="{% static 'admin/img/empty-box.png' %}"/>
+                                    <span>No drafts to show!</span>
+                                </div>
+    
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </form>
+</div>
+
+
+
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+<script src="{% static 'admin/js/newsletter.js' %}"></script>
+
+{% endblock %}

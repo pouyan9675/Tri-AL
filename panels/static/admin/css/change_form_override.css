@@ -1,0 +1,72 @@
+.top-line {
+    border-top: 0.35rem solid rgb(13, 110, 253);
+}
+
+.selector .selector-available h2,
+.selector .selector-chosen h2  {
+    padding: 0.5rem 0;
+    margin: 1em 0 0 0;
+    color: #333;
+    font-weight: 100;
+}
+
+.select2-container--admin-autocomplete .select2-selection--multiple:hover,
+.select2-container--admin-autocomplete .select2-container--focus .select2-selection--multiple {
+    border: 1px solid rgb(13,110,253);  
+    outline: none;
+    -webkit-transition:border-color 0.5s ease;    
+    -moz-transition:border-color 0.5s ease;      
+    -o-transition:border-color 0.5s ease;         
+    transition: border-color 0.5s ease;
+}
+
+.select2-container--admin-autocomplete .select2-selection--multiple {
+    -webkit-transition:border-color 1s ease;    
+    -moz-transition:border-color 1s ease;      
+    -o-transition:border-color 1s ease;         
+    transition: border-color 1s ease;
+}
+
+span.select2-dropdown {
+    border: none;
+    box-shadow: 0 3px 10px rgb(0 0 0 / 0.2);
+    -webkit-box-shadow: 0 3px 10px rgb(0 0 0 / 0.2);
+    -moz-box-shadow: 0 3px 10px rgb(0 0 0 / 0.2);
+}
+
+.select2-results__options li.select2-results__option {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+.select2-results__option i.checked {
+    color: var(--primary);
+}
+
+.select2-results__option--highlighted i.checked {
+    color: #fff;
+}
+
+
+span.select2-container--open span.select2-selection--multiple {
+    border: 1px solid rgb(13,110,253) !important; 
+    outline: none;
+    -webkit-transition:border-color 0.5s ease;    
+    -moz-transition:border-color 0.5s ease;      
+    -o-transition:border-color 0.5s ease;         
+    transition: border-color 0.5s ease;
+}
+
+.select2-container--admin-autocomplete .select2-results__option[aria-selected=true] {
+    background-color: rgb(240, 240, 240) !important;
+    font-weight: 500;
+}
+
+.select2-container--admin-autocomplete .select2-results__option--highlighted[aria-selected] {
+    background-color: var(--primary) !important;
+}
+
+span.select2-container {
+    min-width: 360px;
+    max-width: 260px;
+}
