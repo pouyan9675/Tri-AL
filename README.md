@@ -1,12 +1,12 @@
-# VisuAL: Visual Alzheimer's Disease
+# Tri-AL: VisuAL ClinicAL TriALs
 
-Django app for Backend of Alzheimer's Disease Pipeline.
+An visualization platform to keep track of [clinicaltrials.gov](https://clinicaltrials.gov) data along with more valuable tools.
 
 Project Structure
 ------
 
     .
-    ├── panels                  # Internal app for visual project that contains core of the server
+    ├── panels                  # Internal app for tri-al project that contains core of the server
     │   ├── api                 # Files that are responsible for REST-API to communicate with front-end
     │   └── utils               # Scripts to download and parse clinicaltrials.gov data and insert them into database
     ├── visual                  # Configuration files for Django app
