@@ -1,0 +1,19 @@
+secret_key: 'ENTER-APP-KEY-HERE'
+
+# app allowed domains
+allowed_hosts:
+  - localhost
+
+# system email sending inforamtion
+email:
+  smtp: smtp.gmail.com
+  port: 587
+  username: YOUR-EMAIL
+  password: EMAIL-APP-PASSWORD
+
+admins_email:
+  - ADMIN-EMAIL
+
+# email system recipients 
+update_recipients: []
+log_recipients: []

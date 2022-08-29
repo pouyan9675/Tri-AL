@@ -14,3 +14,4 @@ back.sqlite3
 .sass-cache/*
 logs/*
 static/
+visual/config.yml
