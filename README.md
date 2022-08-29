@@ -26,7 +26,7 @@ chmod +x initdb.sh
 python3 data_manager.py import -i data/AllPublicXML
 ```
 
-6. Start project using Django and access it through browser! [127.0.0.1:8000](http://127.0.0.1:8000/)
+6. Start project using Django and access it through [browser](http://localhost:8000/admin)!
 ```console
 python3 manage.py runserver
 ```
