@@ -11,7 +11,6 @@ admin.site.index_title = 'Tri-AL administration'
 
 urlpatterns = [
     path('', views.index, name='index'),
-    path('trial/', views.change_list, name='change_list'),
     path('api/', include('panels.api.urls')),
     path('admin/', my_site.urls),
 ]

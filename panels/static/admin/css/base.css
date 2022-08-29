@@ -211,6 +211,10 @@ hr {
 
 /* TEXT STYLES & MODIFIERS */
 
+.highlight {
+    color: var(--primary);
+}
+
 .small {
     font-size: 0.6875rem;
 }

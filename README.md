@@ -1,6 +1,8 @@
 # Tri-AL: VisuAL ClinicAL TriALs
 
-An visualization platform to keep track of [clinicaltrials.gov](https://clinicaltrials.gov) data along with more valuable tools.
+![Screenshot of platform](screenshot.jpeg)
+
+An visualization platform to keep track of [clinicaltrials.gov](https://clinicaltrials.gov) data along with more valuable tools. Tri-AL allows clinicaltrials researchers explore the database in a novel way.
 
 Project Structure
 ------

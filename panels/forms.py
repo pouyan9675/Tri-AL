@@ -25,13 +25,6 @@ class TrialForm(forms.ModelForm):
             self.fields['first_end_date'] = forms.CharField(widget=TextView(), required=False, label='End Date at First Registration')
             self.fields['first_primary_completion'] = forms.CharField(widget=TextView(), required=False, label='Primary Completion Date at First Registration')
 
-
-            if self.instance.mmse_sent and len(self.instance.mmse_sent) < 400:
-                self.fields['mmse'].help_text = "Extracted Sentence: " + self.instance.mmse_sent
-            
-            if self.instance.amyloid_sent and len(self.instance.amyloid_sent) < 400:
-                self.fields['amyloid'].help_text = "Extracted Sentence: " + self.instance.amyloid_sent
-
             try:
                 if self.instance.amyloid:
                     self.initial['amyloid'] = ast.literal_eval(self.instance.amyloid)
@@ -89,9 +82,7 @@ class TrialForm(forms.ModelForm):
             bootstrap_select_class = 'form-select form-select-sm py-0 w-auto'
             self.fields['status'].widget.attrs['class'] = bootstrap_select_class
             self.fields['phase'].widget.attrs['class'] = bootstrap_select_class
-            self.fields['moa_class'].widget.attrs['class'] = bootstrap_select_class
             self.fields['location'].widget.attrs['class'] = bootstrap_select_class
-            self.fields['main_agent_type'].widget.attrs['class'] = bootstrap_select_class
 
 
     def preprocess_outcome(self, text):

@@ -3,7 +3,7 @@ from panels import views
 from panels.api import rest_views
 
 urlpatterns = [
-    path('/', views.index, name='index'),
+    # path('/', views.index, name='index'),
     path('all/', rest_views.all_trials, name='all_trials'),
     
     path('trial/nct/<nct_id>', rest_views.get_nct, name='get_nct'),

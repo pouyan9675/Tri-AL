@@ -1,3 +1,4 @@
+import time
 from base64 import decode
 from secrets import choice
 from attr import attr
@@ -14,6 +15,7 @@ from simple_history.admin import SimpleHistoryAdmin
 from django.shortcuts import render, redirect
 from sqlalchemy import desc
 
+from panels import views
 from panels.models import *
 from panels.forms import AdvancedSearchForm, TrialForm
 from panels.utils.pipeline import Pipeline
@@ -52,58 +54,54 @@ class MyAdminSite(admin.sites.AdminSite):
         return custom_urls + urls
 
 
-    def pipeline_view(self, request):
-        request.current_app = self.name
+    def index(self, request, extra_context=None):
+        print('Starting...')
+        if extra_context is None:
+            extra_context = {}
+        
+        extra_context['page_name'] = 'index'
+        now = datetime.now()
 
-        year = 2022
+        start =time.time()
+        a = time.time()
+        map_div, stat_countries, top_countries_div = self.plotter.build_map()
+        extra_context['map'] = map_div
+        extra_context['top_countries'] = top_countries_div
+        print('Building map -> {:.3f}s'.format(time.time() - a))
+        a = time.time()
 
-        context = {}
+        phase_div = self.plotter.build_phases()
+        extra_context['phases'] = phase_div
+        print('Building phases -> {:.3f}s'.format(time.time() - a))
+        a = time.time()    
 
-        pipeline = Pipeline(year=year)
+        condition_div = self.plotter.build_top_conditions()
+        extra_context['frequent_condition'] = condition_div
+        print('Building conditions -> {:.3f}s'.format(time.time() - a))
+        a = time.time()   
 
-        context['page_name'] = 'pipeline'
-        context['is_nav_sidebar_enabled'] = True
-        context['available_apps'] = self.get_app_list(request)
+        status_div = self.plotter.build_status()
+        extra_context['status'] = status_div
+        print('Building status -> {:.3f}s'.format(time.time() - a))
+        a = time.time()
 
-        context['status_summary'] = self.table_formatter.status_summary(pipeline.all_trials_no_filter(), year)
-        context['trials_summary'] = self.table_formatter.pipeline_summary(pipeline.all_trials(), year)
-        context['agents_summary'] = self.table_formatter.agent_summary(pipeline.all_trials(), year)
+        recent_update_div = self.plotter.build_update_chart(now)
+        extra_context['recent_update'] = recent_update_div
 
-        phase3, phase3_dmt = pipeline.phase_MoA(phase_n=3)
-        context['phase3moa'] = self.plotter.build_phase_dmt(phase3, phase3_dmt, 3)
-        phase2, phase2_dmt = pipeline.phase_MoA(phase_n=2)
-        context['phase2moa'] = self.plotter.build_phase_dmt(phase2, phase2_dmt, 2)
+        extra_context['stat_countries'] = stat_countries
+        print('Building updates -> {:.3f}s'.format(time.time() - a))
 
-        context['phase3agents'] = self.table_formatter.draw_trial_table(pipeline.get_agent_phase(3))
-        context['phase2agents'] = self.table_formatter.draw_trial_table(pipeline.get_agent_phase(2))
-        context['phase1agents'] = self.table_formatter.draw_trial_table(pipeline.get_agent_phase(1))
-        context['stemcell_trials'] = self.table_formatter.draw_trial_table(pipeline.get_stem_cells())
+        extra_context['stat_agents'] = '{:,}'.format(Agent.objects.all().count())
+        extra_context['stat_drugs'] = '{:,}'.format(Agent.objects.filter(type=Agent.DRUG).count())
+        extra_context['stat_trials'] = '{:,}'.format(Trial.objects.all().count())
+        extra_context['current_year'] = now.year
+        extra_context['drug_id'] = Agent.DRUG
+        extra_context['stat_conditions'] = '{:,}'.format(Condition.objects.all().count())
 
-        context['location'] = self.table_formatter.draw_distribution(pipeline.all_trials())
-        context['sponsor'] = self.table_formatter.draw_sponsor(pipeline.all_trials())
-        context['biomarkers'] = self.table_formatter.draw_biomarkers(pipeline.get_dmt_phase23())
-        context['participants'] = self.table_formatter.draw_participant(pipeline.all_trials())
-        context['dmt_cadro'] = self.plotter.dmt_cadro_bar(pipeline.all_dmt())
-
-
-
-        pipeline_trials = pipeline.all_trials()
-        context['current_year'] = year
-        context['stat_new_trials'] = pipeline_trials.filter(first_posted__year=year-1).count()
-
-        context['pipeline_new'] = context['stat_new_trials']
-        context['pipeline_last'] = pipeline_trials.count() - context['pipeline_new']
-
-        context['pipeline_total'] = pipeline_trials.count()
-        context['pipeline_completed'] = pipeline.all_trials_no_filter().filter(first_posted__year__lt=year, status='C').count()
-        context['pipeline_ongoing'] = pipeline_trials.filter(status__in=['A','E','N','R']).count()
-        context['pipeline_current_completed'] = Trial.objects.filter(last_update__year=year-1)          \
-                                                        .exclude(first_posted__year=year-1)             \
-                                                        .filter(status='C')                           \
-                                                        .count()
-
-        return HttpResponse(render(request, 'admin/pipeline.html', context))
-
+        extra_context['app_list'] = self.get_app_list(request)
+        
+        print('Total time -> {:.3f}'.format(time.time() - start))
+        return render(request, 'admin/index.html', extra_context)
 
 
     def newsletter(self, request, extra_context=None):
@@ -317,10 +315,9 @@ class TrialAdmin(SimpleHistoryAdmin):
                         'status', 
                         'phase', 
                         'agent', 
-                        'condition'
+                        'condition',
                         'title', 
                         'protocol',
-                        'repurposed',
                         ),
             }),
 
@@ -379,7 +376,6 @@ class TrialAdmin(SimpleHistoryAdmin):
                         ('primary_completion', 'first_primary_completion'), 
                         'last_update',
                         'study_duration',
-                        'exposure_duration',
                         ),
         }), 
 
@@ -387,11 +383,7 @@ class TrialAdmin(SimpleHistoryAdmin):
 
     exclude = (
             'history', 
-            'mmse_sent', 
-            'amyloid_sent', 
-            'condition', 
             'reviewed',
-            'moa_list',
             'list_charac',
             'list_biomarkers',
         )

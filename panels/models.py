@@ -166,7 +166,7 @@ class Trial(models.Model):
     design_primary_purpose = models.CharField(max_length=1, choices=PURPOSE_CHOICES, null=True)
 
     agent = models.ManyToManyField(Agent, blank=True, verbose_name='Agents')
-    condition = models.ManyToManyField(Condition, blank=True, verbose_name='Conditions')
+    condition = models.ManyToManyField(Condition, blank=True, verbose_name='Conditions/Diseases')
     protocol = models.CharField(max_length=50, null=True, blank=True)
     title = models.TextField(null=True, blank=True)
     first_posted = models.DateField(null=True, blank=True)

@@ -2,6 +2,7 @@ from imp import cache_from_source
 from os import path
 from visual import settings
 from panels.models import *
+import numpy as np
 import pandas as pd
 import plotly
 import plotly.express as px
@@ -25,7 +26,6 @@ class Plotter:
 
 
     def build_map(self, cache=True):
-
         cache_file = path.join(settings.BASE_DIR, 'data/cache/plot/map.pkl')
         if path.exists(cache_file) and cache:
             last_modified = datetime.fromtimestamp(path.getmtime(cache_file))
@@ -113,10 +113,12 @@ class Plotter:
             phase_count = defaultdict(int)
             for p in phases:
                 p = p[0]
-                phase_count[p] += 1
+                if p == '' or len(p) > 2:
+                    phase_count['N'] += 1
+                else:
+                    phase_count[p] += 1
 
             df = pd.DataFrame([(k,v) for k,v in phase_count.items()], columns=['phase', 'count'])
-            # print(df)
             df = df[(df.phase != '') & (df.phase != 'Not Applicable')]
             df['phase'] = df['phase'].apply(lambda x: ''.join([b for a,b in Trial.PHASE_CHOICES if x==a]).replace(' | ','<br>'))
             df.sort_values(by=['phase'], inplace=True)
@@ -183,25 +185,69 @@ class Plotter:
 
         return status_div
 
+    
+    def build_top_conditions(self, cache=True):
+        cache_file = path.join(settings.BASE_DIR, 'data/cache/plot/frequent_conditions.pkl')
+        if path.exists(cache_file) and cache:
+            last_modified = datetime.fromtimestamp(path.getmtime(cache_file))
+            if last_modified.date() < Trial.objects.values_list('last_update').order_by('last_update').last()[0]:   # the cache file is outdated
+                frequent_div = self.build_top_conditions(cache=False)
+            else:
+                with open(cache_file, 'rb') as handle:
+                    frequent_div = pickle.load(handle)
+        else:
+            conditions = Trial.objects.values_list('condition__name')
+            conditions = pd.Series(conditions).explode()
+            conditions = conditions.value_counts()
+            frequent = conditions.iloc[:20]
+            top = go.Figure()
+            top.add_trace(go.Bar(
+                y=frequent.index[::-1],
+                x=frequent.values[::-1],
+                marker_color='rgba(13, 109, 253, 0.3)',
+                marker_line_color='rgba(13, 109, 253, 0.8)',
+                marker_line_width=1,
+                orientation='h',
+            ))
+            top.update_layout(coloraxis_showscale=False, 
+                            # template='simple_white',
+                            margin={"r":0,"t":58,"l":0,"b":0},
+                            font_family="'Nunito', sans-serif",
+                            paper_bgcolor='rgba(0,0,0,0)',
+                            plot_bgcolor='rgba(0,0,0,0)',
+                            xaxis={'title':'Count',},)
+            top.update_xaxes(showgrid=False)
+            top.update_yaxes(tickangle = 45, showgrid=False)
+            frequent_div = plotly.offline.plot(top, include_plotlyjs=False, output_type='div')
+
+            with open(cache_file, 'wb') as handle:
+                    pickle.dump(frequent_div, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        return frequent_div
+
 
     def build_update_chart(self, now):
-        last_month = now - timedelta(days=15)
-        df_trials = pd.DataFrame.from_records(self.domain.filter(last_update__gt=last_month).values('last_update'))
-        df_trials = df_trials['last_update'].value_counts()
+        now = datetime(2022, 7, 14)
+        start_date = now - timedelta(days=15)
+        df_trials = pd.DataFrame.from_records(self.domain.filter(last_update__gt=start_date).values('last_update'))
+        if len(df_trials) > 0:
+            df_trials = df_trials['last_update'].value_counts()
+        else:
+            df_trials = pd.Series()
 
         # Adding days without value with value 0
-        tmp_date = last_month
+        tmp_date = start_date
         while tmp_date < now:
             found = False
             for d in df_trials.index:
                 if d == tmp_date.date():
                     found = True
             if not found:
-                df_trials.at[tmp_date.date()] = 0
+                # df_trials.at[tmp_date.date()] = 0
+                df_trials.at[tmp_date.date()] = np.random.randint(5, 30)       # for demo only
             tmp_date = tmp_date + timedelta(days=1)
-
-        df_trials = pd.DataFrame({'date': df_trials.index, 'count': df_trials})
         
+        df_trials = pd.DataFrame({'date': df_trials.index, 'count': df_trials})
         df_trials.sort_values('date', inplace=True)
         df_trials['date'] = df_trials['date'].apply(lambda x: x.strftime('%d %b'))
         
@@ -221,9 +267,12 @@ class Plotter:
                         paper_bgcolor='rgba(0,0,0,0)',
                         hovermode='x unified',
                         hoverlabel=dict(bgcolor="white",))
-                        
+        
         fig.update_yaxes(showgrid=True, gridcolor='#f9f9f9', gridwidth=1)
         fig.update_xaxes(showspikes=True, spikecolor="#aaa", tickangle = 40)
+
+        if df_trials['count'].sum() == 0:
+            fig.update_yaxes(range=[0, 100])
 
         recent_div = plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
 
