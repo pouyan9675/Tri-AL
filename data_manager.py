@@ -150,45 +150,10 @@ def make_pipeline():
 
 
 def manual(input_):
-    # from lxml import etree as etree_lxml
-    # total = 0
-    # for root, dirs, files in os.walk(input_):
-    #     for file in files:
-    #         if file.split('.')[-1] == 'xml':
-    #             total += 1
-    
-    # records = []
-    # with tqdm(total=total) as pbar:
-    #     for root, dirs, files in os.walk(input_):
-    #         for file in files:
-    #             if file.split('.')[-1] == 'xml':
-    #                 with open(os.path.join(root, file), 'rb') as xml:
-    #                     xml_as_bytes = xml.read()
-    #                     tree = etree_lxml.fromstring(xml_as_bytes)
-    #                     records.append({
-    #                         'nct_id' : tree.find('.//nct_id').text,
-    #                         'min_age' : tree.find('.//minimum_age').text if tree.find('.//minimum_age') is not None else None,
-    #                         'max_age' : tree.find('.//maximum_age').text if tree.find('.//maximum_age') is not None else None,
-    #                     })
-    #                     # t = Trial.objects.get(nct_id=tree.find('.//nct_id').text)
-    #                     # for condition in [c.text for c in tree.findall('.//condition', {})]:
-    #                     #     try:
-    #                     #         cond = Condition.objects.get(name=condition)
-    #                     #     except Condition.DoesNotExist:
-    #                     #         cond = Condition(name=condition)
-    #                     #         cond.save()
-    #                     #     t.condition.add(cond) 
-
-    #                 pbar.update(1)
-
-    # df = pd.DataFrame.from_dict(records)
-    # df.to_csv('data/ages.csv', index=False)
-
-    ### Cache count of countries
-    # trials = Trial.objects.all().values('nct_id', 'countries__name')
-    # df = pd.DataFrame(trials)
-    # df['countries__name'].value_counts().to_csv('data/cache/countries.csv', header=['Count'])
-
+    """
+        You can add any manual script that you want here to run it through
+        the data_manager to apply any changes to the database!
+    """
     trials = Trial.objects.values('nct_id', 
                         'condition__name',
                         'agent__name',

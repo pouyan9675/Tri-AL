@@ -2,7 +2,34 @@
 
 ![Screenshot of platform](screenshot.jpeg)
 
-An visualization platform to keep track of [clinicaltrials.gov](https://clinicaltrials.gov) data along with more valuable tools. Tri-AL allows clinicaltrials researchers explore the database in a novel way.
+An visualization platform to keep track of [clinicaltrials.gov](https://clinicaltrials.gov) data along with more valuable tools. Tri-AL allows clinicaltrials researchers explore the database in a novel way. It can be used as both standalone project and a baseline for further improvement. It is still under development and we are trying to make it as perfect as possible. 
+
+Setup
+------
+1. Install all requirements using pip command and requirements.txt file.
+```console
+pip install -r requirements.txt
+```
+
+2. Intialize database and setting up project.
+```console
+chmod +x initdb.sh
+./initdb.sh
+```
+
+3. Download the concent of clinicaltrials.gov from [here](https://clinicaltrials.gov/AllPublicXML.zip) as a zip file to initialize database.
+
+4. Unzip the `AllPublicXML.zip` and place the content under `data` in the project root. For example `data/AllPublicXML/`.
+
+5. Import all the XML files to the database.
+```console
+python3 data_manager.py import -i data/AllPublicXML
+```
+
+6. Start project using Django and access it through browser! [127.0.0.1:8000](http://127.0.0.1:8000/)
+```console
+python3 manage.py runserver
+```
 
 Project Structure
 ------
