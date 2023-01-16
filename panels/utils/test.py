@@ -1,9 +1,9 @@
-import customize
+from panels.utils.customize import Functions
 
 
-names = [name for name in dir(customize.Functions) if not name.startswith('__')] # excluding system functions
-functions = [f for f in names if callable(getattr(customize.Functions, f))]
-functions = [getattr(customize.Functions, f) for f in functions]
+names = [name for name in dir(Functions) if not name.startswith('__')] # excluding system functions
+functions = [f for f in names if callable(getattr(Functions, f))]
+functions = [getattr(Functions, f) for f in functions]
 
 # print(functions)
 
