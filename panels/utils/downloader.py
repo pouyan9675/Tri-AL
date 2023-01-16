@@ -15,7 +15,7 @@ END_KEY = 'lupd_e'               # First Posted Ending Date Key
 SLASH_CODE = '%2F'          # The encoded characters for backslash (\) in url
 
 
-def validate_date(date):
+def validate_date(date: str) -> datetime.datetime:
     """
         Checks if a string is valid date format
 
@@ -35,7 +35,7 @@ def validate_date(date):
         raise argparse.ArgumentTypeError(msg)
 
 
-def encode_url(url):
+def encode_url(url: str) -> str:
     """
         Encode characters of a URL to a format that can be transmitted over web
 
@@ -64,7 +64,7 @@ def download_file(url, save_name='SearchResults'):
     open(settings.BASE_DIR+'/data/'+save_name+'.csv', 'wb').write(r.content)
 
 
-def get_trial(nct_id, columns=None):
+def get_trial(nct_id: str, columns=None) -> dict:
     """
         Download a trials using pytrials API
 
