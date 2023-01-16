@@ -144,10 +144,6 @@ def clear_fill():
     fill_data()
 
 
-def make_pipeline():
-    styled = export_pipeline(2022)
-    styled.to_excel('pipe.xlsx')
-
 
 def manual(input_):
     """
@@ -197,7 +193,5 @@ if __name__ == '__main__':
         manual(args.input)
     elif args.action == 'terminal':
         embed()
-    elif args.action == 'pipeline':
-        make_pipeline()
     elif args.action == 'export':
         export_to_pandas()

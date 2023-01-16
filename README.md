@@ -2,7 +2,7 @@
 
 ![Screenshot of platform](screenshot.jpeg)
 
-An visualization platform to keep track of [clinicaltrials.gov](https://clinicaltrials.gov) data along with more valuable tools. Tri-AL allows clinicaltrials researchers explore the database in a novel way. It can be used as both standalone project and a baseline for further improvement. It is still under development and we are trying to make it as perfect as possible. 
+[Clinicaltrials.gov](https://clinicaltrials.gov) is a website that people all around the world submit the progress and the information of the medical trials on it. Tir-AL is a visualization platform to keep track of clinicaltrials.gov data along with more valuable tools. Tri-AL allows clinicaltrials researchers explore the database in a novel way. It can be used as both standalone project and a baseline for further improvement. It is still under development and we are trying to make it as perfect as possible. 
 
 Setup
 ------
@@ -19,7 +19,7 @@ chmod +x initdb.sh
 
 3. Download the concent of clinicaltrials.gov from [here](https://clinicaltrials.gov/AllPublicXML.zip) as a zip file to initialize database.
 
-4. Unzip the `AllPublicXML.zip` and place the content under `data` in the project root. For example `data/AllPublicXML/`.
+4. Unzip the `AllPublicXML.zip` and place the content under `data` directory in the project root. For example `data/AllPublicXML/`.
 
 5. Import all the XML files to the database.
 ```console

@@ -1,7 +1,7 @@
 from simple_history.models import HistoricalRecords
 from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator
-from panels.utils import downloader
+from panels.utils import downloader, customize
 from visual import settings
 
 
@@ -226,6 +226,10 @@ class Trial(models.Model):
     # system variables
     reviewed = models.BooleanField(default=False)
     history = HistoricalRecords()
+
+    # adding user defined columns
+    vars().update(customize.Database.columns)
+
 
 
     def __str__(self):

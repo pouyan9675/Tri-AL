@@ -6,7 +6,7 @@
 from posixpath import join
 
 from pandas.core.arrays.sparse import dtype
-from panels.utils import downloader, tools
+from panels.utils import downloader, tools, customize
 from panels.models import *
 from panels.utils.comparator import *
 from visual import settings
@@ -142,38 +142,8 @@ def build_columns(data: pd.DataFrame):
         Performing calculations that need other rows as well (such as mean, std, etc.)
     """
 
-    # data['Enrollment'] = data['Enrollment'].fillna(0)
-
-    # condition = data['ArmsNumber'] != 0 & data['ArmsNumber'].notna()
-    # tmp = data[condition]['Enrollment'].astype(int) / data[condition]['ArmsNumber'].astype(int)
-
-    # data['PerArm'] = tmp
-    # data['PerArm'] = data['PerArm'].fillna(0).astype(int)
-
-    # data['FunderType'] = data['LeadSponsorClass'].apply(lambda x: x.split('_')[-1][0])
-    # data['FunderType'] = data['Sponsors']['Lead']['Type'].split('_')[-1][0] if data['Sponsors']['Lead'] and data['Sponsors']['Lead']['Type'] else None,
-
-    # data['Phases'] = data['Phases'].fillna('').str.replace('Phase ', '', regex=False).str.replace('|', '', regex=False).str.replace('Not Applicable', 'N', regex=False).fillna('N')
-    # data['Status'] = data['OverallStatus'].apply(lambda x: x[0])
-    # data['DesignPrimaryPurpose'] = data['DesignPrimaryPurpose'].apply(lambda x: x[0] if x[0] != 'S' else x[1])
-    # data['StudyDuration'] = abs(pd.to_datetime(data['Start Date']) - pd.to_datetime(data['CompletionDate'])).apply(lambda x: x.days).fillna(0)
-
-    # data['TreatmentDuration'] = data['PrimaryOutcomeTimeFrame'].apply(lambda x: '\n'.join(x) if x else None)
-    # data['TreatmentDurationDays'] = data['PrimaryOutcomeTimeFrame'].apply(extract_treatment_duration)
-    # data['TreatmentDurationWeeks'] = data['PrimaryOutcomeTimeFrame'].apply(lambda x : round(extract_treatment_duration(x, time_unit='w'), 3))
-
-    # data[data['LocationCountry'].notna()]['SitesCount'] = data['LocationCountry'].notna().apply(len)
-    # data['LocationCountry'] = data['LocationCountry'].astype(set)
-    # data['Location'] = data['LocationCountry'].apply(Trial.location_symbol)
-
-    # data['EligibilityCriteria'] = data['EligibilityCriteria'].str.replace('|', '\n', regex=False)
-
-    # data['Condition'] = data['Condition'].apply(lambda x: '\n'.join(x) if isinstance(x, list) else x)
-
-    # for d in DATE_COLUMNS:
-    #     data[d] = pd.to_datetime(data[d])
-    #     data[d] = data[d].astype(object).where(data[d].notnull(), None)
-
+    for func in customize.get_functions():              # applying user defined fucntions
+        data[func.column] = data.apply(func, axis=1)
 
     data['StudyDuration'] = data['Date'].apply(lambda x: (tools.read_date(x['Completion']) - tools.read_date(x['Start'])).days if x['Completion'] and x['Start'] else None)
     valid = data[data['Enrollment'].notna() & data['ArmsNumber'].notna() & data['ArmsNumber'] != 0]
@@ -181,6 +151,7 @@ def build_columns(data: pd.DataFrame):
     data['PerArm'] = data['PerArm'].fillna(0)
     data['NumSites'] = data['Locations'].apply(len)
     data['Phase'] = data['Phase'].fillna('N').apply(lambda x: re.sub(r'\s|\||Phase|/', '', x.replace('N/A', 'N')))
+
 
     return data
 
