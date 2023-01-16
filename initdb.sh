@@ -1,8 +1,7 @@
 #!/bin/bash
 rm -r panels/migrations
-./manage.py makemigrations panels
-./manage.py migrate
-./manage.py loaddata panels/fixtures/Country.json
-./manage.py loaddata panels/fixtures/Funder.json
-./data_manager.py cleanfill
-./manage.py createsuperuser
+python3 manage.py makemigrations panels
+python3 manage.py migrate
+python3 manage.py loaddata panels/fixtures/Country.json
+python3 data_manager.py cleanfill
+python3 manage.py createsuperuser
