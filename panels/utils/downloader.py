@@ -15,7 +15,7 @@ END_KEY = 'lupd_e'               # First Posted Ending Date Key
 SLASH_CODE = '%2F'          # The encoded characters for backslash (\) in url
 
 
-def validate_date(date: str) -> datetime.datetime:
+def validate_date(date: str) -> datetime:
     """
         Checks if a string is valid date format
 
