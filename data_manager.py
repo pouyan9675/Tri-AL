@@ -25,23 +25,9 @@ from panels.utils.notification.notification import notify_update
 
 
 parser = argparse.ArgumentParser(description='Process and manages data into the database for further use.')
-actions = ('cleanfill', 'removejunk', 'import', 'update', 'manual', 'terminal', 'pipeline', 'export')
+actions = ('removejunk', 'import', 'update', 'manual', 'terminal', 'pipeline', 'export')
 parser.add_argument('action', help='Actions to perform on database.', choices=actions)
 parser.add_argument('--input', '-i', help='Input file or directory.')
-
-
-def fill_data():
-    """
-        Downloads all data from the http://clinicaltrials.gov/ and 
-        process them to save in database.
-
-        - Return
-        ============================
-        + list : A list of primary keys of the objects that have inserted or updated
-    """
-    downloader.download_trials(f_name='alz-data')       # get from server
-    data = processor.generate_data('alz-data.csv')      # building dataframe from downloaded file
-    pks = processor.build_objects(data)                # builds and insert data and return generated data
     
 
 
@@ -139,10 +125,6 @@ def _import(input_dir: str) -> dict:
     return trials        
 
 
-def clear_fill():
-    clear_data()
-    fill_data()
-
 
 
 def manual(input_):
@@ -179,9 +161,7 @@ def export_to_pandas():
 if __name__ == '__main__':
     args = parser.parse_args()
 
-    if args.action == 'cleanfill':
-        clear_fill()
-    elif args.action == 'removejunk':
+    if args.action == 'removejunk':
         remove_junk()
     elif args.action == 'import':
         _import(args.input)
