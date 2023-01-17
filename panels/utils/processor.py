@@ -136,7 +136,7 @@ def download_columns(data: pd.DataFrame) -> pd.DataFrame:
     return data
 
 
-def build_columns(data: pd.DataFrame):
+def build_columns(data: pd.DataFrame) -> pd.DataFrame:
     """
         Build the columns that are not present in the clinicaltrials.gov database explicitly.
         Performing calculations that need other rows as well (such as mean, std, etc.)
@@ -151,7 +151,6 @@ def build_columns(data: pd.DataFrame):
     data['PerArm'] = data['PerArm'].fillna(0)
     data['NumSites'] = data['Locations'].apply(len)
     data['Phase'] = data['Phase'].fillna('N').apply(lambda x: re.sub(r'\s|\||Phase|/', '', x.replace('N/A', 'N')))
-
 
     return data
 
@@ -284,9 +283,6 @@ def data_mapper(row: dict) -> Trial:
         first_end_date = tools.read_date(row['Date']['Completion']),
         last_update = tools.read_date(row['Date']['LastUpdate']),
         study_duration = row['StudyDuration'],
-        # treatment_duration = row['TreatmentDuration'],
-        # treatment_weeks = row['TreatmentDurationWeeks'],
-        # treatment_days = row['TreatmentDurationDays'],
         enroll_number = row['Enrollment'],
         arms_number = row['ArmsNumber'],
         per_arm = row['PerArm'],

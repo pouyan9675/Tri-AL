@@ -25,9 +25,10 @@ from panels.utils.notification.notification import notify_update
 
 
 parser = argparse.ArgumentParser(description='Process and manages data into the database for further use.')
-actions = ('removejunk', 'import', 'update', 'manual', 'terminal', 'pipeline', 'export')
+actions = ('import', 'update', 'manual', 'terminal', 'export')
 parser.add_argument('action', help='Actions to perform on database.', choices=actions)
 parser.add_argument('--input', '-i', help='Input file or directory.')
+parser.add_argument('--output', '-o', help='The name of output file.')
     
 
 
@@ -84,13 +85,6 @@ def update_data(csv_name):
     return new_pk, updated_pk
 
 
-def remove_junk():
-    Trial.objects.filter(status='Completed').delete()
-    Trial.objects.filter(status='Terminated').delete()
-    Trial.objects.filter(status='Suspended').delete()
-    Trial.objects.filter(status='Unknown status').delete()
-    Trial.objects.filter(status='Withdrawn').delete()
-
 
 def _import(input_dir: str) -> dict:
     """
@@ -114,9 +108,14 @@ def _import(input_dir: str) -> dict:
                     with open(os.path.join(root, file)) as xml:
                         xml_parser = XMLParser(xml.read())
                         data = xml_parser.data
-                        # TODO: Make it more efficient by having all trials as a 
-                        # single dataframe and write all at the same time (bulk update)
-                        t = processor.data_mapper(data)
+
+                        # TODO: Make it more efficient by having all 
+                        # trials as a single dataframe and write all 
+                        # at the same time (bulk update)
+
+                        row = pd.DataFrame.from_dict([data])
+                        row = processor.build_columns(row)
+                        t = processor.data_mapper(row.to_dict(orient='index')[0])
                         trials.append(t)
                     pbar.update(1)
 
@@ -136,7 +135,6 @@ def manual(input_):
                         'title',
                         'brief_summary',
                         'description',
-                        # 'arms',
                         'primary_outcome',
                         'secondary_outcome',
                         'other_outcome'
@@ -150,21 +148,23 @@ def manual(input_):
 
 
 
-def export_to_pandas():
+def export_to_csv(file_name='export.csv'):
+    """
+        Export and save whole database to a CSV file for simple analysis
+    """
     trials = Trial.objects.all()
     df = pd.DataFrame(list(trials.values()))
-    df.to_csv('export.csv')
+    df.to_csv(file_name)
+
 
 
 if __name__ == '__main__':
     args = parser.parse_args()
 
-    if args.action == 'removejunk':
-        remove_junk()
-    elif args.action == 'import':
+    if args.action == 'import':
         _import(args.input)
     elif args.action == 'update':
-        # download_update()
+        download_update()
         new_pk, updated_pk = update_data('update.csv')
         notify_update(new_pk, updated_pk, datetime.now())
     elif args.action == 'manual':
@@ -172,4 +172,7 @@ if __name__ == '__main__':
     elif args.action == 'terminal':
         embed()
     elif args.action == 'export':
-        export_to_pandas()
+        if args.output:
+            export_to_csv(args.output)
+        else:
+            export_to_csv()
