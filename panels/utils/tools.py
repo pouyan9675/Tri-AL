@@ -34,33 +34,7 @@ def create_object(data: dict) -> Trial:
         XML file. To use this function there is no need to call parse function
         since it will be called in the constructor.
     """
-    t = Trial(
-            # nct_id = data['NCTID'],
-            # status = data['Status'][0],
-            # phase  = re.sub(r'\s|\||Phase|/', '', data['Phase'].replace('N/A', 'N')) if data['Phase'] else 'N',
-            # design_primary_purpose = Trial.get_char(Trial.PURPOSE_CHOICES, data['StudyDesign']['PrimaryPurpose']),
-            # protocol = data['Protocol'],
-            # title = data['Title'],
-            # first_posted = read_date(data['Date']['FirstPosted']),
-            # start_date = read_date(data['Date']['Start']),
-            # end_date = read_date(data['Date']['Completion']),
-            # primary_completion = read_date(data['Date']['PrimaryCompletion']),
-            # last_update = read_date(data['Date']['LastUpdate']),
-            # primary_outcome = data['Outcome']['Primary'],
-            # secondary_outcome = data['Outcome']['Secondary'],
-            # other_outcome = data['Outcome']['Other'],
-            # eligibility_criteria = data['Criteria'],
-            # enroll_number = data['Enrollment'],
-            # arms_number = data['ArmsNumber'],
-            # per_arm = int(data['Enrollment']) / int(data['ArmsNumber']) if data['ArmsNumber'] and data['Enrollment'] and data['ArmsNumber'] != 0 else None,
-            # brief_summary = data[ 'Summary']['Brief'],
-            # location_str = data['LocationsString'],
-            # num_sites = len(data['Locations']),
-            # funder_type = data['Sponsors']['Lead']['Type'].split('_')[-1][0] if data['Sponsors']['Lead'] and data['Sponsors']['Lead']['Type'] else None,
-            # study_duration = (read_date(data['Date']['Completion']) - read_date(data['Date']['Start'])).days if data['Date']['Completion'] and data['Date']['Start'] else None,
-            # min_age = re.search(r'\d+', data['Age']['Min']).group() if data['Age']['Min'] and re.search(r'\d+', data['Age']['Min']) else None,
-            # max_age = re.search(r'\d+', data['Age']['Max']).group() if data['Age']['Max'] and re.search(r'\d+', data['Age']['Max']) else None,
-        )
+    t = Trial()
 
     if len(data['Countries']) == 1 and 'United States' in data['Countries']:
         t.location = Trial.US

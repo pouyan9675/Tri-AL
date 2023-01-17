@@ -114,12 +114,10 @@ def _import(input_dir: str) -> dict:
                     with open(os.path.join(root, file)) as xml:
                         xml_parser = XMLParser(xml.read())
                         data = xml_parser.data
-                        # df = tools.trial_to_dataframe(data)
-                        # data = processor.build_columns(data)
-                        # processor.build_objects(data)
-                        # TODO: Make it more efficient by having all trials as a single dataframe and write all at the same time (bulk update)
-                        processor.data_mapper()
-                        tools.create_object(data)
+                        # TODO: Make it more efficient by having all trials as a 
+                        # single dataframe and write all at the same time (bulk update)
+                        t = processor.data_mapper(data)
+                        trials.append(t)
                     pbar.update(1)
 
     return trials        
