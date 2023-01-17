@@ -37,6 +37,11 @@ def clear_data():
         Clears the data from database
     """
     Trial.objects.all().delete()
+    Agent.objects.all().delete()
+    Condition.objects.all().delete()
+    Biomarker.objects.all().delete()
+    Sponsor.objects.all().delete()
+    UpdatesLog.objects.all().delete()
 
 
 def download_update(f_name='update'):
@@ -55,7 +60,7 @@ def download_update(f_name='update'):
                                 f_name=f_name)        
 
 
-def update_data(csv_name):
+def update_data(csv_name: str) -> list:
     """
         Updates the databaset using given csv file
 
@@ -116,7 +121,8 @@ def _import(input_dir: str) -> dict:
                         row = pd.DataFrame.from_dict([data])
                         row = processor.build_columns(row)
                         t = processor.data_mapper(row.to_dict(orient='index')[0])
-                        trials.append(t)
+                        trials[data['NCTID']] = t
+
                     pbar.update(1)
 
     return trials        
