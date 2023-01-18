@@ -6,7 +6,7 @@
 
 Setup
 ------
-1. Install all requirements using pip command and requirements.txt file.
+1. Activate environment and install all requirements using pip command and requirements.txt file.
 ```console
 pip install -r requirements.txt
 ```
