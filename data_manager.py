@@ -25,7 +25,7 @@ from panels.utils.notification.notification import notify_update
 
 
 parser = argparse.ArgumentParser(description='Process and manages data into the database for further use.')
-actions = ('import', 'update', 'manual', 'terminal', 'export')
+actions = ('import', 'update', 'manual', 'terminal', 'export', 'cleardata')
 parser.add_argument('action', help='Actions to perform on database.', choices=actions)
 parser.add_argument('--input', '-i', help='Input file or directory.')
 parser.add_argument('--output', '-o', help='The name of output file.')
@@ -182,3 +182,5 @@ if __name__ == '__main__':
             export_to_csv(args.output)
         else:
             export_to_csv()
+    elif args.action == 'cleardata':
+        clear_data()
