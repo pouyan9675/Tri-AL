@@ -230,7 +230,7 @@ class XMLParser:
 
     def __init__(self, xml: str):
         self.xml = xml
-        self.soup = BeautifulSoup(xml, 'xml')
+        self.soup = BeautifulSoup(xml, 'lxml')
         self.data = self._parse()
         self.data['LocationsString'] = self.get_formatted_locations()
 
@@ -358,6 +358,290 @@ class XMLParser:
         return data
 
 
+    def get_formatted_locations(self):
+        """
+            Returns the locations in a formatted string:
+                Name, City, State, Country
+        """
+        result = []
+        for l in self.data['Locations']:
+            addr = ', '.join([v for k,v in l.items() if v != None and k != 'Status'])
+            result.append(addr)
+            
+        return '\n'.join(result)
+
+
+
+class XMLFastParser:
+    def __init__(self, xml: str):
+        self.xml = xml
+        self.tree = etree_lxml.fromstring(xml)
+        self.data = self._parse()
+        self.data['LocationsString'] = self.get_formatted_locations()
+
+
+
+    def _get_text(self, xpath: str) -> str:
+        """
+            Returns the text content of a tag if exisits and returns 
+            None if the tag not exists in the XML
+        """
+        node = self.tree.find(xpath)
+        if node:
+            return node.text
+        else:
+            return None
+
+    
+    def _parse(self):
+        """
+            Parses the XML data into a dictionary
+
+            - Return
+            ============================
+            + dict : A dictionary of parsed data
+        """
+        data = {}
+
+        data['NCTID'] = self.tree.findtext('.//nct_id')
+        data['Phase'] = self.tree.findtext('.//phase')
+        data['Status'] = self.tree.findtext('.//overall_status')
+
+
+        data['StudyDesign'] = {}
+        data['StudyDesign']['Allocation'] = self.tree.findtext('.//allocation')
+        data['StudyDesign']['PrimaryPurpose'] = self.tree.findtext('.//primary_purpose')
+
+        data['StudyType'] = self.tree.findtext('.//study_type')
+
+        data['Agents'] = []
+        for intervention in self.tree.findall('.//intervention'):
+            data['Agents'].append({
+                'Name' : intervention.findtext('.//intervention_name'),
+                'Type' : intervention.findtext('.//intervention_type'),
+                'Description' : intervention.findtext('.//description'),
+            })
+
+        data['Conditions'] = [c.text for c in self.tree.findall('.//condition')]
+        data['Protocol'] = self.tree.findtext('.//org_study_id')
+        data['Title'] = self.tree.findtext('.//official_title') or self.tree.findtext('.//brief_title')
+        
+        data['Date'] = {
+            'FirstPosted' : {},
+            'Start' : {},
+            'LastUpdate' : {},
+            'PrimaryCompletion' : {},
+            'Completion' : {},
+        }
+        data['Date']['FirstPosted'] = self.tree.findtext('.//study_first_posted')
+        data['Date']['Start'] = self.tree.findtext('.//start_date')
+        data['Date']['LastUpdate'] = self.tree.findtext('.//last_update_submitted')
+        data['Date']['PrimaryCompletion'] = self.tree.findtext('.//primary_completion_date')
+        data['Date']['Completion'] = self.tree.findtext('.//completion_date')
+
+        data['Summary'] = {
+            'Brief' : {},
+            'Detailed' : {},
+        }
+        data['Summary']['Brief'] = self.tree.findtext('.//brief_summary/textblock'),
+        data['Summary']['Detailed'] = self.tree.findtext('.//detailed_description/textblock'),
+
+        data['Outcome'] = {
+            'Primary' : [],
+            'Secondary' : [],
+            'Other' : [],
+        }
+        for primary in self.tree.findall('.//primary_outcome'):
+            data['Outcome']['Primary'].append({
+                'Measure' : primary.findtext('.//measure'),
+                'TimeFrame' : primary.findtext('.//time_frame'),
+                'Description' : primary.findtext('.//description'),
+            })
+        
+        for secondary in self.tree.findall('.//secondary_outcome'):
+            data['Outcome']['Secondary'].append({
+                'Measure' : secondary.findtext('.//measure'),
+                'TimeFrame' : secondary.findtext('.//time_frame'),
+                'Description' : secondary.findtext('.//description'),
+            })
+
+        for other in self.tree.findall('.//other_outcome'):
+            data['Outcome']['Other'].append({
+                'Measure' : other.findtext('.//measure'),
+                'TimeFrame' : other.findtext('.//time_frame'),
+                'Description' : other.findtext('.//description'),
+            })
+
+        data['Criteria'] = self.tree.findtext('.//criteria/textblock')
+        data['Enrollment'] = self.tree.findtext('.//enrollment')
+        
+        data['ArmGroups'] = []
+        for arm in self.tree.findall('.//arm_group'):
+            data['ArmGroups'].append({
+                'Label' : arm.findtext('.//arm_group_label'),
+                'Type'  : arm.findtext('.//arm_group_type'),
+            })
+        data['ArmsNumber'] = len(data['ArmGroups'])
+
+        data['Sponsors'] = {}
+        data['Sponsors']['Lead'] = {
+            'Name' : self.tree.findtext('.//sponsors/lead_sponsor/agency'),
+            'Type' : self.tree.findtext('.//sponsors/lead_sponsor/agency_class'),
+        }
+        # data['Sponsors']['All'] = [data['Sponsors']['Lead']]
+        # for colab in self.tree.findall('.//List[@Name="CollaboratorList"]/Field[@Name="Collaborator"]'):
+        #     data['Sponsors']['All'].append({
+        #         'Name' : colab.findtext('.//Field[@Name="CollaboratorName"]'),
+        #         'Type' : colab.findtext('.//Field[@Name="CollaboratorClass"]'),
+        #     })
+
+        data['Age'] = {
+            'Min' : self.tree.findtext('.//minimum_age'),
+            'Max' : self.tree.findtext('.//maximum_age'),
+        }
+
+        data['Gender'] = self.tree.findtext('.//gender')
+
+        data['Locations'] = []
+        for loc in self.tree.findall('.//location'):
+            information = {
+                'Name'  : loc.findtext('.//facility/name'),
+                'City'  : loc.findtext('.//facility/address/city'),
+                'State'  : loc.findtext('.//facility/address/state'),
+                'Country'  : loc.findtext('.//facility/address/country'),
+                'ZipCode'  : loc.findtext('.//facility/address/zip'),
+            }
+            data['Locations'].append(information)
+
+        data['Countries'] = set([f['Country'] for f in data['Locations'] if f['Country'] != None])
+
+        data['Keywords'] = [t.text for t in self.tree.findall('.//keyword')]
+        data['ConditionMesh'] = [m.text for m in self.tree.findall('.//condition_browse/mesh_term')]
+        data['InterventionMesh'] = [m.text for m in self.tree.findall('.//intervention_browse/mesh_term')]
+
+        data['HasResults'] = self.tree.find('.//clinical_results') != None
+        
+        data['Result'] = {}
+        data['Result']['Flow'] = {}
+
+        data['Result']['Flow']['Groups'] = {}
+        for group in self.tree.findall('.//participant_flow/group_list/group'):
+            data['Result']['Flow']['Groups'][group.get('group_id')] = {
+                'title' : group.findtext('.//title'),
+                'description' : group.findtext('.//description'),
+            }
+
+        
+        # Time Periods
+        data['Result']['Flow']['TimePeriods'] = {}
+        for period in self.tree.findall('.//participant_flow/period_list/period'):
+            milestones = {}
+            for milestone in period.findall('.//milestone_list/milestone'):
+                title = milestone.findtext('.//title')
+                participants = {}
+                for p in milestone.findall('.//participants_list/participants'):
+                    participants[p.get('group_id')] = p.get('count')
+                milestones[title] = participants
+
+            data['Result']['Flow']['TimePeriods'][period.findtext('.//title')] = milestones
+
+
+        # Baseline
+        data['Result']['Baseline'] = {}
+
+        data['Result']['Baseline']['Groups'] = []
+        for group in self.tree.findall('.//baseline/group_list/group'):
+            gp = {
+                'id' : p.get('group_id'),
+                'title' : group.findtext('.//title'),
+                'description' : group.findtext('.//description'),
+            }
+            data['Result']['Baseline']['Groups'].append(gp)
+
+
+        data['Result']['Baseline']['Analyzed'] = []
+        for analyzed in self.tree.findall('.//baseline/analyzed_list/analyzed'):
+            a = {
+                'unit' : analyzed.findtext('.//units'),
+                'scope' : analyzed.findtext('.//scope'),
+                'counts' : {c.get('group_id') : c.get('value')  for c in analyzed.findall('.//count_list/count')},
+            }
+            data['Result']['Baseline']['Analyzed'].append(a)
+
+        
+        data['Result']['Baseline']['Measure'] = []
+        for measure in self.tree.findall('.//baseline/measure_list/measure'):
+            m = {
+                'title' : measure.findtext('.//title'),
+                'units' : measure.findtext('.//units'),
+                'param' : measure.findtext('.//param'),
+                'dispersion' : measure.findtext('.//dispersion'),
+            }
+            measurements = {}
+            for category in measure.findall('.//category_list/category'):
+                title = category.findtext('.//title')
+                values = []
+                for mea in category.findall('.//measurement'):
+                    values.append({
+                        'group_id' : mea.get('group_id'),
+                        'value' : mea.get('value'),
+                        'lower_limit' : mea.get('lower_limit'),
+                        'upper_limit' : mea.get('upper_limit'),
+                    })
+                measurements[title] = values
+
+            m['Measurements'] = measurements
+
+            data['Result']['Baseline']['Measure'].append(m)
+
+
+        return data
+
+
+    def _preprocess_data(self, data):
+        """
+            A function to perfrom preprocess to data in parser level
+
+            - Parameters
+            ============================
+            + data:  A dictionary of parsed data
+
+            
+            - Return
+            ============================
+            + dict : Preprocessed data
+        """
+        data['PrimaryOutcome'] = self._format_outcome(data["PrimaryOutcomeMeasure"], data["PrimaryOutcomeTimeFrame"], data["PrimaryOutcomeDescription"])
+        data['SecondaryOutcome'] = self._format_outcome(data["SecondaryOutcomeMeasure"], data["SecondaryOutcomeTimeFrame"], data["SecondaryOutcomeDescription"])
+        data['OtherOutcome'] = self._format_outcome(data["OtherOutcomeMeasure"], data["OtherOutcomeTimeFrame"], data["OtherOutcomeDescription"])
+
+        for k, v in data.items():
+            if k == 'PrimaryOutcomeTimeFrame':  # overriding process
+                data[k] = set(v)
+
+
+        return data
+
+
+    def _format_outcome(self, measeure, time, desc):
+
+        outcome_measure = []
+
+        if len(measeure) == len(time) and len(time) == len(desc):
+            for m, t, d in zip(measeure, time, desc):
+                outcome_measure.append('- ' + m + ' [Time Frame: ' + t + ']\n\t' + d)
+        elif len(measeure) == len(time):
+            for m, t in zip(measeure, time):
+                outcome_measure.append('- ' + m + ' [Time Frame: ' + t + ']')
+        elif len(measeure) == len(desc):
+            for m, d in zip(measeure, desc):
+                outcome_measure.append('- ' + m + ' \n\t' + d)
+        else:
+            for m in measeure:
+                outcome_measure.append('- ' + m)
+        return '\n\n'.join(outcome_measure)
+
+    
     def get_formatted_locations(self):
         """
             Returns the locations in a formatted string:
