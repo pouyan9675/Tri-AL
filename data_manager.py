@@ -18,7 +18,7 @@ from IPython import embed
 from visual import settings
 from datetime import datetime, date
 from panels.models import *
-from panels.utils.parser import XMLParser
+from panels.utils.parser import XMLFastParser
 from panels.utils import downloader, processor, tools
 from panels.utils.pipeline import export_pipeline
 from panels.utils.notification.notification import notify_update
@@ -111,7 +111,7 @@ def _import(input_dir: str) -> dict:
                     if file.split('.')[0] in existing:
                         continue
                     with open(os.path.join(root, file)) as xml:
-                        xml_parser = XMLParser(xml.read())
+                        xml_parser = XMLFastParser(xml.read())
                         data = xml_parser.data
 
                         # TODO: Make it more efficient by having all 
