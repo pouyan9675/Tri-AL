@@ -340,3 +340,19 @@ class Newsletter(models.Model):
 class UpdatesLog(models.Model):
     update_counts = models.SmallIntegerField()
     udpate_date = models.DateField()
+
+
+
+class DataCache(models.Model):
+    """
+        A table to save parameters to cache values that are expensive to calculate 
+        for example: values of charts for whole database
+    """
+    category = models.TextField(null=True)
+    sub_category = models.TextField(null=True)
+    name = models.TextField()
+    str_value = models.TextField()
+    additional_value = models.TextField(null=True)
+    int_value = models.IntegerField(null=True)
+    created_at = models.DateField(auto_now_add=True)
+    last_modified = models.DateTimeField(auto_now=True)
