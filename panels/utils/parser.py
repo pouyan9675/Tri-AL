@@ -488,12 +488,12 @@ class XMLFastParser:
             'Name' : self.tree.findtext('.//sponsors/lead_sponsor/agency'),
             'Type' : self.tree.findtext('.//sponsors/lead_sponsor/agency_class'),
         }
-        # data['Sponsors']['All'] = [data['Sponsors']['Lead']]
-        # for colab in self.tree.findall('.//List[@Name="CollaboratorList"]/Field[@Name="Collaborator"]'):
-        #     data['Sponsors']['All'].append({
-        #         'Name' : colab.findtext('.//Field[@Name="CollaboratorName"]'),
-        #         'Type' : colab.findtext('.//Field[@Name="CollaboratorClass"]'),
-        #     })
+        data['Sponsors']['All'] = [data['Sponsors']['Lead']]
+        for colab in self.tree.findall('.//List[@Name="CollaboratorList"]/Field[@Name="Collaborator"]'):
+            data['Sponsors']['All'].append({
+                'Name' : colab.findtext('.//Field[@Name="CollaboratorName"]'),
+                'Type' : colab.findtext('.//Field[@Name="CollaboratorClass"]'),
+            })
 
         data['Age'] = {
             'Min' : self.tree.findtext('.//minimum_age'),

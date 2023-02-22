@@ -1,0 +1,23 @@
+{% extends 'admin/base_site.html' %}
+{% load i18n static %}
+
+{% block content %}
+
+<div class="container-lg py-4">
+    <div class="row">
+        <div class="card mb-2">
+            <div class="card-body">
+                <h1 class="card-title">Race/Ethnicity & Gender Analysis (2000-2022)</h1>
+                <img class="px-5 my-4" src="{% static 'admin/img/analysis/gender-race.png' %}">
+                <p class="text-center mb-5">Trials reported gender and race/ethnicity from 2000 to 2022 </p>
+                <img class="px-5 my-4" src="{% static 'admin/img/analysis/race-comp.png' %}">
+                <p class="text-center mb-5">Comparison of top 5 races reported in trials that reported race/ethnicity</p>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+
+{% endblock %}

@@ -21,6 +21,12 @@
                         <span class="nav__name">Advanced Search</span>
                     </a>
 
+
+                    <a href="{% url 'admin:minority' %}" class="nav__link {% if page_name and page_name == 'minority' %}active{% endif %}">
+                        <i class='bx bx-scatter-chart nav__icon' ></i>
+                        <span class="nav__name">Minority Analysis</span>
+                    </a>
+
                 </div>
 
 

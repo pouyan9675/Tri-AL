@@ -49,6 +49,7 @@ class MyAdminSite(admin.sites.AdminSite):
             path('newsletter/', self.admin_view(self.newsletter), name="newsletter"),
             path('newsletter/save', self.admin_view(self.newsletter_save), name="news_publish"),
             path('advanced/', self.admin_view(self.advanced_search), name="advanced_search"),
+            path('minority/', self.admin_view(self.minority), name="minority"),
             path('ajax/search/', self.ajax_search, name="ajax_search"),
         ]
         return custom_urls + urls
@@ -179,6 +180,20 @@ class MyAdminSite(admin.sites.AdminSite):
 
     def message(self, request, extra_context=None):
         return HttpResponse(render(request, 'admin/message.html', extra_context))
+
+
+    def minority(self, request,  extra_context=None):
+        if extra_context is None:
+            extra_context = {}
+
+        request.current_app = self.name
+
+        context = {
+            **self.each_context(request),
+            'page_name': 'minority',
+            **(extra_context or {}),
+        }
+        return HttpResponse(render(request, 'admin/minority.html', context))
 
 
     def advanced_search(self, request, extra_context=None):
