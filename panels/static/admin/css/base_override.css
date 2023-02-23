@@ -1,0 +1,87 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter&family=Raleway&display=swap');
+    
+h2, h3, th {
+  font-family: 'Raleway', sans-serif;
+  font-weight: 600;
+}
+
+span, p, a, td {
+  font-family: 'Inter', sans-serif;
+  font-weight: 400;
+}
+
+
+/* Side Filters */
+
+#changelist-filter h3 {
+  font-size: 15px;
+}
+
+
+
+/* General Configuration */
+:root {
+  --header-bg: #111;
+  --header-hover: #aaa;
+
+  --breadcrumbs-bg: #191919;
+  --primary: #25262F;
+  --accent: #fff;
+  --hover-bg: #F7F7F7;
+  --body-bg: #fff;
+
+  --button-bg: #111;
+  --button-hover-bg: rgb(80, 80, 80);
+
+  --input-border: #ddd;
+  --input-focus-border: #111;
+
+  --table-header: #F5F5F7;
+  --table-content: #28282E;
+  --table-title: #6E6D82;
+
+  --status-dis-text: #8c010d;
+  --status-en-text: #0e4526;
+  --status-com-text: #0b4c75;
+  --status-unk-text: #474747;
+}
+
+
+/* Header */
+#header {
+  height: 54px;
+}
+
+#user-tools a:hover {
+  color: var(--header-hover);
+}
+
+
+@media (prefers-color-scheme: dark){
+  :root {
+    --header-bg: #111;
+    --header-hover: #aaa;
+
+    --breadcrumbs-bg: #191919;
+    --primary: #25262F;
+    --accent: #fff;
+    --hover-bg: #28282F;
+    
+    --button-bg: #888;
+    --button-hover-bg: rgb(100, 100, 100);
+
+    --input-border: #888;
+    --input-focus-border: #ccc;
+
+    --table-header: #28282F;
+    --table-content: #CAC9D1;
+    --table-title: #9694A2;
+    --body-bg: #211F26;
+    --darkened-bg: #110F16;
+
+    --status-dis-text: #fa6975;
+    --status-en-text: #2abf6b;
+    --status-com-text: #34a4eb;
+    --status-unk-text: #b3b3b3;
+  }
+}

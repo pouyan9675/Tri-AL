@@ -13,5 +13,5 @@ back.sqlite3
 .sass-cache/
 .sass-cache/*
 logs/*
-static/
+/static/
 visual/config.yml
