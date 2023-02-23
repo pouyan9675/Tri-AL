@@ -91,7 +91,7 @@ def update_data(csv_name: str) -> list:
 
 
 
-def _import(input_dir: str) -> dict:
+def _import(input_dir: str):
     """
         Import XML trials downloaded from ClinicalTrials.gov and builds a
         list of structured data.
@@ -102,8 +102,7 @@ def _import(input_dir: str) -> dict:
             if file.split('.')[-1] == 'xml':
                 total += 1
 
-    existing = set([t[0] for t in Trial.objects.values_list('nct_id')])
-    trials = {}
+    existing = set(Trial.objects.values_list('nct_id'), flat=True)
     with tqdm(total=total) as pbar:
         for root, dirs, files in os.walk(input_dir):
             for file in files:
@@ -121,11 +120,9 @@ def _import(input_dir: str) -> dict:
                         row = pd.DataFrame.from_dict([data])
                         row = processor.build_columns(row)
                         t = processor.data_mapper(row.to_dict(orient='index')[0])
-                        trials[data['NCTID']] = t
 
                     pbar.update(1)
 
-    return trials        
 
 
 
