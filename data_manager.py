@@ -102,7 +102,7 @@ def _import(input_dir: str):
             if file.split('.')[-1] == 'xml':
                 total += 1
 
-    existing = set(Trial.objects.values_list('nct_id'), flat=True)
+    existing = set(Trial.objects.values_list('nct_id', flat=True))
     with tqdm(total=total) as pbar:
         for root, dirs, files in os.walk(input_dir):
             for file in files:
