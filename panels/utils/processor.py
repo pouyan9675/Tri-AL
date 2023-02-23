@@ -145,7 +145,9 @@ def build_columns(data: pd.DataFrame) -> pd.DataFrame:
     for func in customize.get_functions():              # applying user defined fucntions
         data[func.column] = data.apply(func, axis=1)
 
-    data['StudyDuration'] = data['Date'].apply(lambda x: (tools.read_date(x['Completion']) - tools.read_date(x['Start'])).days if x['Completion'] and x['Start'] else None)
+    
+    selection = data['Date'].apply(lambda x: tools.read_date(x['Completion']) is not None and tools.read_date(x['Start']) is not None) 
+    data.loc[selection, 'StudyDuration'] = data.loc[selection, 'Date'].apply(lambda x: (tools.read_date(x['Completion']) - tools.read_date(x['Start'])).days if x['Completion'] and x['Start'] else None)
     valid = data[data['Enrollment'].notna() & data['ArmsNumber'].notna() & data['ArmsNumber'] != 0]
     data['PerArm'] = (valid['Enrollment'].astype(int) / valid['ArmsNumber'].astype(int))
     data['PerArm'] = data['PerArm'].fillna(0)
