@@ -26,7 +26,13 @@ chmod +x initdb.sh
 python3 data_manager.py import -i data/AllPublicXML
 ```
 
-6. Start project using Django and access it through [browser](http://localhost:8000/admin)!
+6. Update config file by using sample cofing file. The config file is located in `visual/sample-config.yml`. Name config to `config.yml` in the same directoy. It can be done as following as well:
+```console
+cp visual/sample-config.yml visual/config.yml
+# EDIT config.yml WITH ANY EDITOR
+```
+
+7. Start project using Django and access it through [browser](http://localhost:8000/admin)!
 ```console
 python3 manage.py runserver
 ```
