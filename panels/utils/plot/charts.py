@@ -18,11 +18,13 @@ import random
 
 class Plotter:
 
-    def __init__(self, primary_color='#0d6efd'):
+    def __init__(self, primary_color='#0d6efd', domain=None):
         self.primary_color = primary_color
         
-        # self.domain = Trial.objects.filter(condition__name='Healthy')
-        self.domain = Trial.objects.all()
+        if domain:
+            self.domain = domain
+        else:
+            self.domain = Trial.objects.all()
 
 
     def build_map(self, cache=True):
@@ -196,7 +198,7 @@ class Plotter:
                 with open(cache_file, 'rb') as handle:
                     frequent_div = pickle.load(handle)
         else:
-            conditions = Condition.objects.values_list('name', flat=True).distinct()
+            conditions = Trial.objects.values_list('condition__name', flat=True)
             conditions = pd.Series(conditions)
             conditions = conditions.value_counts()
             frequent = conditions.iloc[:20]
@@ -226,54 +228,66 @@ class Plotter:
         return frequent_div
 
 
-    def build_update_chart(self, now):
-        start_date = now - timedelta(days=30)
-        df_trials = pd.DataFrame.from_records(self.domain.filter(last_update__gt=start_date).values('last_update'))
-        if len(df_trials) > 0:
-            df_trials = df_trials['last_update'].value_counts()
+    def build_update_chart(self, now, cache=True):
+        cache_file = path.join(settings.BASE_DIR, 'data/cache/plot/updates_freq.pkl')
+        if path.exists(cache_file) and cache:
+            last_modified = datetime.fromtimestamp(path.getmtime(cache_file))
+            if last_modified.date() < Trial.objects.last().last_update:
+                recent_div = self.build_update_chart(now, cache=False)
+            else:
+                with open(cache_file, 'rb') as handle:
+                    recent_div = pickle.load(handle)
         else:
-            df_trials = pd.Series()
+            start_date = now - timedelta(days=30)
+            df_trials = pd.DataFrame.from_records(self.domain.filter(last_update__gt=start_date).values('last_update'))
+            if len(df_trials) > 0:
+                df_trials = df_trials['last_update'].value_counts()
+            else:
+                df_trials = pd.Series()
 
-        # Adding days without value with value 0
-        tmp_date = start_date
-        while tmp_date < now:
-            found = False
-            for d in df_trials.index:
-                if d == tmp_date.date():
-                    found = True
-            if not found:
-                # df_trials.at[tmp_date.date()] = 0
-                df_trials.at[tmp_date.date()] = np.random.randint(5, 30)       # for demo only
-            tmp_date = tmp_date + timedelta(days=1)
-        
-        df_trials = pd.DataFrame({'date': df_trials.index, 'count': df_trials})
-        df_trials.sort_values('date', inplace=True)
-        df_trials['date'] = df_trials['date'].apply(lambda x: x.strftime('%d %b'))
-        
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df_trials['date'], 
-                                y=df_trials['count'], 
-                                fill='tozeroy',
-                                line=dict(shape='spline', 
-                                color=self.primary_color,
-                                width=4,),
-                                xperiodalignment="middle",))
+            # Adding days without value with value 0
+            tmp_date = start_date
+            while tmp_date < now:
+                found = False
+                for d in df_trials.index:
+                    if d == tmp_date.date():
+                        found = True
+                if not found:
+                    df_trials.at[tmp_date.date()] = 0
+                    # df_trials.at[tmp_date.date()] = np.random.randint(5, 30)       # for demo only
+                tmp_date = tmp_date + timedelta(days=1)
+            
+            df_trials = pd.DataFrame({'date': df_trials.index, 'count': df_trials})
+            df_trials.sort_values('date', inplace=True)
+            df_trials['date'] = df_trials['date'].apply(lambda x: x.strftime('%d %b'))
+            
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=df_trials['date'], 
+                                    y=df_trials['count'], 
+                                    fill='tozeroy',
+                                    line=dict(shape='spline', 
+                                    color=self.primary_color,
+                                    width=4,),
+                                    xperiodalignment="middle",))
 
-        fig.update_layout(coloraxis_showscale=False, 
-                        margin={"r":0,"t":0,"l":0,"b":0},
-                        font_family="'Nunito', sans-serif",
-                        plot_bgcolor='rgba(0,0,0,0)',
-                        paper_bgcolor='rgba(0,0,0,0)',
-                        hovermode='x unified',
-                        hoverlabel=dict(bgcolor="white",))
-        
-        fig.update_yaxes(showgrid=True, gridcolor='#f9f9f9', gridwidth=1)
-        fig.update_xaxes(showspikes=True, spikecolor="#aaa", tickangle = 40)
+            fig.update_layout(coloraxis_showscale=False, 
+                            margin={"r":0,"t":0,"l":0,"b":0},
+                            font_family="'Nunito', sans-serif",
+                            plot_bgcolor='rgba(0,0,0,0)',
+                            paper_bgcolor='rgba(0,0,0,0)',
+                            hovermode='x unified',
+                            hoverlabel=dict(bgcolor="white",))
+            
+            fig.update_yaxes(showgrid=True, gridcolor='#f9f9f9', gridwidth=1)
+            fig.update_xaxes(showspikes=True, spikecolor="#aaa", tickangle = 40)
 
-        if df_trials['count'].sum() == 0:
-            fig.update_yaxes(range=[0, 100])
+            if df_trials['count'].sum() == 0:
+                fig.update_yaxes(range=[0, 100])
 
-        recent_div = plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
+            recent_div = plotly.offline.plot(fig, include_plotlyjs=False, output_type='div')
+
+            with open(cache_file, 'wb') as handle:
+                    pickle.dump(recent_div, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         return recent_div
 
