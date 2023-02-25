@@ -227,7 +227,7 @@ class Plotter:
 
 
     def build_update_chart(self, now):
-        start_date = now - timedelta(month=1)
+        start_date = now - timedelta(days=30)
         df_trials = pd.DataFrame.from_records(self.domain.filter(last_update__gt=start_date).values('last_update'))
         if len(df_trials) > 0:
             df_trials = df_trials['last_update'].value_counts()
