@@ -10,6 +10,7 @@ from panels.utils import downloader, tools, customize
 from panels.models import *
 from panels.utils.comparator import *
 from visual import settings
+from ast import literal_eval
 import pandas as pd
 import numpy as np
 import re
@@ -98,9 +99,11 @@ def parallel_get_trial(nct_id, trials):
     done = False
     while not done:
         try:
-            trials.append(downloader.get_trial(nct_id))
-            done = True
-            s.release()
+            t = downloader.get_trial(nct_id)
+            if t:
+                trials.append(t)
+                done = True
+                s.release()
         except Exception as e:
             print(e)
             print('Failed to retrieve:', nct_id)
@@ -145,8 +148,8 @@ def build_columns(data: pd.DataFrame) -> pd.DataFrame:
     for func in customize.get_functions():              # applying user defined fucntions
         data[func.column] = data.apply(func, axis=1)
 
-    
-    selection = data['Date'].apply(lambda x: tools.read_date(x['Completion']) is not None and tools.read_date(x['Start']) is not None) 
+    # selection = data['Date'].apply(lambda x: tools.read_date(x['Completion']) is not None and tools.read_date(x['Start']) is not None) 
+    selection = data['Date'].apply(lambda x: x['Completion'] and x['Start']).isna()
     data.loc[selection, 'StudyDuration'] = data.loc[selection, 'Date'].apply(lambda x: (tools.read_date(x['Completion']) - tools.read_date(x['Start'])).days if x['Completion'] and x['Start'] else None)
     valid = data[data['Enrollment'].notna() & data['ArmsNumber'].notna() & data['ArmsNumber'] != 0]
     data['PerArm'] = (valid['Enrollment'].astype(int) / valid['ArmsNumber'].astype(int))
@@ -310,12 +313,13 @@ def data_mapper(row: dict) -> Trial:
     t.save()
 
     for agent in row['Agents']:
-        try:
-            ag = Agent.objects.get(name=agent['Name'], type=Agent.get_type_choice(agent['Type']))
-        except Agent.DoesNotExist:
-            ag = Agent(name=agent['Name'], type=Agent.get_type_choice(agent['Type']))
-            ag.save()
-        t.agent.add(ag)     
+        if agent['Name'] and agent['Type']:
+            try:
+                ag = Agent.objects.get(name=agent['Name'], type=Agent.get_type_choice(agent['Type']))
+            except Agent.DoesNotExist:
+                ag = Agent(name=agent['Name'], type=Agent.get_type_choice(agent['Type']))
+                ag.save()
+            t.agent.add(ag)     
 
 
     for c in row['Conditions']:

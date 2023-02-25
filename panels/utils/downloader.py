@@ -119,7 +119,7 @@ def get_trial(nct_id: str, columns=None) -> dict:
     _parser = FullStudyParser(r.content)
     data = _parser.data
 
-    return data
+    return data if data['NCTID'] else None
 
 
 def download_trials(start_date=None, end_date=None, f_name=None):
