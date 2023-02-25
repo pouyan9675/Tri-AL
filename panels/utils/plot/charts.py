@@ -29,7 +29,7 @@ class Plotter:
         cache_file = path.join(settings.BASE_DIR, 'data/cache/plot/map.pkl')
         if path.exists(cache_file) and cache:
             last_modified = datetime.fromtimestamp(path.getmtime(cache_file))
-            if last_modified.date() < Trial.objects.values_list('last_update').order_by('last_update').last()[0]:   # the cache file is outdated
+            if last_modified.date() < Trial.objects.last().last_update:   # the cache file is outdated
                 map_div, stat_countries, top_countries_div = self.build_map(cache=False)
             else:
                 with open(cache_file, 'rb') as handle:
@@ -102,7 +102,7 @@ class Plotter:
         cache_file = path.join(settings.BASE_DIR, 'data/cache/plot/phase.pkl')
         if path.exists(cache_file) and cache:
             last_modified = datetime.fromtimestamp(path.getmtime(cache_file))
-            if last_modified.date() < Trial.objects.values_list('last_update').order_by('last_update').last()[0]:   # the cache file is outdated
+            if last_modified.date() < Trial.objects.last().last_update:   # the cache file is outdated
                 phase_div = self.build_phases(cache=False)
             else:
                 with open(cache_file, 'rb') as handle:
@@ -153,7 +153,7 @@ class Plotter:
         cache_file = path.join(settings.BASE_DIR, 'data/cache/plot/status.pkl')
         if path.exists(cache_file) and cache:
             last_modified = datetime.fromtimestamp(path.getmtime(cache_file))
-            if last_modified.date() < Trial.objects.values_list('last_update').order_by('last_update').last()[0]:   # the cache file is outdated
+            if last_modified.date() < Trial.objects.last().last_update:   # the cache file is outdated
                 status_div = self.build_status(cache=False)
             else:
                 with open(cache_file, 'rb') as handle:
@@ -190,14 +190,14 @@ class Plotter:
         cache_file = path.join(settings.BASE_DIR, 'data/cache/plot/frequent_conditions.pkl')
         if path.exists(cache_file) and cache:
             last_modified = datetime.fromtimestamp(path.getmtime(cache_file))
-            if last_modified.date() < Trial.objects.values_list('last_update').order_by('last_update').last()[0]:   # the cache file is outdated
+            if last_modified.date() < Trial.objects.last().last_update:   # the cache file is outdated
                 frequent_div = self.build_top_conditions(cache=False)
             else:
                 with open(cache_file, 'rb') as handle:
                     frequent_div = pickle.load(handle)
         else:
-            conditions = Trial.objects.values_list('condition__name')
-            conditions = pd.Series(conditions).explode()
+            conditions = Condition.objects.values_list('name', flat=True).distinct()
+            conditions = pd.Series(conditions)
             conditions = conditions.value_counts()
             frequent = conditions.iloc[:20]
             top = go.Figure()
@@ -227,8 +227,7 @@ class Plotter:
 
 
     def build_update_chart(self, now):
-        now = datetime(2022, 7, 14)
-        start_date = now - timedelta(days=15)
+        start_date = now - timedelta(month=1)
         df_trials = pd.DataFrame.from_records(self.domain.filter(last_update__gt=start_date).values('last_update'))
         if len(df_trials) > 0:
             df_trials = df_trials['last_update'].value_counts()
