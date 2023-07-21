@@ -1,17 +1,27 @@
-/test.py
-db.sqlite3
+# Development Environment
 .vscode
-data/*
-__pycache__
 .DS_Store
-Lib/*
-Scripts/*
-*.cfg 
-credentials/
-back.sqlite3
+
+# Python
 *.ipynb
+__pycache__
+venv/
+.python-version
+
+# Misc and Config
 .sass-cache/
 .sass-cache/*
 logs/*
 /static/
+*.cfg 
+
+/test.py
+Lib/*
+Scripts/*
+
+credentials/
+back.sqlite3
+db.sqlite3
+data/*
 visual/config.yml
+
