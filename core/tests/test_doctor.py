@@ -13,6 +13,7 @@ from trial_al import doctor
 from trial_al.cli import create_app
 from trial_al.plugins import Registry
 from trial_al.storage import Migration, SQLiteStorage, open_app_db
+from trial_al.storage.core_migrations import TRIALS_MIGRATIONS
 
 if TYPE_CHECKING:
     from conftest import Install, MakePlugin
@@ -161,7 +162,8 @@ def test_fails_on_a_database_from_a_newer_version(install: Install) -> None:
     install()
     with SQLiteStorage.open(Path("data/trials.db")) as storage, storage.engine.begin() as conn:
         conn.execute(
-            text("INSERT INTO _migrations VALUES ('core', 2, 'from the future', '2030-01-01')")
+            text("INSERT INTO _migrations VALUES ('core', :v, 'from the future', '2030-01-01')"),
+            {"v": len(TRIALS_MIGRATIONS) + 1},
         )
 
     result = run_doctor()

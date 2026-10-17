@@ -2,7 +2,8 @@
 
 from sqlalchemy import Connection
 
-from trial_al.storage.countries import COUNTRIES
+from trial_al.storage import docs
+from trial_al.storage.countries import COUNTRIES, EXTRA_COUNTRIES
 from trial_al.storage.migrations import Migration, run_script
 
 COMPONENT = "core"
@@ -247,6 +248,35 @@ def _trials_1(conn: Connection) -> None:
     )
 
 
+_TRIALS_2 = """\
+CREATE TABLE doc_dicts (
+    id INTEGER NOT NULL PRIMARY KEY,
+    dict BLOB NOT NULL,
+    created_at TEXT NOT NULL
+);
+ALTER TABLE trial_docs ADD COLUMN dict_id INTEGER REFERENCES doc_dicts (id);
+"""
+
+
+def _trials_2(conn: Connection) -> None:
+    """Compress raw documents with zstd instead of storing JSONB; add non-ISO countries.
+
+    Real raw JSON is about 10 GB for 607k studies as JSONB, and about 2 GB compressed.
+    Documents already stored are recompressed here without a dictionary.
+    """
+    run_script(conn, _TRIALS_2)
+    encoder = docs.Encoder()
+    rows = conn.exec_driver_sql("SELECT trial_id, json(doc) FROM trial_docs").all()
+    if rows:
+        conn.exec_driver_sql(
+            "UPDATE trial_docs SET doc = ? WHERE trial_id = ?",
+            [(encoder.encode(doc.encode()), trial_id) for trial_id, doc in rows],
+        )
+    conn.exec_driver_sql(
+        "INSERT INTO countries (code, alpha3, name) VALUES (?, ?, ?)", list(EXTRA_COUNTRIES)
+    )
+
+
 _APP_1 = """\
 CREATE TABLE jobs (
     id INTEGER NOT NULL PRIMARY KEY,
@@ -273,5 +303,8 @@ CREATE TABLE enricher_state (
 ) WITHOUT ROWID;
 """
 
-TRIALS_MIGRATIONS = (Migration(1, "initial trials schema", _trials_1),)
+TRIALS_MIGRATIONS = (
+    Migration(1, "initial trials schema", _trials_1),
+    Migration(2, "compressed raw documents; Kosovo and former countries", _trials_2),
+)
 APP_MIGRATIONS = (Migration(1, "initial app schema", _APP_1),)

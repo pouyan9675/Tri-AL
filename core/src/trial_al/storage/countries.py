@@ -1,7 +1,8 @@
-"""ISO 3166-1 countries that migration 1 seeds into ``countries`` (docs/design.md §6).
+"""Countries that migrations seed into ``countries`` (docs/design.md §6).
 
-Copied from v1's ``panels/fixtures/Country.json``. Migrations are frozen once released: add
-or rename countries in a new migration, not here.
+``COUNTRIES`` is ISO 3166-1, copied from v1's ``panels/fixtures/Country.json`` (migration 1);
+``EXTRA_COUNTRIES`` came with migration 2. Migrations are frozen once released: add or rename
+countries in a new migration and a new tuple here, never by editing these.
 """
 
 COUNTRIES: tuple[tuple[str, str, str], ...] = (
@@ -255,4 +256,15 @@ COUNTRIES: tuple[tuple[str, str, str], ...] = (
     ("ZA", "ZAF", "South Africa"),
     ("ZM", "ZMB", "Zambia"),
     ("ZW", "ZWE", "Zimbabwe"),
+)
+
+EXTRA_COUNTRIES: tuple[tuple[str, str, str], ...] = (
+    # Codes outside ISO 3166-1 that registries still use, added by migration 2. Kosovo's XK
+    # is a user-assigned code in wide use; the others are former countries whose codes
+    # ISO 3166-3 reserves (ClinicalTrials.gov: "Serbia and Montenegro", "Federal Republic
+    # of Yugoslavia", "Netherlands Antilles").
+    ("XK", "XKX", "Kosovo"),
+    ("CS", "SCG", "Serbia and Montenegro"),
+    ("YU", "YUG", "Yugoslavia"),
+    ("AN", "ANT", "Netherlands Antilles"),
 )

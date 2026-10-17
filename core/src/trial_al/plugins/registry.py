@@ -8,6 +8,8 @@ from typing import Literal, NoReturn
 import typer
 from pydantic import BaseModel
 
+from trial_al.pipeline.events import EVENTS, Handler, Subscription
+from trial_al.pipeline.source import Source
 from trial_al.plugins.errors import PluginError
 from trial_al.storage import Migration, MigrationError, SqliteExtension
 from trial_al.storage.migrations import check_migrations
@@ -26,6 +28,10 @@ class Contributions:
     sqlite_extensions: dict[str, SqliteExtension] = field(default_factory=dict)
     # by database, then plugin
     migrations: dict[Database, dict[str, tuple[Migration, ...]]] = field(default_factory=dict)
+    # by source name
+    sources: dict[str, Source] = field(default_factory=dict)
+    # by event name, in plugin load order
+    subscriptions: dict[str, list[Subscription]] = field(default_factory=dict)
 
     def migrations_for(self, database: Database) -> dict[str, tuple[Migration, ...]]:
         """Each plugin's migrations for ``database``, in plugin load order."""
@@ -89,10 +95,29 @@ class Registry:
             raise PluginError(str(exc)) from None
         per_plugin[self._plugin] = tuple(migrations)
 
-    # The rest of the base registry API arrives with later milestones (design §14).
+    def add_source(self, source: Source) -> None:
+        """A registry that ``install`` and ``update`` fetch trials from (docs/design.md §7)."""
+        if not isinstance(source, Source):
+            raise PluginError(
+                f"{type(source).__name__} isn't a source: it needs name, fetch_all, "
+                "fetch_changed, normalize and hashable (see trial_al.pipeline.Source)"
+            )
+        if source.name in self._contributions.sources:
+            raise PluginError(f"a source named {source.name!r} was already added")
+        self._contributions.sources[source.name] = source
 
-    def add_source(self, source: object) -> None:
-        _not_yet("add_source")
+    def on(self, event: str, handler: Handler) -> None:
+        """Call ``handler(event)`` when the pipeline fires ``event`` (docs/design.md §5.6).
+
+        Events: ``update.started``, ``trials.changed``, ``update.finished`` and
+        ``install.finished``; see ``trial_al.pipeline.events`` for what each carries.
+        """
+        if event not in EVENTS:
+            raise PluginError(f"unknown event {event!r}; events are {', '.join(EVENTS)}")
+        subscription = Subscription(self._plugin, handler)
+        self._contributions.subscriptions.setdefault(event, []).append(subscription)
+
+    # The rest of the base registry API arrives with later milestones (design §14).
 
     def add_enricher(self, enricher: object) -> None:
         _not_yet("add_enricher")
@@ -111,9 +136,6 @@ class Registry:
 
     def add_job(self, job: object) -> None:
         _not_yet("add_job")
-
-    def on(self, event: str, handler: Callable[..., object]) -> None:
-        _not_yet("on")
 
     def set_access_policy(self, policy: object) -> None:
         _not_yet("set_access_policy")

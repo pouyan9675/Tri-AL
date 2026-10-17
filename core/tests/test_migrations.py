@@ -48,6 +48,10 @@ def tables(engine: Engine) -> set[str]:
         return {name for (name,) in rows}
 
 
+CORE_RECORDED = [
+    ("core", migration.version, migration.description) for migration in TRIALS_MIGRATIONS
+]
+
 PLUGIN = (
     Migration(1, "notes table", "CREATE TABLE p_notes (id INTEGER PRIMARY KEY, body TEXT);"),
     Migration(2, "tags table", "CREATE TABLE p_tags (note_id INTEGER, tag TEXT);"),
@@ -55,13 +59,13 @@ PLUGIN = (
 
 
 def test_migrating_twice_changes_nothing(engine: Engine) -> None:
-    assert migrate(engine, {"core": TRIALS_MIGRATIONS}) == {"core": [1]}
+    assert migrate(engine, {"core": TRIALS_MIGRATIONS}) == {"core": [1, 2]}
     before = schema(engine)
 
     assert migrate(engine, {"core": TRIALS_MIGRATIONS}) == {"core": []}
 
     assert schema(engine) == before
-    assert recorded(engine) == [("core", 1, "initial trials schema")]
+    assert recorded(engine) == CORE_RECORDED
 
 
 def test_storage_open_is_idempotent(tmp_path: Path) -> None:
@@ -69,9 +73,9 @@ def test_storage_open_is_idempotent(tmp_path: Path) -> None:
     with SQLiteStorage.open(path):
         pass
     with SQLiteStorage.open(path) as storage:
-        assert recorded(storage.engine) == [("core", 1, "initial trials schema")]
+        assert recorded(storage.engine) == CORE_RECORDED
         with storage.engine.connect() as conn:
-            assert conn.execute(text("SELECT count(*) FROM countries")).scalar() == 249
+            assert conn.execute(text("SELECT count(*) FROM countries")).scalar() == 253
 
 
 def test_components_are_tracked_separately(engine: Engine) -> None:
@@ -81,7 +85,7 @@ def test_components_are_tracked_separately(engine: Engine) -> None:
 
     assert applied == {"core": [], "notes": [2]}
     assert recorded(engine) == [
-        ("core", 1, "initial trials schema"),
+        *CORE_RECORDED,
         ("notes", 1, "notes table"),
         ("notes", 2, "tags table"),
     ]

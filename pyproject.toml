@@ -10,11 +10,13 @@ python-preference = "only-managed"
 [tool.uv.sources]
 trial-al = { workspace = true }
 trial-al-sample = { workspace = true }
+trial-al-ctgov = { workspace = true }
 
 [dependency-groups]
 dev = [
     "trial-al",
     "trial-al-sample",
+    "trial-al-ctgov",
     "mypy>=2.4",
     "pytest>=9.1",
     "ruff>=0.17",
@@ -29,7 +31,7 @@ extend-exclude = ["data_manager.py", "manage.py", "panels", "visual", "scheduler
 select = ["E", "W", "F", "I", "UP", "B", "C4", "SIM", "PT", "RUF"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["trial_al", "trial_al_sample"]
+known-first-party = ["trial_al", "trial_al_sample", "trial_al_ctgov"]
 
 [tool.mypy]
 python_version = "3.13"
@@ -39,6 +41,7 @@ plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 testpaths = ["core/tests", "plugins"]
-addopts = ["--import-mode=importlib", "-ra", "--strict-markers", "--strict-config"]
+addopts = ["--import-mode=importlib", "-ra", "--strict-markers", "--strict-config", "-m", "not live"]
+markers = ["live: talks to the real ClinicalTrials.gov API; run with `uv run pytest -m live`"]
 xfail_strict = true
 filterwarnings = ["error"]

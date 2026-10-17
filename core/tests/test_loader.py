@@ -8,6 +8,7 @@ import typer
 from pydantic import BaseModel, ConfigDict
 
 from trial_al.config import Config, PluginSection
+from trial_al.pipeline import Subscription
 from trial_al.plugins import (
     ENTRY_POINT_GROUP,
     Plugin,
@@ -19,6 +20,7 @@ from trial_al.plugins import (
 )
 from trial_al.plugins.registry import Contributions
 from trial_al.storage import Migration, SqliteExtension
+from trial_al.testing import FakeSource
 
 if TYPE_CHECKING:
     from conftest import MakeEntryPoint, MakePlugin
@@ -263,8 +265,44 @@ def test_registry_add_cli_records_one_app_per_plugin() -> None:
 def test_registry_methods_from_later_milestones_are_stubs() -> None:
     registry = Registry("alpha", None, Contributions())
 
-    with pytest.raises(NotImplementedError, match=r"Registry\.add_source is not implemented yet"):
-        registry.add_source(object())
+    with pytest.raises(NotImplementedError, match=r"Registry\.add_enricher is not implemented yet"):
+        registry.add_enricher(object())
+
+
+def test_registry_add_source_records_sources_by_name() -> None:
+    contributions = Contributions()
+    source = FakeSource()
+
+    Registry("alpha", None, contributions).add_source(source)
+
+    assert contributions.sources == {"fake": source}
+    with pytest.raises(PluginError, match="a source named 'fake' was already added"):
+        Registry("beta", None, contributions).add_source(FakeSource())
+
+
+def test_registry_add_source_checks_the_interface() -> None:
+    registry = Registry("alpha", None, Contributions())
+
+    with pytest.raises(PluginError, match="object isn't a source"):
+        registry.add_source(object())  # type: ignore[arg-type]
+
+
+def test_registry_on_subscribes_in_load_order() -> None:
+    contributions = Contributions()
+
+    Registry("alpha", None, contributions).on("update.finished", print)
+    Registry("beta", None, contributions).on("update.finished", repr)
+
+    assert contributions.subscriptions == {
+        "update.finished": [Subscription("alpha", print), Subscription("beta", repr)]
+    }
+
+
+def test_registry_on_knows_the_events() -> None:
+    with pytest.raises(
+        PluginError, match=r"unknown event 'update\.done'; events are update\.started"
+    ):
+        Registry("alpha", None, Contributions()).on("update.done", print)
 
 
 def load_nothing(conn: object) -> None:

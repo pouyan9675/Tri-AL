@@ -179,11 +179,20 @@ trial_outcomes = Table(
     Column("time_frame", Text),
 )
 
+doc_dicts = Table(
+    "doc_dicts",
+    trials_metadata,
+    Column("id", Integer, primary_key=True),
+    Column("dict", BLOB, nullable=False),  # a zstd dictionary (see storage/docs.py)
+    Column("created_at", UTCDateTime, nullable=False),
+)
+
 trial_docs = Table(
     "trial_docs",
     trials_metadata,
     _trial_id(primary_key=True),
-    Column("doc", BLOB, nullable=False),  # SQLite JSONB: write jsonb(?), read json(doc)
+    Column("doc", BLOB, nullable=False),  # the raw document, zstd-compressed
+    Column("dict_id", Integer, ForeignKey("doc_dicts.id")),  # NULL: no dictionary
 )
 
 trial_conditions = Table(

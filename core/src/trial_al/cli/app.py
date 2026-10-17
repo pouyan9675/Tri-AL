@@ -6,21 +6,19 @@ from typing import Annotated
 import typer
 
 from trial_al import __version__
-from trial_al.cli import plugins
+from trial_al.cli import data, plugins
 from trial_al.cli.doctor import doctor
 from trial_al.config import ConfigError, load_config
 from trial_al.plugins import PluginError, load_plugins
 
 STUBS = {
-    "install": "Download every trial and build the database.",
-    "update": "Fetch the trials changed since the last update.",
     "rebuild": "Rebuild the database from the downloaded data.",
     "serve": "Start the API and the job worker.",
     "worker": "Run the job worker on its own.",
     "backup": "Copy the databases while the app is running.",
     "bench": "Run the benchmark suite.",
 }
-CORE_COMMANDS = {*STUBS, "doctor", "plugins"}
+CORE_COMMANDS = {*STUBS, "install", "update", "doctor", "plugins"}
 
 
 def create_app() -> typer.Typer:
@@ -32,6 +30,8 @@ def create_app() -> typer.Typer:
         add_completion=False,
     )
     app.callback()(_root)
+    app.command("install")(data.install)
+    app.command("update")(data.update)
     for name, help_text in STUBS.items():
         app.command(name, help=f"{help_text} (Not implemented yet.)")(_stub(name))
     app.command("doctor")(doctor)

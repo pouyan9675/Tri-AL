@@ -10,7 +10,10 @@ from typer.testing import CliRunner, Result
 from trial_al import __version__
 from trial_al.cli import create_app
 from trial_al.cli.app import STUBS
-from trial_al.plugins import Registry
+from trial_al.cli.data import ProgressPrinter, describe, duration
+from trial_al.pipeline import Progress
+from trial_al.plugins import Plugin, Registry
+from trial_al.testing import FakeSource, fake_study
 
 if TYPE_CHECKING:
     from conftest import Install, MakePlugin
@@ -168,3 +171,117 @@ def test_core_commands_work_when_plugins_cannot_load(
     assert "plugin commands are unavailable" in capsys.readouterr().err
     assert result.exit_code == 0
     assert "written for plugin API 99" in result.stdout
+
+
+# --- install and update ---------------------------------------------------------------------
+
+
+def test_progress_lines() -> None:
+    assert (
+        describe(Progress("load", 5_000, 607_349, "trials")) == "load: 5,000 of 607,349 trials (1%)"
+    )
+    assert describe(Progress("download", 512_000_000, None, "bytes")) == "download: 512 MB"
+    assert describe(Progress("index", message="building")) == "index: building"
+    assert describe(Progress("check")) == "check"
+
+
+@pytest.mark.parametrize(("seconds", "text"), [(12.34, "12.3s"), (245, "4m05s"), (3725, "1h02m")])
+def test_durations(seconds: float, text: str) -> None:
+    assert duration(seconds) == text
+
+
+def test_progress_printer_throttles_within_a_stage() -> None:
+    now = [0.0]
+    lines: list[str] = []
+    printer = ProgressPrinter(interval=5, clock=lambda: now[0], echo=lines.append)
+
+    for t, report in [
+        (0, Progress("load", 0, 10)),
+        (1, Progress("load", 2, 10)),
+        (6, Progress("load", 5, 10)),
+        (7, Progress("index")),
+    ]:
+        now[0] = t
+        printer(report)
+
+    assert lines == ["load: 0 of 10 (0%)", "load: 5 of 10 (50%)", "index"]
+
+
+def test_progress_printer_shows_how_a_stage_ended() -> None:
+    lines: list[str] = []
+    printer = ProgressPrinter(interval=5, clock=lambda: 0.0, echo=lines.append)
+
+    for report in [Progress("load", 0, 10), Progress("load", 10, 10), Progress("index")]:
+        printer(report)
+
+    assert lines == ["load: 0 of 10 (0%)", "load: 10 of 10 (100%)", "index"]
+
+
+def source_plugin(make_plugin: MakePlugin, source: FakeSource) -> Plugin:
+    return make_plugin("fakes", register=lambda registry: registry.add_source(source))
+
+
+def test_install_and_update(install: Install, make_plugin: MakePlugin) -> None:
+    studies = (fake_study("F1", updated="2026-10-01"), fake_study("F2", updated="2026-10-02"))
+    install(source_plugin(make_plugin, FakeSource(studies=studies)))
+
+    result = run("install", "--workers", "0")
+
+    assert result.exit_code == 0, result.output
+    assert "Installed into data/trials.db" in result.stdout
+    assert "fake: 2 fetched, 2 new, 0 updated, 0 unchanged, 0 failed" in result.stdout
+    assert Path("data/trials.db").exists()
+
+    result = run("update")
+
+    assert result.exit_code == 0, result.output
+    assert "fake: 1 fetched, 0 new, 0 updated, 1 unchanged, 0 failed" not in result.stdout
+    assert "fake: 0 fetched" in result.stdout
+
+
+def test_install_into_another_directory(
+    install: Install, make_plugin: MakePlugin, tmp_path: Path
+) -> None:
+    install(source_plugin(make_plugin, FakeSource(studies=(fake_study("F1"),))))
+
+    result = run("install", "--workers", "0", "--data-dir", str(tmp_path / "elsewhere"))
+
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "elsewhere" / "trials.db").exists()
+
+
+def test_install_explains_errors(install: Install, make_plugin: MakePlugin) -> None:
+    install(source_plugin(make_plugin, FakeSource(studies=(fake_study("F1"),))))
+    run("install", "--workers", "0")
+
+    result = run("install", "--workers", "0")
+
+    assert result.exit_code == 1
+    assert "error: data/trials.db already exists" in result.stderr
+
+
+def test_update_needs_an_install(install: Install, make_plugin: MakePlugin) -> None:
+    install(source_plugin(make_plugin, FakeSource()))
+
+    result = run("update")
+
+    assert result.exit_code == 1
+    assert "run `trial-al install` first" in result.stderr
+
+
+def test_install_needs_a_source(install: Install) -> None:
+    install()
+
+    result = run("install")
+
+    assert result.exit_code == 1
+    assert "no source plugin is enabled" in result.stderr
+
+
+def test_install_reports_plugins_that_dont_load(install: Install, make_plugin: MakePlugin) -> None:
+    install(make_plugin("alpha", api_version=99))
+
+    result = run("install")
+
+    assert result.exit_code == 1
+    assert "written for plugin API 99" in result.stderr

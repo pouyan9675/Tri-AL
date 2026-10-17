@@ -5,7 +5,6 @@ import re
 from collections import Counter
 from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import TracebackType
@@ -26,6 +25,7 @@ from sqlalchemy import (
     text,
     update,
 )
+from sqlalchemy.exc import DatabaseError
 from sqlalchemy.sql.elements import KeyedColumnElement
 
 from trial_al.schema import (
@@ -35,7 +35,9 @@ from trial_al.schema import (
     Outcome,
     Sponsor,
     TrialRecord,
+    without_repeats,
 )
+from trial_al.storage import docs
 from trial_al.storage import tables as t
 from trial_al.storage.base import (
     ALL_TRIALS,
@@ -63,6 +65,10 @@ _FTS_COLUMNS = (
     "summary, description, eligibility, outcomes"
 )
 _WORD = re.compile(r"\w+")
+_FTS_INTEGRITY_CHECKS = (
+    "INSERT INTO trials_fts (trials_fts, rank) VALUES ('integrity-check', 1)",
+    "INSERT INTO names_fts (names_fts) VALUES ('integrity-check')",
+)
 
 
 def components(
@@ -80,6 +86,7 @@ class SQLiteStorage:
 
     def __init__(self, engine: Engine) -> None:
         self._engine = engine
+        self._decoder = docs.Decoder()
 
     @classmethod
     def open(
@@ -124,11 +131,17 @@ class SQLiteStorage:
 
     def get_trial(self, trial_id: int) -> TrialRecord | None:
         with self._engine.connect() as conn:
-            return _read_trial(conn, trial_id)
+            return _read_trial(conn, trial_id, self._decoder)
 
     def find_trial(self, source: str, source_id: str) -> TrialRecord | None:
         with self._engine.connect() as conn:
-            return _find_trial(conn, source, source_id)
+            return _find_trial(conn, source, source_id, self._decoder)
+
+    def content_hashes(
+        self, source: str, source_ids: Iterable[str] | None = None
+    ) -> dict[str, bytes | None]:
+        with self._engine.connect() as conn:
+            return _content_hashes(conn, source, source_ids)
 
     def query_trials(self, query: TrialQuery = ALL_TRIALS) -> list[TrialSummary]:
         stmt = _filtered(
@@ -201,6 +214,30 @@ class SQLiteStorage:
         with self._engine.connect() as conn:
             return [NameHit(*row) for row in conn.execute(stmt, params)]
 
+    def check(self, *, full_text: bool = True) -> None:
+        """Raise StorageError unless the database is sound.
+
+        Runs SQLite's ``quick_check``, makes sure no bulk load is unfinished and, with
+        ``full_text``, checks both full-text indexes against the data they index.
+        """
+        with self._engine.connect() as conn:
+            problems = conn.exec_driver_sql("PRAGMA quick_check").scalars().all()
+            if problems != ["ok"]:
+                raise StorageError(f"the database is damaged: {'; '.join(problems[:5])}")
+            started = conn.execute(
+                select(t.meta.c.value).where(t.meta.c.key == BULK_LOAD_KEY)
+            ).scalar_one_or_none()
+            if started is not None:
+                raise StorageError(f"a bulk load started at {started} didn't finish")
+            if full_text:
+                try:
+                    for statement in _FTS_INTEGRITY_CHECKS:
+                        conn.execute(_sql(statement))
+                except DatabaseError as exc:
+                    raise StorageError(f"a full-text index doesn't match the data: {exc}") from exc
+                finally:
+                    conn.rollback()
+
     # --- writes -----------------------------------------------------------------------------
 
     def upsert_batch(self, records: Sequence[TrialRecord]) -> list[int]:
@@ -220,7 +257,7 @@ class SQLiteStorage:
                         f"a bulk load into this database started at {started} and didn't "
                         "finish, so its indexes are incomplete; run the bulk load again"
                     )
-                yield SQLiteTransaction(conn)
+                yield SQLiteTransaction(conn, self._decoder)
 
     @contextmanager
     def bulk_load(self) -> Iterator["SQLiteBulkLoader"]:
@@ -240,8 +277,9 @@ class SQLiteStorage:
 
 
 class SQLiteTransaction:
-    def __init__(self, conn: Connection) -> None:
+    def __init__(self, conn: Connection, decoder: docs.Decoder) -> None:
         self._conn = conn
+        self._decoder = decoder
         self._writer = _Writer(conn, bulk=False)
 
     @property
@@ -249,10 +287,15 @@ class SQLiteTransaction:
         return self._conn
 
     def get_trial(self, trial_id: int) -> TrialRecord | None:
-        return _read_trial(self._conn, trial_id)
+        return _read_trial(self._conn, trial_id, self._decoder)
 
     def find_trial(self, source: str, source_id: str) -> TrialRecord | None:
-        return _find_trial(self._conn, source, source_id)
+        return _find_trial(self._conn, source, source_id, self._decoder)
+
+    def content_hashes(
+        self, source: str, source_ids: Iterable[str] | None = None
+    ) -> dict[str, bytes | None]:
+        return _content_hashes(self._conn, source, source_ids)
 
     def upsert_batch(self, records: Sequence[TrialRecord]) -> list[int]:
         return self._writer.upsert(records)
@@ -262,6 +305,12 @@ class SQLiteBulkLoader:
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
         self._writer: _Writer | None = None
+
+    def content_hashes(
+        self, source: str, source_ids: Iterable[str] | None = None
+    ) -> dict[str, bytes | None]:
+        with self._conn.begin():
+            return _content_hashes(self._conn, source, source_ids)
 
     def upsert_batch(self, records: Sequence[TrialRecord]) -> list[int]:
         try:
@@ -356,6 +405,32 @@ class _MeshTerms:
         return self.rows[code][0]
 
 
+class _Docs:
+    """Compresses raw documents for ``trial_docs``, training the dictionary when it can."""
+
+    def __init__(self, conn: Connection) -> None:
+        latest = conn.execute(
+            select(t.doc_dicts.c.id, t.doc_dicts.c.dict).order_by(t.doc_dicts.c.id.desc()).limit(1)
+        ).one_or_none()
+        self._encoder = docs.Encoder() if latest is None else docs.Encoder(*latest)
+        self._trained = latest is not None
+
+    def rows(self, conn: Connection, raws: Sequence[tuple[int, bytes]]) -> list[dict[str, Any]]:
+        if not self._trained and (content := docs.train([raw for _, raw in raws])):
+            dict_id = _next_id(conn, t.doc_dicts)
+            conn.execute(
+                insert(t.doc_dicts),
+                {"id": dict_id, "dict": content, "created_at": datetime.now(UTC)},
+            )
+            self._encoder = docs.Encoder(dict_id, content)
+            self._trained = True
+        encoder = self._encoder
+        return [
+            {"trial_id": trial_id, "doc": encoder.encode(raw), "dict_id": encoder.dict_id}
+            for trial_id, raw in raws
+        ]
+
+
 class _Writer:
     """Upserts batches of trials on one connection, inside the caller's transaction.
 
@@ -370,6 +445,7 @@ class _Writer:
         self._interventions = _Names(t.interventions, "name", "intervention")
         self._sponsors = _Names(t.sponsors, "name", "sponsor")
         self._mesh = _MeshTerms()
+        self._docs = _Docs(conn)
         self._countries = frozenset(conn.execute(select(t.countries.c.code)).scalars())
         if bulk:
             for names in (self._conditions, self._interventions, self._sponsors, self._mesh):
@@ -378,7 +454,7 @@ class _Writer:
     def upsert(self, records: Sequence[TrialRecord]) -> list[int]:
         if not records:
             return []
-        records = [_dedupe(record) for record in records]
+        records = [without_repeats(record) for record in records]
         self._check(records)
         ids, existing = self._assign_ids(records)
         conn = self._conn
@@ -508,7 +584,7 @@ class _Writer:
 
     def _insert_children(self, records: Sequence[TrialRecord], ids: Sequence[int]) -> None:
         rows: dict[Table, list[dict[str, Any]]] = {table: [] for table in t.LINK_TABLES}
-        docs = []
+        raws: list[tuple[int, bytes]] = []
         for record, trial_id in zip(records, ids, strict=True):
             rows[t.trial_text].append(
                 {
@@ -530,7 +606,7 @@ class _Writer:
                 for position, outcome in enumerate(record.outcomes)
             )
             if record.raw is not None:
-                docs.append({"b_trial_id": trial_id, "b_doc": record.raw.decode()})
+                raws.append((trial_id, record.raw))
             rows[t.trial_conditions] += (
                 {
                     "trial_id": trial_id,
@@ -596,40 +672,10 @@ class _Writer:
                 }
                 for position, location in enumerate(record.locations)
             )
+        rows[t.trial_docs] = self._docs.rows(self._conn, raws)
         for table, table_rows in rows.items():
             if table_rows:
                 self._conn.execute(insert(table), table_rows)
-        if docs:
-            stmt = insert(t.trial_docs).values(
-                trial_id=bindparam("b_trial_id"), doc=func.jsonb(bindparam("b_doc"))
-            )
-            self._conn.execute(stmt, docs)
-
-
-def _dedupe(record: TrialRecord) -> TrialRecord:
-    """The record with repeats dropped from its lists (the first occurrence stays)."""
-    return replace(
-        record,
-        conditions=_unique(record.conditions, lambda name: name),
-        mesh_terms=_unique(record.mesh_terms, lambda term: (term.code, term.kind)),
-        interventions=[
-            replace(i, other_names=tuple(_unique(i.other_names, lambda alias: alias)))
-            for i in _unique(record.interventions, lambda i: i.name)
-        ],
-        sponsors=_unique(record.sponsors, lambda sponsor: sponsor.name),
-        countries=_unique(record.countries, lambda code: code),
-    )
-
-
-def _unique[T](items: Iterable[T], key: Any) -> list[T]:
-    seen = set()
-    unique = []
-    for item in items:
-        k = key(item)
-        if k not in seen:
-            seen.add(k)
-            unique.append(item)
-    return unique
 
 
 def _start_bulk_load(conn: Connection) -> None:
@@ -668,14 +714,25 @@ def _finish_bulk_load(conn: Connection) -> None:
 # --- reading ------------------------------------------------------------------------------
 
 
-def _find_trial(conn: Connection, source: str, source_id: str) -> TrialRecord | None:
+def _content_hashes(
+    conn: Connection, source: str, source_ids: Iterable[str] | None
+) -> dict[str, bytes | None]:
+    stmt = select(t.trials.c.source_id, t.trials.c.content_hash).where(t.trials.c.source == source)
+    if source_ids is not None:
+        stmt = stmt.where(_in(t.trials.c.source_id, source_ids))
+    return dict(conn.execute(stmt).all())
+
+
+def _find_trial(
+    conn: Connection, source: str, source_id: str, decoder: docs.Decoder
+) -> TrialRecord | None:
     trial_id = conn.execute(
         select(t.trials.c.id).where(t.trials.c.source == source, t.trials.c.source_id == source_id)
     ).scalar_one_or_none()
-    return None if trial_id is None else _read_trial(conn, trial_id)
+    return None if trial_id is None else _read_trial(conn, trial_id, decoder)
 
 
-def _read_trial(conn: Connection, trial_id: int) -> TrialRecord | None:
+def _read_trial(conn: Connection, trial_id: int, decoder: docs.Decoder) -> TrialRecord | None:
     trial = conn.execute(select(t.trials).where(t.trials.c.id == trial_id)).one_or_none()
     if trial is None:
         return None
@@ -688,9 +745,16 @@ def _read_trial(conn: Connection, trial_id: int) -> TrialRecord | None:
     text_row = conn.execute(
         select(t.trial_text).where(t.trial_text.c.trial_id == trial_id)
     ).one_or_none()
-    raw = conn.execute(
-        select(func.json(t.trial_docs.c.doc)).where(t.trial_docs.c.trial_id == trial_id)
-    ).scalar_one_or_none()
+    doc = conn.execute(
+        select(t.trial_docs.c.doc, t.trial_docs.c.dict_id).where(
+            t.trial_docs.c.trial_id == trial_id
+        )
+    ).one_or_none()
+
+    def load_dict(dict_id: int) -> bytes:
+        stmt = select(t.doc_dicts.c.dict).where(t.doc_dicts.c.id == dict_id)
+        return bytes(conn.execute(stmt).scalar_one())
+
     aliases: dict[int, list[str]] = {}
     for intervention_id, alias in rows(
         select(t.intervention_aliases.c.intervention_id, t.intervention_aliases.c.alias),
@@ -774,7 +838,7 @@ def _read_trial(conn: Connection, trial_id: int) -> TrialRecord | None:
             )
             for row in rows(select(t.locations), t.locations)
         ],
-        raw=None if raw is None else raw.encode(),
+        raw=None if doc is None else decoder.decode(doc.doc, doc.dict_id, load_dict),
         content_hash=trial.content_hash,
         ingested_at=trial.ingested_at,
     )

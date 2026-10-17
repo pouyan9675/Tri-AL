@@ -1,6 +1,6 @@
 """The storage contract (docs/design.md §5.2). Backends must pass ``trial_al.testing``."""
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import date
@@ -77,6 +77,16 @@ class StorageTransaction(Protocol):
 
     def find_trial(self, source: str, source_id: str) -> TrialRecord | None: ...
 
+    def content_hashes(
+        self, source: str, source_ids: Iterable[str] | None = None
+    ) -> dict[str, bytes | None]:
+        """Stored ``content_hash`` by ``source_id``, for every trial of ``source`` or those listed.
+
+        Trials that aren't stored are left out. The pipeline compares these with fresh hashes
+        to skip trials that haven't changed.
+        """
+        ...
+
     def upsert_batch(self, records: Sequence[TrialRecord]) -> list[int]:
         """Insert new trials and replace existing ones (matched on ``(source, source_id)``).
 
@@ -88,6 +98,12 @@ class StorageTransaction(Protocol):
 
 
 class BulkLoader(Protocol):
+    def content_hashes(
+        self, source: str, source_ids: Iterable[str] | None = None
+    ) -> dict[str, bytes | None]:
+        """Like ``Storage.content_hashes``; a resumed load uses it to skip what it already wrote."""
+        ...
+
     def upsert_batch(self, records: Sequence[TrialRecord]) -> list[int]:
         """Like ``StorageTransaction.upsert_batch``; each batch commits on its own."""
         ...
@@ -97,6 +113,12 @@ class Storage(Protocol):
     def get_trial(self, trial_id: int) -> TrialRecord | None: ...
 
     def find_trial(self, source: str, source_id: str) -> TrialRecord | None: ...
+
+    def content_hashes(
+        self, source: str, source_ids: Iterable[str] | None = None
+    ) -> dict[str, bytes | None]:
+        """``StorageTransaction.content_hashes``, reading the last commit."""
+        ...
 
     def query_trials(self, query: TrialQuery = ALL_TRIALS) -> list[TrialSummary]: ...
 

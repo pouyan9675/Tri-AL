@@ -23,10 +23,13 @@ Checked against the live API on 2026-10-17:
 | Change rate | About 700–1,600 studies updated per weekday, 0 on weekends |
 | Paging | `pageSize` up to 1,000 (larger values are capped), cursor via `nextPageToken` |
 | Incremental query | `filter.advanced=AREA[LastUpdatePostDate]RANGE[<date>,MAX]` |
-| Bulk download | `GET /api/v2/studies/download?format=json.zip` → `ctg-studies.json.zip` (streamed, no size given up front) |
+| Bulk download | `GET /api/v2/studies/download?format=json.zip` → `ctg-studies.json.zip`, about 2.7 GB. Streamed with no `Content-Length`, and `Range` is ignored (a Range request gets 200 and the whole file), so an interrupted download can't resume |
+| Bulk zip layout | One compact JSON file per study, in 100 folders by the last two digits of the NCT number (`35/NCT02807935.json`). Each file is the same JSON the API returns for that study |
 | Study shape | `protocolSection` (13 modules), `resultsSection`, `documentSection`, `derivedSection` (MeSH browse terms for conditions and interventions), `hasResults` |
 | Enums | Uppercase codes, e.g. `PHASE3`, `ACTIVE_NOT_RECRUITING` |
-| Record size | Up to about 175 KB for a study with results |
+| Record size | Median 9.9 KB, average 17.3 KB, 99th percentile 150 KB, a few over 500 KB (`/api/v2/stats/size`); 10.5 GB of JSON in all. `resultsSection` is 35% of the bytes |
+| Release date | Every study's `derivedSection.miscInfoModule.versionHolder` is the date of the data release, so it changes in all 607k studies every day |
+| Countries | 226 `LocationCountry` names. Four have no ISO 3166-1 code: Kosovo, Serbia and Montenegro, Federal Republic of Yugoslavia, Netherlands Antilles |
 | v1's endpoints | `/api/query/full_studies` returns 404; `/ct2/...` redirects to the new site. `AllPublicXML.zip` still redirects to `/api/legacy/public-xml`. |
 
 So a daily update is **1–2 API pages**. The data is tiny next to what SQLite can handle.
@@ -114,12 +117,14 @@ fetch ─▶ parse (orjson) ─▶ normalize (source → TrialRecord) ─▶ has
       ─▶ enrichers (changed trials only) ─▶ rebuild stats ─▶ commit ─▶ bump data_version ─▶ events
 ```
 
-- **Change detection:** `content_hash` is a BLAKE2b hash (from the standard library) of the raw JSON with sorted keys. Trials whose hash hasn't changed are skipped completely.
+- **Change detection:** `content_hash` is a 16-byte BLAKE2b hash (from the standard library) of the raw JSON with sorted keys. Trials whose hash hasn't changed are skipped completely. The source decides what goes into the hash (`Source.hashable`, §7): ClinicalTrials.gov leaves out `versionHolder`, the release date every study carries (§2), or every study would look changed after each release. The same study from the bulk zip and from the API hashes the same.
 - **Update cursor:** `since = last_seen_update_date − 1 day`. Dates only have day precision, so the overlap guarantees nothing is missed, and the hash check makes the overlap free.
 - **Updates are atomic:** the whole update is one `BEGIN IMMEDIATE` transaction on `trials.db`. Readers keep seeing the old data and old stats until the commit, then see the new data and new stats together.
 - **Installs are atomic:** an install or rebuild writes `trials.db.new`, checks it, then renames it over `trials.db`.
-- **Parallel work:** during install, normalization runs in a process pool (it's CPU-bound) while a single writer inserts batches of about 5,000 trials. Updates (about 1,500 trials) run in one process.
-- **Resuming:** each stage is checkpointed in `runs`. A re-run skips finished stages. Within the load stage, trials already stored with the same hash are skipped cheaply. Milestone 3 will check whether the bulk endpoint supports HTTP `Range`, which would make an interrupted download resumable.
+- **Parallel work:** during install, parsing, hashing and normalizing run in a process pool (spawned, at most 8 workers; about 77 µs per study on one core) while a single writer inserts batches of 5,000 trials. The writer is the bottleneck. Updates (about 1,500 trials) run in one process.
+- **Failures:** a study that doesn't parse or normalize is skipped and counted, and the first 100 messages go in the run summary; one odd study doesn't stop an install of 600k.
+- **Resuming:** each install stage (`load`, `index`, `enrich`, `stats`, `check`) is checkpointed in the `runs` row inside `trials.db.new`. A re-run skips finished stages. Within the load stage, trials already stored with the same hash are skipped cheaply. The bulk endpoint ignores HTTP `Range` (§2), so an interrupted download starts over; a download that finished (it's written to `.part` and renamed, with its size and SHA-256 in `ctg-studies.json.zip.json`) is reused when an install resumes, and downloaded again for a new install.
+- **Entry points:** `Pipeline.run_install(progress, from_file=, force=)` and `Pipeline.run_update(progress)`, built from the loaded plugins with `Pipeline.from_plugins`. Both return a `RunSummary` (counts per source, seconds per stage, failures, the source's notes). `progress` receives `Progress(stage, done, total, unit, message)` reports, often; milestone 4's job throttles them to `app.db`, and can stop a run by raising from the callback.
 - **Reconcile:** an optional weekly job pages through just the NCT IDs to catch studies that were removed.
 
 ### 5.4 Jobs
@@ -153,7 +158,7 @@ fetch ─▶ parse (orjson) ─▶ normalize (source → TrialRecord) ─▶ has
   - `add_migrations(database, migrations)` for `"trials"` or `"app"`, tracked under the plugin's name; `add_sqlite_extension(name, load)` (see §5.2)
   - `add_job`, `add_cli`, `on(event, handler)`
   - `set_access_policy` (see §5.8)
-- **Events:** `update.started`, `trials.changed(ids, kind)`, `update.finished(summary)`, `install.finished`. Handlers run in the process that fires the event; pipeline events fire in the worker.
+- **Events:** `update.started(run_id)`, `trials.changed(run_id, ids, kind)` with kind `new` or `updated`, `update.finished(summary)`, `install.finished(summary)`. Each handler gets one event object (`trial_al.pipeline.events`). Handlers run in the process that fires the event, after the data is committed; pipeline events fire in the worker. An install doesn't send `trials.changed`, since every trial is new. A handler that raises is logged and listed in the summary's `handler_errors`; it doesn't stop the run.
 - **Rules:**
   - The core never imports plugins.
   - Plugins communicate only through core interfaces and events.
@@ -209,12 +214,13 @@ A TypeScript client for `web/` is generated from the OpenAPI schema.
 | `trials` | Narrow and fast to scan. See the column groups below this table. |
 | `trial_text` | brief_summary, description, eligibility_criteria |
 | `trial_outcomes` | trial_id, position, kind (primary, secondary, other), measure, description, time_frame |
-| `trial_docs` | Raw study JSON (stored as SQLite JSONB), kept apart so `trials` stays narrow |
+| `trial_docs` | Raw study JSON, byte for byte, compressed with zstd against a shared dictionary (`dict_id`); kept apart so `trials` stays narrow. See "Raw documents" below |
+| `doc_dicts` | The zstd dictionaries `trial_docs` rows were compressed with, kept for good |
 | `conditions`, `trial_conditions` | Conditions and links to trials |
 | `mesh_terms`, `trial_mesh` | MeSH terms (by descriptor code) and ancestors from `derivedSection`; the link has kind = condition or intervention, and an ancestor flag |
 | `interventions`, `trial_interventions`, `intervention_aliases` | Interventions, links (with the intervention type), and each trial's other names for them |
 | `sponsors`, `trial_sponsors` | Sponsors and links (with role = lead or collaborator, and the sponsor class) |
-| `countries`, `trial_countries` | Countries (seeded with ISO 3166-1 codes; the alpha-2 code is the key) and links |
+| `countries`, `trial_countries` | Countries (seeded with ISO 3166-1 codes, plus Kosovo `XK` and the former Serbia and Montenegro `CS`, Yugoslavia `YU` and Netherlands Antilles `AN`, which registries still use; the alpha-2 code is the key) and links |
 | `locations` | trial_id, position, facility, city, state, country_code, status, lat/lon |
 | `trial_changes` | trial_id, run_id, field, old, new: replaces v1's `simple_history` and its `first_*` fields |
 | `runs` | Install and update runs: stage checkpoints and summary |
@@ -236,22 +242,34 @@ The `trials` table has these columns:
 
 Notes:
 - **Dates** are stored as ISO text `YYYY-MM-DD`. Month-only dates become the 1st of the month; the exact original stays in `trial_docs`.
-- **Ages** are converted to days, so age ranges are simple numeric filters (v1 stored them as strings).
+- **Ages** are converted to days, so age ranges are simple numeric filters (v1 stored them as strings). `trial_al.schema.age_in_days` does it, rounding down, with a year of 365.25 days and a month of a twelfth of that (so "12 Months" equals "1 Year"); filters convert with the same function.
 - **Link tables** use `WITHOUT ROWID` with primary key `(trial_id, x_id)` plus a reverse index `(x_id, trial_id)`. A `position` column keeps the source's order.
 - **Entities are identified by name** (MeSH terms by code). Per-trial details, such as an intervention's type or a sponsor's class, are on the link, so each trial reads back exactly as written. A trial that lists the same entity twice keeps the first.
 - **Outcomes are rows, not JSON:** FTS5 can't read virtual tables such as `json_each` through its content view.
 - **`trials` indexes** cover the dashboard's main filters: `status`, `(phase, status)` (which also serves `phase` alone), `start_date`, `last_update`, `lead_sponsor_class`.
+- **Raw documents** are compressed one by one with zstd (level 3) against a 110 KB dictionary that the first batch of at least 1,000 documents trains (`storage/docs.py`). A document is still quick to read alone, and real ones shrink to 19% of their JSON size. As SQLite JSONB they'd be about 10 GB at 607k studies, more than every other table together; compressed they're about 2.5 GB (§15, decision 6). The storage no longer checks that `raw` is JSON; the pipeline has parsed it already.
+- **The change log** records these fields when an update changes them, old and new as JSON text: title, status, phase, study_type, primary_purpose, the start and completion dates, enrollment and its type, arms_count, has_results, lead sponsor, ages, sex, healthy_volunteers, conditions, interventions, countries and num_sites (`pipeline/changes.py`). `last_update` changes with every version, so it isn't logged.
 
 `app.db` holds `jobs`, `enricher_state` and `_migrations`. Plugin state stays in `trial-al.toml` (§5.6).
 
 ## 7. Plugin interfaces (base)
 
 ```python
-class Source(Protocol):
+class Source(Protocol):                 # trial_al.pipeline; picklable, it's sent to the pool
     name: str
     def fetch_all(self, ctx: FetchContext) -> Iterator[bytes]: ...            # raw study JSON
     def fetch_changed(self, since: date, ctx: FetchContext) -> Iterator[bytes]: ...
     def normalize(self, raw: dict) -> TrialRecord: ...                         # pure, runs in pool
+    def hashable(self, raw: dict) -> Any: ...       # what the content hash covers (§5.3)
+
+@dataclass
+class FetchContext:
+    downloads: Path                    # where a source may keep downloads
+    progress: ProgressCallback
+    from_file: Path | None             # a local copy of the bulk download (`install --from-file`)
+    reuse_download: bool               # a resumed install may reuse a finished download
+    total: int | None                  # set by the source: how many studies it will yield
+    notes: dict                        # set by the source: facts for the run summary
 
 class Enricher(Protocol):
     name: str
@@ -279,14 +297,14 @@ v1's `customize.py` (`@column` functions plus `Database.columns`) becomes an `En
 ## 8. Flows
 
 ### Install
-1. `uv tool install trial-al`, then `trial-al install [--profile default|minimal] [--data-dir ./data]`.
-2. Write `trial-al.toml` (from prompts or flags).
+1. `uv tool install trial-al`, then `trial-al install [--from-file PATH] [--data-dir ./data] [--force] [--workers N]` (milestone 3; milestone 6 adds `--profile default|minimal` and `--serve`).
+2. Write `trial-al.toml` (from prompts or flags). (Milestone 6.)
 3. Create `app.db` and run its migrations.
-4. Download `ctg-studies.json.zip` into `data/downloads/`, with progress shown and a checksum recorded.
-5. Build `trials.db.new`: read the zip as a stream (no full extraction), normalize in a pool, insert in batches with a single writer.
-6. Create indexes and full-text search, compute the precomputed stats, run `ANALYZE` and an integrity check.
-7. Rename to `trials.db`; set `data_version=1` and the update cursor.
-8. Print the URL; `--serve` starts the server straight away.
+4. Download `ctg-studies.json.zip` into `data/downloads/`, with progress shown and its size and SHA-256 recorded beside it, or read the file given with `--from-file`.
+5. Build `trials.db.new`: read the zip member by member (no extraction), in NCT order, so trial ids follow registration order; parse, hash and normalize in a pool; insert in batches with a single writer.
+6. Create indexes and full-text search, compute the precomputed stats, run `ANALYZE`, then check: SQLite's `quick_check`, both full-text indexes' `integrity-check`, and at least one trial loaded.
+7. Set `data_version` (1, or the old database's plus 1) and each source's update cursor (its latest `last_update`), then rename to `trials.db`. An existing `trials.db` is only replaced with `--force`, which starts the change log over, and only if no other process has it open.
+8. Print the URL; `--serve` starts the server straight away. (Milestone 6.)
 
 ### Update (button, schedule or CLI)
 1. `POST /api/jobs/update` adds a job to the queue. The worker claims it, and the lock rejects a second one.
@@ -330,8 +348,8 @@ Targets on the full dataset, measured on the reference machine:
 | Filtered list, facets or chart | p95 < 300 ms |
 | Trial detail | p95 < 30 ms |
 | Full-text search | p95 < 150 ms |
-| Daily update (~1,500 changed) | < 2 min end to end |
-| Full install | measured in milestone 3, then becomes a budget |
+| Daily update (~1,500 changed) | < 2 min end to end (milestone 3: 2,606 trials rewritten in 10–17 s) |
+| Full install | < 18 min end to end, download included (milestone 3: 14m50s, of which the download took 1m43s) |
 | Front end | initial JS < 200 KB gzip; dashboard interactive < 1.5 s on a cold load |
 
 How we get there:
@@ -408,6 +426,7 @@ Each milestone ends working, tested and measured.
 3. **ClinicalTrials.gov plugin and pipeline.**
    - Build: bulk install, incremental update, hash checks, atomic commit and swap, checkpoints, change log.
    - Done when: a full install and a real daily update both work, and the install time is recorded.
+   - Done 2026-10-17: the `ctgov` plugin, `trial_al.pipeline` and real `install`/`update` commands. A full install of 607,349 studies took 14m50s and makes a 9.1 GB `trials.db`; a real update fetched 2,606 studies in 3.7s (numbers in bench/README.md).
 4. **Jobs, stats and API.**
    - Build: worker, scheduler, SSE, stats engine, `TrialFilter`, facets, all core endpoints, the access hook and browser protections.
    - Done when: the API benchmarks meet §10 on the full dataset.
@@ -427,3 +446,10 @@ Decided 2026-10-17:
 3. **Dashboard layout:** one shared layout. Per-user layouts might come later.
 4. **v1 carry-over:** email notifications, the newsletter, Excel exports and curation are removed. Email may come back later as a plugin. No v1 curated data is imported.
 5. **Install method:** `uv tool install`. A Docker image might be added at publishing.
+
+Decided in milestone 3 (2026-10-17):
+
+6. **Raw documents are compressed with zstd.** Real study JSON is 10.5 GB; as SQLite JSONB it would be about 9.8 GB of a 16.4 GB database. Each document is compressed on its own (level 3) against a 110 KB dictionary trained on the first batch, kept in `doc_dicts`: 19% of the JSON size, 2.5 GB, and still quick to read one document (`storage/docs.py`, migration 2). It needs `backports.zstd` on Python 3.13 (the standard library's `compression.zstd` from 3.14). Not chosen: zlib (standard library, but 27% and a quarter of the speed); dropping `resultsSection` (35% of the bytes, but the planned demographics plugin reads it); dropping text that other tables repeat (the document would no longer be the original). Next, if size matters: compress `trial_text` and `trial_outcomes` too and make `trials_fts` contentless, about 2.7 GB less but no snippets.
+7. **Sources choose what the content hash covers** (`Source.hashable`), because ClinicalTrials.gov stamps every study with the release date (`versionHolder`); hashing it would make each daily update rewrite every study it fetches.
+8. **`install` doesn't replace an existing database** unless `--force`, because a fresh database starts the change log over. Carrying the log across a rebuild is left for the `rebuild` command.
+9. **Countries outside ISO 3166-1** that ClinicalTrials.gov uses get codes: Kosovo `XK` (user-assigned, widely used) and the former Serbia and Montenegro `CS`, Yugoslavia `YU` and Netherlands Antilles `AN` (reserved by ISO 3166-3). Puerto Rico and other territories keep their own codes, so a trial in the US and Puerto Rico has `location_scope = BOTH`.

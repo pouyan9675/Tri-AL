@@ -46,6 +46,11 @@ def assert_round_trips(
         assert stored.id == trial_id
 
 
+def hashed(records: Iterable[TrialRecord]) -> list[TrialRecord]:
+    """``records``, each with a different content hash."""
+    return [replace(record, content_hash=f"hash {i}".encode()) for i, record in enumerate(records)]
+
+
 class _HasSourceId(Protocol):
     @property
     def source_id(self) -> str: ...
@@ -143,6 +148,47 @@ class StorageContract:
 
     def test_empty_batch(self, storage: Storage) -> None:
         assert storage.upsert_batch([]) == []
+
+    def test_raw_documents_round_trip_exactly(self, storage: Storage) -> None:
+        raw = '{ "title": "Köln \\u00f6",\n  "n": 2.50 }'.encode()
+
+        [trial_id] = storage.upsert_batch([replace(minimal_trial(), raw=raw)])
+
+        stored = storage.get_trial(trial_id)
+        assert stored is not None
+        assert stored.raw == raw
+
+    # --- content hashes ---------------------------------------------------------------------
+
+    def test_content_hashes_by_source(self, storage: Storage) -> None:
+        records = hashed(sample_trials())
+        storage.upsert_batch(records)
+        ctgov = {r.source_id: r.content_hash for r in records if r.source == "ctgov"}
+
+        assert storage.content_hashes("ctgov") == ctgov
+        assert storage.content_hashes("isrctn") == {"ISRCTN00000001": records[-1].content_hash}
+        assert storage.content_hashes("nobody") == {}
+
+    def test_content_hashes_of_listed_trials(self, storage: Storage) -> None:
+        records = hashed(sample_trials())
+        storage.upsert_batch(
+            [*records, replace(minimal_trial(), source_id="NCT1", content_hash=None)]
+        )
+
+        found = storage.content_hashes("ctgov", ["NCT90000002", "NCT1", "NCT404", "ISRCTN00000001"])
+
+        assert found == {"NCT90000002": records[1].content_hash, "NCT1": None}
+
+    def test_content_hashes_follow_writes(self, storage: Storage) -> None:
+        [record] = hashed([phase3_trial()])
+        with storage.transaction() as tx:
+            tx.upsert_batch([record])
+            assert tx.content_hashes("ctgov") == {"NCT90000001": record.content_hash}
+            assert storage.content_hashes("ctgov") == {}  # not committed yet
+
+        with storage.bulk_load() as load:
+            load.upsert_batch([replace(record, content_hash=b"new")])
+            assert load.content_hashes("ctgov", ["NCT90000001"]) == {"NCT90000001": b"new"}
 
     def test_upsert_rejects_two_records_for_one_trial(self, storage: Storage) -> None:
         with pytest.raises(ValueError, match="more than one record"):
