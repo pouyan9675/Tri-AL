@@ -1,0 +1,44 @@
+# Workspace root for Tri-AL v2 (see docs/design.md §4). v1's Django code at the
+# repository root is not part of the workspace and is excluded from every tool below.
+
+[tool.uv.workspace]
+members = ["core", "plugins/*"]
+
+[tool.uv]
+python-preference = "only-managed"
+
+[tool.uv.sources]
+trial-al = { workspace = true }
+trial-al-sample = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "trial-al",
+    "trial-al-sample",
+    "mypy>=2.4",
+    "pytest>=9.1",
+    "ruff>=0.17",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+extend-exclude = ["data_manager.py", "manage.py", "panels", "visual", "schedulers", "docs"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "C4", "SIM", "PT", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["trial_al", "trial_al_sample"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+files = ["core/src", "core/tests", "plugins/*/src", "plugins/*/tests"]
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["core/tests", "plugins"]
+addopts = ["--import-mode=importlib", "-ra", "--strict-markers", "--strict-config"]
+xfail_strict = true
+filterwarnings = ["error"]

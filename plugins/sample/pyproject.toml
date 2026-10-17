@@ -1,0 +1,16 @@
+[project]
+name = "trial-al-sample"
+version = "0.1.0"
+description = "Sample Tri-AL plugin that shows how discovery, settings and CLI registration work."
+requires-python = ">=3.13"
+dependencies = ["trial-al"]
+
+[project.entry-points."trial_al.plugins"]
+sample = "trial_al_sample:plugin"
+
+[tool.uv.sources]
+trial-al = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.9.5,<0.10.0"]
+build-backend = "uv_build"

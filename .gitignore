@@ -15,3 +15,6 @@ back.sqlite3
 logs/*
 /static/
 visual/config.yml
+
+# v2
+/trial-al.toml

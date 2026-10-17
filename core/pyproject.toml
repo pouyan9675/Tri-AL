@@ -1,0 +1,18 @@
+[project]
+name = "trial-al"
+version = "2.0.0.dev0"
+description = "Mirror ClinicalTrials.gov into SQLite and explore it in a fast local dashboard."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pydantic>=2.12",
+    "tomlkit>=0.13",
+    "typer>=0.20",
+]
+
+[project.scripts]
+trial-al = "trial_al.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.9.5,<0.10.0"]
+build-backend = "uv_build"
