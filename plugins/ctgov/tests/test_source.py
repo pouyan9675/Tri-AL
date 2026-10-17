@@ -10,11 +10,11 @@ import httpx
 import orjson
 import pytest
 
-from trial_al.pipeline import FetchContext, FetchError, Progress, Source
-from trial_al.testing import SourceContract
-from trial_al_ctgov import CtgovSource, Settings, plugin
-from trial_al_ctgov.client import MAX_ATTEMPTS
-from trial_al_ctgov.source import BULK_FILE
+from tri_al.pipeline import FetchContext, FetchError, Progress, Source
+from tri_al.testing import SourceContract
+from tri_al_ctgov import CtgovSource, Settings, plugin
+from tri_al_ctgov.client import MAX_ATTEMPTS
+from tri_al_ctgov.source import BULK_FILE
 
 if TYPE_CHECKING:
     from tests.conftest import FakeApi, Sleeps, ZipMaker
@@ -55,8 +55,8 @@ class TestCtgovSourceContract(SourceContract):
 
 
 def test_the_plugin_registers_the_source_with_its_settings() -> None:
-    from trial_al.plugins import Registry
-    from trial_al.plugins.registry import Contributions
+    from tri_al.plugins import Registry
+    from tri_al.plugins.registry import Contributions
 
     contributions = Contributions()
     settings = Settings(page_size=250, timeout=5)
@@ -98,7 +98,7 @@ def test_fetch_changed_asks_for_studies_posted_since_a_date(api: FakeApi, tmp_pa
     assert second["pageToken"] == "ZVNj7o2Elu8o3lpzXcinvarumpOQJJxuZfSk2_g"
     assert "countTotal" not in second
     assert api.requests[0].url.path == "/api/v2/studies"
-    assert api.requests[0].headers["user-agent"].startswith("trial-al-ctgov/")
+    assert api.requests[0].headers["user-agent"].startswith("tri-al-ctgov/")
 
 
 def test_fetch_changed_yields_each_study_as_its_own_document(api: FakeApi, tmp_path: Path) -> None:

@@ -37,15 +37,15 @@ So a daily update is **1–2 API pages**. The data is tiny next to what SQLite c
 ## 3. Architecture
 
 ```
-                   ┌──────────────────────────── trial-al serve ───────────────────────────┐
- browser ──HTTP──▶ │  API (FastAPI, N uvicorn workers)          Worker process (1)          │
+                   ┌───────────────────────────── tri-al serve ──────────────────────────────┐
+ browser ──HTTP──▶ │  API (FastAPI, N uvicorn workers)          Worker process (1)           │
   React SPA ◀─SSE─ │   reads trials.db, reads/writes app.db      runs jobs: install, update, │
                    │   serves built SPA files                    enrich, schedule            │
-                   └───────────────┬───────────────────────────────────────┬───────────────┘
+                   └───────────────┬───────────────────────────────────────┬─────────────────┘
                                    │ read                                  │ the only writer
                          ┌─────────▼─────────┐                   ┌─────────▼─────────┐
                          │  data/trials.db   │◀──────────────────│ ClinicalTrials.gov│
-                         │  trial data+stats │   pipeline writes │  API v2 / bulk zip │
+                         │  trial data+stats │   pipeline writes │ API v2 / bulk zip │
                          └───────────────────┘                   └───────────────────┘
                          ┌───────────────────┐
                          │  data/app.db      │  jobs + progress,
@@ -56,7 +56,7 @@ So a daily update is **1–2 API pages**. The data is tiny next to what SQLite c
 **Two SQLite files, on purpose:**
 - **`trials.db`** holds only data that comes from sources. Only the pipeline writes to it, inside the worker. A rebuild can build a new file and swap it in.
 - **`app.db`** holds state the app changes (jobs, enricher state). Job progress keeps updating while an update holds the write lock on `trials.db`, because it's in a different file and so a different lock.
-- **Plugin on/off state and settings** live in `trial-al.toml` (§5.6), not in either database.
+- **Plugin on/off state and settings** live in `tri-al.toml` (§5.6), not in either database.
 
 No Redis and no separate database server. The cache lives in memory in each API worker, keyed by `data_version`.
 
@@ -65,14 +65,14 @@ No Redis and no separate database server. The cache lives in memory in each API 
 One repo managed as a uv workspace:
 
 ```
-core/                 Python package `trial-al` (src/trial_al/…)
-  src/trial_al/
+core/                 Python package `tri-al` (src/tri_al/…)
+  src/tri_al/
     schema/  storage/  pipeline/  jobs/  stats/  plugins/  config/  access/  api/  cli/
     testing/          contract test suites that plugins reuse
   tests/
 plugins/
-  ctgov/              trial-al-ctgov       ClinicalTrials.gov source (installed by default)
-  charts/             trial-al-charts      default dashboard charts (installed by default)
+  ctgov/              tri-al-ctgov       ClinicalTrials.gov source (installed by default)
+  charts/             tri-al-charts      default dashboard charts (installed by default)
 web/                  React + Vite + TypeScript + Tailwind + shadcn/ui
 bench/                benchmark suite and dataset fetch script
 docs/
@@ -149,25 +149,25 @@ fetch ─▶ parse (orjson) ─▶ normalize (source → TrialRecord) ─▶ has
 - **Facets** (the counts shown beside each filter option) are just stats with a filter applied.
 
 ### 5.6 Plugin system
-- **Discovery:** Python entry points in the group `trial_al.plugins`. Each plugin exposes a `Plugin` object (name, version, `api_version`, `requires`, settings model) and a `register(registry)` function.
+- **Discovery:** Python entry points in the group `tri_al.plugins`. Each plugin exposes a `Plugin` object (name, version, `api_version`, `requires`, settings model) and a `register(registry)` function.
 - **Loading:** the core loads the plugins enabled in config, ordered by `requires`. It refuses any plugin whose `api_version` doesn't match.
-- **On/off state and settings live in `trial-al.toml`.** Installed plugins are enabled unless their `[plugins.<name>]` section says `enabled = false`, and the rest of that section is the plugin's settings. `trial-al plugins enable|disable` (and later the API) edit the file and keep its comments, and `TRIAL_AL_PLUGINS__<NAME>__…` variables override it. Plugins load at startup, so changes apply on the next start. No database holds plugin state.
+- **On/off state and settings live in `tri-al.toml`.** Installed plugins are enabled unless their `[plugins.<name>]` section says `enabled = false`, and the rest of that section is the plugin's settings. `tri-al plugins enable|disable` (and later the API) edit the file and keep its comments, and `TRI_AL_PLUGINS__<NAME>__…` variables override it. Plugins load at startup, so changes apply on the next start. No database holds plugin state.
 - **Registry API (base):**
   - `add_source`, `add_enricher`, `add_chart`, `add_filter_field`, `add_search_provider`
   - `add_routes(router)`, mounted at `/api/x/<plugin>/`
   - `add_migrations(database, migrations)` for `"trials"` or `"app"`, tracked under the plugin's name; `add_sqlite_extension(name, load)` (see §5.2)
   - `add_job`, `add_cli`, `on(event, handler)`
   - `set_access_policy` (see §5.8)
-- **Events:** `update.started(run_id)`, `trials.changed(run_id, ids, kind)` with kind `new` or `updated`, `update.finished(summary)`, `install.finished(summary)`. Each handler gets one event object (`trial_al.pipeline.events`). Handlers run in the process that fires the event, after the data is committed; pipeline events fire in the worker. An install doesn't send `trials.changed`, since every trial is new. A handler that raises is logged and listed in the summary's `handler_errors`; it doesn't stop the run.
+- **Events:** `update.started(run_id)`, `trials.changed(run_id, ids, kind)` with kind `new` or `updated`, `update.finished(summary)`, `install.finished(summary)`. Each handler gets one event object (`tri_al.pipeline.events`). Handlers run in the process that fires the event, after the data is committed; pipeline events fire in the worker. An install doesn't send `trials.changed`, since every trial is new. A handler that raises is logged and listed in the summary's `handler_errors`; it doesn't stop the run.
 - **Rules:**
   - The core never imports plugins.
   - Plugins communicate only through core interfaces and events.
   - Each plugin owns its prefixed tables and its migrations.
-  - Every implementation of an interface must pass the core's contract tests (`trial_al.testing`).
+  - Every implementation of an interface must pass the core's contract tests (`tri_al.testing`).
 
 ### 5.7 Config
-- **One file**, `trial-al.toml`, read with the standard library's `tomllib`. Sections: `[server]` (host defaults to `127.0.0.1`), `[data]`, `[update]`, `[plugins.<name>]`.
-- **Environment variables** `TRIAL_AL_*` override it, and secrets come only from the environment.
+- **One file**, `tri-al.toml`, read with the standard library's `tomllib`. Sections: `[server]` (host defaults to `127.0.0.1`), `[data]`, `[update]`, `[plugins.<name>]`.
+- **Environment variables** `TRI_AL_*` override it, and secrets come only from the environment.
 - **Validation:** each plugin's section is checked against that plugin's settings model.
 
 ### 5.8 Access (no login by default)
@@ -191,12 +191,12 @@ All GET responses use orjson, an `ETag` derived from `data_version` (unchanged d
 | `GET /api/stats/{chart_id}` | Chart data, precomputed or filtered |
 | `GET /api/events` | SSE stream: `data_version` changes, job progress |
 | `POST /api/jobs/update`, `GET /api/jobs[/{id}]` | Start an update, job status |
-| `GET/PATCH /api/plugins[/{name}]` | List plugins; PATCH enables, disables or changes settings by editing `trial-al.toml` (applies on the next start) |
+| `GET/PATCH /api/plugins[/{name}]` | List plugins; PATCH enables, disables or changes settings by editing `tri-al.toml` (applies on the next start) |
 
 A TypeScript client for `web/` is generated from the OpenAPI schema.
 
 ### 5.10 CLI (Typer)
-`trial-al install | update | rebuild | serve | worker | backup | doctor | bench`, plus `trial-al plugins list|enable|disable`.
+`tri-al install | update | rebuild | serve | worker | backup | doctor | bench`, plus `tri-al plugins list|enable|disable`.
 
 - `serve` starts the API workers and the job worker together.
 - `backup` uses `VACUUM INTO` (an online copy).
@@ -242,7 +242,7 @@ The `trials` table has these columns:
 
 Notes:
 - **Dates** are stored as ISO text `YYYY-MM-DD`. Month-only dates become the 1st of the month; the exact original stays in `trial_docs`.
-- **Ages** are converted to days, so age ranges are simple numeric filters (v1 stored them as strings). `trial_al.schema.age_in_days` does it, rounding down, with a year of 365.25 days and a month of a twelfth of that (so "12 Months" equals "1 Year"); filters convert with the same function.
+- **Ages** are converted to days, so age ranges are simple numeric filters (v1 stored them as strings). `tri_al.schema.age_in_days` does it, rounding down, with a year of 365.25 days and a month of a twelfth of that (so "12 Months" equals "1 Year"); filters convert with the same function.
 - **Link tables** use `WITHOUT ROWID` with primary key `(trial_id, x_id)` plus a reverse index `(x_id, trial_id)`. A `position` column keeps the source's order.
 - **Entities are identified by name** (MeSH terms by code). Per-trial details, such as an intervention's type or a sponsor's class, are on the link, so each trial reads back exactly as written. A trial that lists the same entity twice keeps the first.
 - **Outcomes are rows, not JSON:** FTS5 can't read virtual tables such as `json_each` through its content view.
@@ -250,12 +250,12 @@ Notes:
 - **Raw documents** are compressed one by one with zstd (level 3) against a 110 KB dictionary that the first batch of at least 1,000 documents trains (`storage/docs.py`). A document is still quick to read alone, and real ones shrink to 19% of their JSON size. As SQLite JSONB they'd be about 10 GB at 607k studies, more than every other table together; compressed they're about 2.5 GB (§15, decision 6). The storage no longer checks that `raw` is JSON; the pipeline has parsed it already.
 - **The change log** records these fields when an update changes them, old and new as JSON text: title, status, phase, study_type, primary_purpose, the start and completion dates, enrollment and its type, arms_count, has_results, lead sponsor, ages, sex, healthy_volunteers, conditions, interventions, countries and num_sites (`pipeline/changes.py`). `last_update` changes with every version, so it isn't logged.
 
-`app.db` holds `jobs`, `enricher_state` and `_migrations`. Plugin state stays in `trial-al.toml` (§5.6).
+`app.db` holds `jobs`, `enricher_state` and `_migrations`. Plugin state stays in `tri-al.toml` (§5.6).
 
 ## 7. Plugin interfaces (base)
 
 ```python
-class Source(Protocol):                 # trial_al.pipeline; picklable, it's sent to the pool
+class Source(Protocol):                 # tri_al.pipeline; picklable, it's sent to the pool
     name: str
     def fetch_all(self, ctx: FetchContext) -> Iterator[bytes]: ...            # raw study JSON
     def fetch_changed(self, since: date, ctx: FetchContext) -> Iterator[bytes]: ...
@@ -297,8 +297,8 @@ v1's `customize.py` (`@column` functions plus `Database.columns`) becomes an `En
 ## 8. Flows
 
 ### Install
-1. `uv tool install trial-al`, then `trial-al install [--from-file PATH] [--data-dir ./data] [--force] [--workers N]` (milestone 3; milestone 6 adds `--profile default|minimal` and `--serve`).
-2. Write `trial-al.toml` (from prompts or flags). (Milestone 6.)
+1. `uv tool install tri-al`, then `tri-al install [--from-file PATH] [--data-dir ./data] [--force] [--workers N]` (milestone 3; milestone 6 adds `--profile default|minimal` and `--serve`).
+2. Write `tri-al.toml` (from prompts or flags). (Milestone 6.)
 3. Create `app.db` and run its migrations.
 4. Download `ctg-studies.json.zip` into `data/downloads/`, with progress shown and its size and SHA-256 recorded beside it, or read the file given with `--from-file`.
 5. Build `trials.db.new`: read the zip member by member (no extraction), in NCT order, so trial ids follow registration order; parse, hash and normalize in a pool; insert in batches with a single writer.
@@ -364,7 +364,7 @@ How we get there:
 ## 11. Testing and tooling
 
 - **Python:** ruff for lint and format, mypy (strict on `core`), and pytest. API tests use httpx against the app.
-- **Contract tests:** every Source, Enricher, storage backend and SearchProvider must pass the suites in `trial_al.testing`.
+- **Contract tests:** every Source, Enricher, storage backend and SearchProvider must pass the suites in `tri_al.testing`.
 - **Fixtures:** a handful of real study JSON files (public data) cover edge cases: results, month-only dates, multiple phases, no locations.
 - **Web:** Vitest + Testing Library, plus a Playwright smoke test (install sample → dashboard → filter → detail).
 - **CI:** GitHub Actions (hosted runners for PRs; the self-hosted runner for nightly full benchmarks).
@@ -376,7 +376,7 @@ Nothing AI-specific is in the base, but these hooks exist so AI features plug in
 - **`SearchProvider`:** semantic and hybrid search behind the same ⌘K box and `/api/search`.
 - **`add_routes` and `add_job`:** chat endpoints and embedding backfill jobs.
 - **Vector search: a planned plugin built on sqlite-vec.**
-  - **Package:** its own plugin (e.g. `trial-al-vectors`), depending on `sqlite-vec`. That's 0 dependencies, version 0.1.9 on 2026-10-17, still pre-1.0. It's loaded through the extension hook (§5.2).
+  - **Package:** its own plugin (e.g. `tri-al-vectors`), depending on `sqlite-vec`. That's 0 dependencies, version 0.1.9 on 2026-10-17, still pre-1.0. It's loaded through the extension hook (§5.2).
   - **Storage:** its migration creates a `vec0` virtual table in `trials.db` keyed by trial `id`, so vectors change in the same transaction as the trial data.
   - **Filling it:** an embedding `Enricher` fills it for changed trials.
   - **Searching it:** a `SearchProvider` merges its results with FTS5. Filters use the existing tables, with nothing copied into a separate store.
@@ -419,14 +419,14 @@ Each milestone ends working, tested and measured.
 
 1. **Skeleton.**
    - Build: uv workspace, `core` package, plugin loader with a sample plugin, config, CLI stub, ruff/mypy/pytest, CI.
-   - Done when: `trial-al plugins list` shows the sample plugin, and CI is green.
+   - Done when: `tri-al plugins list` shows the sample plugin, and CI is green.
 2. **Schema and storage.**
    - Build: `TrialRecord`, SQLite storage, migration runner, `trials.db` and `app.db` tables, full-text search, storage contract tests.
    - Done when: the contract tests pass and a fixture round-trips.
 3. **ClinicalTrials.gov plugin and pipeline.**
    - Build: bulk install, incremental update, hash checks, atomic commit and swap, checkpoints, change log.
    - Done when: a full install and a real daily update both work, and the install time is recorded.
-   - Done 2026-10-17: the `ctgov` plugin, `trial_al.pipeline` and real `install`/`update` commands. A full install of 607,349 studies took 14m50s and makes a 9.1 GB `trials.db`; a real update fetched 2,606 studies in 3.7s (numbers in bench/README.md).
+   - Done 2026-10-17: the `ctgov` plugin, `tri_al.pipeline` and real `install`/`update` commands. A full install of 607,349 studies took 14m50s and makes a 9.1 GB `trials.db`; a real update fetched 2,606 studies in 3.7s (numbers in bench/README.md).
 4. **Jobs, stats and API.**
    - Build: worker, scheduler, SSE, stats engine, `TrialFilter`, facets, all core endpoints, the access hook and browser protections.
    - Done when: the API benchmarks meet §10 on the full dataset.

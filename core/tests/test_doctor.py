@@ -9,11 +9,11 @@ import pytest
 from sqlalchemy import text
 from typer.testing import CliRunner, Result
 
-from trial_al import doctor
-from trial_al.cli import create_app
-from trial_al.plugins import Registry
-from trial_al.storage import Migration, SQLiteStorage, open_app_db
-from trial_al.storage.core_migrations import TRIALS_MIGRATIONS
+from tri_al import doctor
+from tri_al.cli import create_app
+from tri_al.plugins import Registry
+from tri_al.storage import Migration, SQLiteStorage, open_app_db
+from tri_al.storage.core_migrations import TRIALS_MIGRATIONS
 
 if TYPE_CHECKING:
     from conftest import Install, MakePlugin
@@ -61,7 +61,7 @@ def test_passes_on_a_working_install(install: Install, make_plugin: MakePlugin) 
     assert checks["SQLite"].startswith(f"ok  {sqlite3.sqlite_version} (needs 3.45 or newer)")
     assert checks["plugins"] == "ok  1 enabled (alpha)"
     assert (
-        checks["trials.db"] == "ok  data/trials.db doesn't exist yet; `trial-al install` creates it"
+        checks["trials.db"] == "ok  data/trials.db doesn't exist yet; `tri-al install` creates it"
     )
     assert result.stdout.endswith("All checks passed.\n")
 
@@ -73,7 +73,7 @@ def test_fails_on_old_sqlite(install: Install, monkeypatch: pytest.MonkeyPatch) 
     result = run_doctor()
 
     assert result.exit_code == 1
-    assert lines(result)["SQLite"] == "fail  3.37.2, but trial-al needs 3.45 or newer"
+    assert lines(result)["SQLite"] == "fail  3.37.2, but tri-al needs 3.45 or newer"
     assert "uv python install 3.13" in fixes(result)[0]
     assert result.stderr == "\n1 check failed.\n"
 
@@ -131,12 +131,12 @@ def test_fails_when_plugins_do_not_load(install: Install, make_plugin: MakePlugi
 
 def test_fails_on_bad_config(install: Install) -> None:
     install()
-    Path("trial-al.toml").write_text("[data]\ndri = 'x'\n")
+    Path("tri-al.toml").write_text("[data]\ndri = 'x'\n")
 
     result = run_doctor()
 
     assert result.exit_code == 1
-    assert lines(result)["config"] == "fail  invalid config (trial-al.toml):"
+    assert lines(result)["config"] == "fail  invalid config (tri-al.toml):"
     assert "\n        data.dri: Extra inputs are not permitted\n" in result.stdout
     assert "trials.db" not in lines(result)
 
@@ -187,4 +187,4 @@ def test_warns_about_an_unfinished_bulk_load(install: Install) -> None:
 
     assert result.exit_code == 0
     assert "didn't finish" in lines(result)["trials.db"]
-    assert fixes(result) == ["run `trial-al rebuild`"]
+    assert fixes(result) == ["run `tri-al rebuild`"]

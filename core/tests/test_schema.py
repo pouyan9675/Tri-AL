@@ -1,4 +1,4 @@
-"""The migrations and the SQLAlchemy tables in ``trial_al.storage.tables`` describe one schema."""
+"""The migrations and the SQLAlchemy tables in ``tri_al.storage.tables`` describe one schema."""
 
 import sqlite3
 from collections.abc import Callable
@@ -11,10 +11,10 @@ from sqlalchemy import MetaData, Table, UniqueConstraint
 from sqlalchemy.dialects import sqlite as sqlite_dialect
 from sqlalchemy.sql.elements import TextClause
 
-from trial_al.schema import Location, Sponsor
-from trial_al.storage import SQLiteStorage, open_app_db
-from trial_al.storage.tables import DEFERRED_INDEXES, app_metadata, trials_metadata
-from trial_al.testing.fixtures import minimal_trial
+from tri_al.schema import Location, Sponsor
+from tri_al.storage import SQLiteStorage, open_app_db
+from tri_al.storage.tables import DEFERRED_INDEXES, app_metadata, trials_metadata
+from tri_al.testing.fixtures import minimal_trial
 
 DIALECT = sqlite_dialect.dialect()
 

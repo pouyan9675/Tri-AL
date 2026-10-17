@@ -7,13 +7,13 @@ import pytest
 import typer
 from typer.testing import CliRunner, Result
 
-from trial_al import __version__
-from trial_al.cli import create_app
-from trial_al.cli.app import STUBS
-from trial_al.cli.data import ProgressPrinter, describe, duration
-from trial_al.pipeline import Progress
-from trial_al.plugins import Plugin, Registry
-from trial_al.testing import FakeSource, fake_study
+from tri_al import __version__
+from tri_al.cli import create_app
+from tri_al.cli.app import STUBS
+from tri_al.cli.data import ProgressPrinter, describe, duration
+from tri_al.pipeline import Progress
+from tri_al.plugins import Plugin, Registry
+from tri_al.testing import FakeSource, fake_study
 
 if TYPE_CHECKING:
     from conftest import Install, MakePlugin
@@ -29,7 +29,7 @@ def test_version() -> None:
     result = run("--version")
 
     assert result.exit_code == 0
-    assert result.stdout == f"trial-al {__version__}\n"
+    assert result.stdout == f"tri-al {__version__}\n"
 
 
 @pytest.mark.parametrize("command", list(STUBS))
@@ -37,12 +37,12 @@ def test_unbuilt_commands_say_so(command: str) -> None:
     result = run(command)
 
     assert result.exit_code == 1
-    assert result.stderr == f"trial-al {command}: not implemented yet\n"
+    assert result.stderr == f"tri-al {command}: not implemented yet\n"
 
 
 def test_plugins_list_shows_installed_plugins(install: Install, make_plugin: MakePlugin) -> None:
     install(make_plugin("alpha", version="1.2", description="First."), make_plugin("beta"))
-    Path("trial-al.toml").write_text("[plugins.beta]\nenabled = false\n")
+    Path("tri-al.toml").write_text("[plugins.beta]\nenabled = false\n")
 
     result = run("plugins", "list")
 
@@ -74,7 +74,7 @@ def test_plugins_list_without_plugins(install: Install) -> None:
 
 def test_plugins_list_reports_config_errors(install: Install) -> None:
     install()
-    Path("trial-al.toml").write_text("[server]\nhots = 'x'\n")
+    Path("tri-al.toml").write_text("[server]\nhots = 'x'\n")
 
     result = run("plugins", "list")
 
@@ -84,12 +84,12 @@ def test_plugins_list_reports_config_errors(install: Install) -> None:
 
 def test_plugins_disable_then_enable(install: Install, make_plugin: MakePlugin) -> None:
     install(make_plugin("alpha"))
-    config = Path("trial-al.toml")
+    config = Path("tri-al.toml")
 
     result = run("plugins", "disable", "alpha")
 
     assert result.exit_code == 0
-    assert result.stdout == "Plugin 'alpha' disabled in trial-al.toml.\n"
+    assert result.stdout == "Plugin 'alpha' disabled in tri-al.toml.\n"
     assert config.read_text() == "[plugins.alpha]\nenabled = false\n"
     assert run("plugins", "disable", "alpha").stdout == "Plugin 'alpha' is already disabled.\n"
 
@@ -106,16 +106,16 @@ def test_plugins_enable_rejects_unknown_names(install: Install, make_plugin: Mak
 
     assert result.exit_code == 1
     assert result.stderr == "error: no installed plugin named 'nope'; installed: alpha\n"
-    assert not Path("trial-al.toml").exists()
+    assert not Path("tri-al.toml").exists()
 
 
-def test_plugins_enable_writes_to_trial_al_config(
+def test_plugins_enable_writes_to_tri_al_config(
     install: Install, make_plugin: MakePlugin, tmp_path: Path
 ) -> None:
     install(make_plugin("alpha"))
     path = tmp_path / "elsewhere.toml"
 
-    result = run("plugins", "disable", "alpha", env={"TRIAL_AL_CONFIG": str(path)})
+    result = run("plugins", "disable", "alpha", env={"TRI_AL_CONFIG": str(path)})
 
     assert result.exit_code == 0
     assert path.read_text() == "[plugins.alpha]\nenabled = false\n"
@@ -125,12 +125,12 @@ def test_plugins_enable_warns_when_environment_wins(
     install: Install, make_plugin: MakePlugin
 ) -> None:
     install(make_plugin("alpha"))
-    Path("trial-al.toml").write_text("[plugins.alpha]\nenabled = false\n")
+    Path("tri-al.toml").write_text("[plugins.alpha]\nenabled = false\n")
 
-    result = run("plugins", "enable", "alpha", env={"TRIAL_AL_PLUGINS__ALPHA__ENABLED": "0"})
+    result = run("plugins", "enable", "alpha", env={"TRI_AL_PLUGINS__ALPHA__ENABLED": "0"})
 
     assert result.exit_code == 0
-    assert "TRIAL_AL_PLUGINS__ALPHA__ENABLED overrides the file" in result.stderr
+    assert "TRI_AL_PLUGINS__ALPHA__ENABLED overrides the file" in result.stderr
 
 
 def test_plugins_disable_warns_about_dependents(install: Install, make_plugin: MakePlugin) -> None:
@@ -266,7 +266,7 @@ def test_update_needs_an_install(install: Install, make_plugin: MakePlugin) -> N
     result = run("update")
 
     assert result.exit_code == 1
-    assert "run `trial-al install` first" in result.stderr
+    assert "run `tri-al install` first" in result.stderr
 
 
 def test_install_needs_a_source(install: Install) -> None:

@@ -7,9 +7,9 @@ import pytest
 import typer
 from pydantic import BaseModel, ConfigDict
 
-from trial_al.config import Config, PluginSection
-from trial_al.pipeline import Subscription
-from trial_al.plugins import (
+from tri_al.config import Config, PluginSection
+from tri_al.pipeline import Subscription
+from tri_al.plugins import (
     ENTRY_POINT_GROUP,
     Plugin,
     PluginError,
@@ -18,9 +18,9 @@ from trial_al.plugins import (
     inspect_plugins,
     load_plugins,
 )
-from trial_al.plugins.registry import Contributions
-from trial_al.storage import Migration, SqliteExtension
-from trial_al.testing import FakeSource
+from tri_al.plugins.registry import Contributions
+from tri_al.storage import Migration, SqliteExtension
+from tri_al.testing import FakeSource
 
 if TYPE_CHECKING:
     from conftest import MakeEntryPoint, MakePlugin
@@ -103,8 +103,8 @@ def test_rejects_other_plugin_api_versions(
         load_plugins(Config(), [make_entry_point("alpha", make_plugin("alpha", api_version=99))])
 
     assert exc_info.value.problems == [
-        "alpha: written for plugin API 99, but this trial-al supports API 1; "
-        "upgrade the plugin or trial-al"
+        "alpha: written for plugin API 99, but this tri-al supports API 1; "
+        "upgrade the plugin or tri-al"
     ]
 
 
@@ -116,9 +116,7 @@ def test_rejects_entry_point_name_that_differs_from_plugin_name(
 
 
 def test_rejects_objects_that_are_not_plugins(make_entry_point: MakeEntryPoint) -> None:
-    with pytest.raises(
-        PluginLoadError, match=r"alpha: .* is a str, not a trial_al\.plugins\.Plugin"
-    ):
+    with pytest.raises(PluginLoadError, match=r"alpha: .* is a str, not a tri_al\.plugins\.Plugin"):
         load_plugins(Config(), [make_entry_point("alpha", "not a plugin")])
 
 
@@ -141,7 +139,7 @@ def test_reports_missing_and_disabled_requirements(
         load_plugins(config(b={"enabled": False}), eps)
 
     assert exc_info.value.problems == [
-        "a: requires plugin 'b', which is disabled; run `trial-al plugins enable b`",
+        "a: requires plugin 'b', which is disabled; run `tri-al plugins enable b`",
         "a: requires plugin 'nope', which is not installed",
     ]
     assert registered == []
@@ -197,7 +195,7 @@ def test_rejects_invalid_and_duplicate_names(
         load_plugins(Config(), eps)
 
     assert "Bad-Name: invalid name" in problems(exc_info)
-    assert "alpha: fake_trial_al_plugins:obj2 also provides a plugin" in problems(exc_info)
+    assert "alpha: fake_tri_al_plugins:obj2 also provides a plugin" in problems(exc_info)
 
 
 def test_collects_every_problem_before_registering(
@@ -242,8 +240,7 @@ def test_inspect_reports_every_plugin_without_raising(
         ("on", True, True, "2.1"),
     ]
     assert statuses[1].problems == [
-        "written for plugin API 99, but this trial-al supports API 1; "
-        "upgrade the plugin or trial-al"
+        "written for plugin API 99, but this tri-al supports API 1; upgrade the plugin or tri-al"
     ]
     assert statuses[2].problems == []
     assert statuses[2].description == "Enabled."

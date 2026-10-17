@@ -38,5 +38,5 @@ jobs:
 
       - name: CLI smoke test
         run: |
-          uv run trial-al plugins list
-          uv run trial-al doctor
+          uv run tri-al plugins list
+          uv run tri-al doctor

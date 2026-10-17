@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from trial_al.plugins import API_VERSION, ENTRY_POINT_GROUP, Plugin, Registry, loader
+from tri_al.plugins import API_VERSION, ENTRY_POINT_GROUP, Plugin, Registry, loader
 
 type MakeEntryPoint = Callable[[str, object], EntryPoint]
 type MakePlugin = Callable[..., Plugin]
@@ -18,9 +18,9 @@ type Install = Callable[..., None]
 
 @pytest.fixture(autouse=True)
 def _isolated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Run each test in an empty directory, without the caller's TRIAL_AL_* variables."""
+    """Run each test in an empty directory, without the caller's TRI_AL_* variables."""
     for var in list(os.environ):
-        if var.startswith("TRIAL_AL_"):
+        if var.startswith("TRI_AL_"):
             monkeypatch.delenv(var)
     monkeypatch.chdir(tmp_path)
 
@@ -28,7 +28,7 @@ def _isolated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 @pytest.fixture
 def make_entry_point(monkeypatch: pytest.MonkeyPatch) -> MakeEntryPoint:
     """Make entry points that load the given objects, without installing a package."""
-    module = types.ModuleType("fake_trial_al_plugins")
+    module = types.ModuleType("fake_tri_al_plugins")
     monkeypatch.setitem(sys.modules, module.__name__, module)
     counter = itertools.count()
 

@@ -8,9 +8,9 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "trial-al",
-    "trial-al-ctgov",
-    "trial-al-sample",
+    "tri-al",
+    "tri-al-ctgov",
+    "tri-al-sample",
 ]
 
 [manifest.dependency-groups]
@@ -18,9 +18,9 @@ dev = [
     { name = "mypy", specifier = ">=2.4" },
     { name = "pytest", specifier = ">=9.1" },
     { name = "ruff", specifier = ">=0.17" },
-    { name = "trial-al", editable = "core" },
-    { name = "trial-al-ctgov", editable = "plugins/ctgov" },
-    { name = "trial-al-sample", editable = "plugins/sample" },
+    { name = "tri-al", editable = "core" },
+    { name = "tri-al-ctgov", editable = "plugins/ctgov" },
+    { name = "tri-al-sample", editable = "plugins/sample" },
 ]
 
 [[package]]
@@ -696,7 +696,7 @@ wheels = [
 ]
 
 [[package]]
-name = "trial-al"
+name = "tri-al"
 version = "2.0.0.dev0"
 source = { editable = "core" }
 dependencies = [
@@ -726,32 +726,32 @@ requires-dist = [
 provides-extras = ["testing"]
 
 [[package]]
-name = "trial-al-ctgov"
+name = "tri-al-ctgov"
 version = "0.1.0"
 source = { editable = "plugins/ctgov" }
 dependencies = [
     { name = "httpx" },
     { name = "orjson" },
-    { name = "trial-al" },
+    { name = "tri-al" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "orjson", specifier = ">=3.13.0" },
-    { name = "trial-al", editable = "core" },
+    { name = "tri-al", editable = "core" },
 ]
 
 [[package]]
-name = "trial-al-sample"
+name = "tri-al-sample"
 version = "0.1.0"
 source = { editable = "plugins/sample" }
 dependencies = [
-    { name = "trial-al" },
+    { name = "tri-al" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "trial-al", editable = "core" }]
+requires-dist = [{ name = "tri-al", editable = "core" }]
 
 [[package]]
 name = "typer"

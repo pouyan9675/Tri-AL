@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from trial_al.schema import Intervention, Location, MeshTerm, Outcome, Sponsor
-from trial_al.storage.countries import COUNTRIES, EXTRA_COUNTRIES
-from trial_al_ctgov.countries import CTGOV_COUNTRIES, country_code
-from trial_al_ctgov.normalize import age_days, hashable, normalize, parse_date, phase
+from tri_al.schema import Intervention, Location, MeshTerm, Outcome, Sponsor
+from tri_al.storage.countries import COUNTRIES, EXTRA_COUNTRIES
+from tri_al_ctgov.countries import CTGOV_COUNTRIES, country_code
+from tri_al_ctgov.normalize import age_days, hashable, normalize, parse_date, phase
 
 if TYPE_CHECKING:
     from tests.conftest import StudyLoader

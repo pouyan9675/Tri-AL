@@ -26,9 +26,9 @@ from pathlib import Path
 
 from sqlalchemy import text
 
-from trial_al.schema import Intervention, Location, MeshTerm, Outcome, Sponsor, TrialRecord
-from trial_al.storage import SQLiteStorage, TrialQuery
-from trial_al.storage.countries import COUNTRIES
+from tri_al.schema import Intervention, Location, MeshTerm, Outcome, Sponsor, TrialRecord
+from tri_al.storage import SQLiteStorage, TrialQuery
+from tri_al.storage.countries import COUNTRIES
 
 STATUSES = {
     "COMPLETED": 55,

@@ -8,14 +8,14 @@ import pytest
 from sqlalchemy import Connection, text
 from sqlalchemy.exc import DatabaseError
 
-from trial_al.schema import TrialRecord
-from trial_al.storage import SQLiteStorage, Storage, StorageError, create_engine, docs, migrate
-from trial_al.storage.core_migrations import TRIALS_MIGRATIONS
-from trial_al.storage.engine import raw_connection
-from trial_al.storage.sqlite import BULK_LOAD_KEY
-from trial_al.storage.tables import DEFERRED_INDEXES
-from trial_al.testing import StorageContract
-from trial_al.testing.fixtures import minimal_trial, phase3_trial, raw_json, sample_trials
+from tri_al.schema import TrialRecord
+from tri_al.storage import SQLiteStorage, Storage, StorageError, create_engine, docs, migrate
+from tri_al.storage.core_migrations import TRIALS_MIGRATIONS
+from tri_al.storage.engine import raw_connection
+from tri_al.storage.sqlite import BULK_LOAD_KEY
+from tri_al.storage.tables import DEFERRED_INDEXES
+from tri_al.testing import StorageContract
+from tri_al.testing.fixtures import minimal_trial, phase3_trial, raw_json, sample_trials
 
 ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
 

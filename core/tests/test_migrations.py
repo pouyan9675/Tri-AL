@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import Connection, Engine, text
 from sqlalchemy.exc import IntegrityError
 
-from trial_al.storage import (
+from tri_al.storage import (
     Migration,
     MigrationError,
     SQLiteStorage,
@@ -17,8 +17,8 @@ from trial_al.storage import (
     open_app_db,
     run_script,
 )
-from trial_al.storage.core_migrations import TRIALS_MIGRATIONS
-from trial_al.storage.migrations import current_version
+from tri_al.storage.core_migrations import TRIALS_MIGRATIONS
+from tri_al.storage.migrations import current_version
 
 
 @pytest.fixture

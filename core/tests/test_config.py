@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from trial_al.config import ConfigError, config_path, load_config, set_plugin_enabled
+from tri_al.config import ConfigError, config_path, load_config, set_plugin_enabled
 
 
 def write(path: Path, text: str) -> Path:
@@ -22,7 +22,7 @@ def test_missing_file_means_defaults(tmp_path: Path) -> None:
 
 def test_reads_the_file(tmp_path: Path) -> None:
     path = write(
-        tmp_path / "trial-al.toml",
+        tmp_path / "tri-al.toml",
         '[server]\nport = 9000\n\n[plugins.sample]\nenabled = false\ngreeting = "Hi"\n',
     )
 
@@ -41,11 +41,11 @@ def test_plugins_without_a_section_are_enabled() -> None:
 
 
 def test_environment_overrides_the_file(tmp_path: Path) -> None:
-    path = write(tmp_path / "trial-al.toml", '[server]\nhost = "0.0.0.0"\nport = 9000\n')
+    path = write(tmp_path / "tri-al.toml", '[server]\nhost = "0.0.0.0"\nport = 9000\n')
     env = {
-        "TRIAL_AL_SERVER__PORT": "9100",
-        "TRIAL_AL_PLUGINS__SAMPLE__GREETING": "Hi",
-        "TRIAL_AL_PLUGINS__OTHER__ENABLED": "false",
+        "TRI_AL_SERVER__PORT": "9100",
+        "TRI_AL_PLUGINS__SAMPLE__GREETING": "Hi",
+        "TRI_AL_PLUGINS__OTHER__ENABLED": "false",
         "UNRELATED": "ignored",
     }
 
@@ -57,52 +57,52 @@ def test_environment_overrides_the_file(tmp_path: Path) -> None:
     assert not config.plugin_enabled("other")
 
 
-def test_config_path_comes_from_trial_al_config(tmp_path: Path) -> None:
+def test_config_path_comes_from_tri_al_config(tmp_path: Path) -> None:
     path = write(tmp_path / "custom.toml", "[server]\nport = 9200\n")
-    env = {"TRIAL_AL_CONFIG": str(path)}
+    env = {"TRI_AL_CONFIG": str(path)}
 
-    assert config_path({}) == Path("trial-al.toml")
+    assert config_path({}) == Path("tri-al.toml")
     assert config_path(env) == path
     assert load_config(env=env).server.port == 9200
 
 
 def test_rejects_unknown_keys(tmp_path: Path) -> None:
-    path = write(tmp_path / "trial-al.toml", "[server]\nhots = 'x'\n")
+    path = write(tmp_path / "tri-al.toml", "[server]\nhots = 'x'\n")
 
     with pytest.raises(ConfigError, match=r"server\.hots: Extra inputs are not permitted"):
         load_config(path, env={})
 
 
 def test_errors_name_the_environment_variable(tmp_path: Path) -> None:
-    with pytest.raises(ConfigError, match=r"server\.port: .* \(from TRIAL_AL_SERVER__PORT\)"):
-        load_config(tmp_path / "absent.toml", env={"TRIAL_AL_SERVER__PORT": "lots"})
+    with pytest.raises(ConfigError, match=r"server\.port: .* \(from TRI_AL_SERVER__PORT\)"):
+        load_config(tmp_path / "absent.toml", env={"TRI_AL_SERVER__PORT": "lots"})
 
 
 @pytest.mark.parametrize(
     ("env", "message"),
     [
-        ({"TRIAL_AL_SERVER__": "1"}, "empty key"),
-        ({"TRIAL_AL_SERVER__HOST__NAME": "x"}, "'server.host' is not a table"),
+        ({"TRI_AL_SERVER__": "1"}, "empty key"),
+        ({"TRI_AL_SERVER__HOST__NAME": "x"}, "'server.host' is not a table"),
     ],
 )
 def test_rejects_malformed_environment_variables(
     tmp_path: Path, env: dict[str, str], message: str
 ) -> None:
-    path = write(tmp_path / "trial-al.toml", "[server]\nhost = 'h'\n")
+    path = write(tmp_path / "tri-al.toml", "[server]\nhost = 'h'\n")
 
     with pytest.raises(ConfigError, match=message):
         load_config(path, env=env)
 
 
 def test_rejects_invalid_toml(tmp_path: Path) -> None:
-    path = write(tmp_path / "trial-al.toml", "[server\n")
+    path = write(tmp_path / "tri-al.toml", "[server\n")
 
-    with pytest.raises(ConfigError, match=r"trial-al\.toml"):
+    with pytest.raises(ConfigError, match=r"tri-al\.toml"):
         load_config(path, env={})
 
 
 def test_set_plugin_enabled_creates_the_file(tmp_path: Path) -> None:
-    path = tmp_path / "trial-al.toml"
+    path = tmp_path / "tri-al.toml"
 
     set_plugin_enabled(path, "sample", False)
 
@@ -114,7 +114,7 @@ def test_set_plugin_enabled_keeps_comments_and_settings(tmp_path: Path) -> None:
     original = (
         '# My setup\n[server]\nport = 9000  # not 8000\n\n[plugins.sample]\ngreeting = "Hi"\n'
     )
-    path = write(tmp_path / "trial-al.toml", original)
+    path = write(tmp_path / "tri-al.toml", original)
 
     set_plugin_enabled(path, "sample", False)
 

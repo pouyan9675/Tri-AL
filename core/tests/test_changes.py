@@ -3,9 +3,9 @@ from datetime import date
 
 import pytest
 
-from trial_al.pipeline.changes import TRACKED_FIELDS, changes, tracked
-from trial_al.schema import Intervention, Sponsor, age_in_days
-from trial_al.testing.fixtures import phase3_trial
+from tri_al.pipeline.changes import TRACKED_FIELDS, changes, tracked
+from tri_al.schema import Intervention, Sponsor, age_in_days
+from tri_al.testing.fixtures import phase3_trial
 
 
 def test_tracked_values_are_json_ready() -> None:

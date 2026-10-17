@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import Connection, text
 from sqlalchemy.exc import IntegrityError, OperationalError
 
-from trial_al.storage import (
+from tri_al.storage import (
     ExtensionLoadError,
     Migration,
     SqliteExtension,
@@ -140,7 +140,7 @@ def test_a_failing_extension_stops_startup(tmp_path: Path) -> None:
     assert str(exc_info.value) == (
         "SQLite extension 'vec0' from plugin 'vectors' failed to load: dlopen(vec0.dylib): "
         "image not found; fix or reinstall the plugin, or disable it with "
-        "`trial-al plugins disable vectors`"
+        "`tri-al plugins disable vectors`"
     )
 
 

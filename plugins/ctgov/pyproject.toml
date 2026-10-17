@@ -1,19 +1,19 @@
 [project]
-name = "trial-al-ctgov"
+name = "tri-al-ctgov"
 version = "0.1.0"
 description = "ClinicalTrials.gov source for Tri-AL: bulk install and daily updates from API v2."
 requires-python = ">=3.13"
 dependencies = [
     "httpx>=0.28.1",
     "orjson>=3.13.0",
-    "trial-al",
+    "tri-al",
 ]
 
-[project.entry-points."trial_al.plugins"]
-ctgov = "trial_al_ctgov:plugin"
+[project.entry-points."tri_al.plugins"]
+ctgov = "tri_al_ctgov:plugin"
 
 [tool.uv.sources]
-trial-al = { workspace = true }
+tri-al = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.9.5,<0.10.0"]

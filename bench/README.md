@@ -8,9 +8,9 @@
 ## Real data (milestone 3)
 
 ```bash
-uv run trial-al install                            # download the bulk zip and build data/trials.db
-uv run trial-al install --from-file ctg-studies.json.zip  # or use a zip you downloaded
-uv run trial-al update                             # fetch what changed since the last update
+uv run tri-al install                            # download the bulk zip and build data/trials.db
+uv run tri-al install --from-file ctg-studies.json.zip  # or use a zip you downloaded
+uv run tri-al update                             # fetch what changed since the last update
 uv run python bench/db_report.py data/trials.db    # size by table, from SQLite's dbstat
 ```
 

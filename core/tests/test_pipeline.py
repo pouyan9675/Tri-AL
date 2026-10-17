@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from sqlalchemy import text
 
-from trial_al.pipeline import (
+from tri_al.pipeline import (
     Event,
     FetchContext,
     InstallFinished,
@@ -22,8 +22,8 @@ from trial_al.pipeline import (
     content_hash,
     prepare,
 )
-from trial_al.storage import SQLiteStorage, StorageError
-from trial_al.testing import FakeSource, fake_study
+from tri_al.storage import SQLiteStorage, StorageError
+from tri_al.testing import FakeSource, fake_study
 
 STUDIES = (
     fake_study("F1", "Donepezil in mild AD", updated="2026-09-01", status="RECRUITING"),
@@ -341,7 +341,7 @@ def updated(pipeline: Pipeline, *changed: bytes, **fields: Any) -> Pipeline:
 
 
 def test_update_before_install(pipeline: Pipeline) -> None:
-    with pytest.raises(PipelineError, match="run `trial-al install` first"):
+    with pytest.raises(PipelineError, match="run `tri-al install` first"):
         pipeline.run_update()
 
 
@@ -502,8 +502,8 @@ def test_storage_errors_are_raised(installed: Pipeline) -> None:
 
 
 def test_from_plugins_uses_what_plugins_registered(tmp_path: Path) -> None:
-    from trial_al.config import Config
-    from trial_al.plugins import LoadedPlugins
+    from tri_al.config import Config
+    from tri_al.plugins import LoadedPlugins
 
     plugins = LoadedPlugins()
     plugins.contributions.sources["fake"] = FakeSource()

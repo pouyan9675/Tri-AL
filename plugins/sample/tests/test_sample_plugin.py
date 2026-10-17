@@ -4,15 +4,15 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-import trial_al_sample
-from trial_al.cli import create_app
-from trial_al.plugins import discover
+import tri_al_sample
+from tri_al.cli import create_app
+from tri_al.plugins import discover
 
 
 @pytest.fixture(autouse=True)
 def _isolated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     for var in list(os.environ):
-        if var.startswith("TRIAL_AL_"):
+        if var.startswith("TRI_AL_"):
             monkeypatch.delenv(var)
     monkeypatch.chdir(tmp_path)
 
@@ -20,7 +20,7 @@ def _isolated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 def test_is_discovered_through_its_entry_point() -> None:
     entry_points = {ep.name: ep for ep in discover()}
 
-    assert entry_points["sample"].load() is trial_al_sample.plugin
+    assert entry_points["sample"].load() is tri_al_sample.plugin
 
 
 @pytest.mark.parametrize(
@@ -28,14 +28,14 @@ def test_is_discovered_through_its_entry_point() -> None:
     [
         ("", {}, "Hello, Ada!\n"),
         ('[plugins.sample]\ngreeting = "Hi"\n', {}, "Hi, Ada!\n"),
-        ("", {"TRIAL_AL_PLUGINS__SAMPLE__GREETING": "Hey"}, "Hey, Ada!\n"),
+        ("", {"TRI_AL_PLUGINS__SAMPLE__GREETING": "Hey"}, "Hey, Ada!\n"),
     ],
     ids=["default", "file", "env"],
 )
 def test_hello_uses_the_configured_greeting(
     monkeypatch: pytest.MonkeyPatch, config: str, env: dict[str, str], expected: str
 ) -> None:
-    Path("trial-al.toml").write_text(config)
+    Path("tri-al.toml").write_text(config)
     for var, value in env.items():
         monkeypatch.setenv(var, value)
 

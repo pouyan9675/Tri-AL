@@ -7,9 +7,9 @@ from pathlib import Path
 import httpx
 import pytest
 
-from trial_al.pipeline import FetchContext, prepare
-from trial_al_ctgov import CtgovSource
-from trial_al_ctgov.source import BASE_URL
+from tri_al.pipeline import FetchContext, prepare
+from tri_al_ctgov import CtgovSource
+from tri_al_ctgov.source import BASE_URL
 
 pytestmark = pytest.mark.live
 

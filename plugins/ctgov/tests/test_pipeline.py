@@ -13,11 +13,11 @@ import pytest
 from sqlalchemy import text
 from typer.testing import CliRunner
 
-from trial_al.cli import create_app
-from trial_al.pipeline import Pipeline
-from trial_al.storage import SQLiteStorage
-from trial_al_ctgov import CtgovSource
-from trial_al_ctgov.normalize import normalize
+from tri_al.cli import create_app
+from tri_al.pipeline import Pipeline
+from tri_al.storage import SQLiteStorage
+from tri_al_ctgov import CtgovSource
+from tri_al_ctgov.normalize import normalize
 
 if TYPE_CHECKING:
     from tests.conftest import StudyLoader
@@ -119,7 +119,7 @@ def test_the_cli_installs_from_a_file(
     bulk_zip: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    for var in [var for var in os.environ if var.startswith("TRIAL_AL_")]:
+    for var in [var for var in os.environ if var.startswith("TRI_AL_")]:
         monkeypatch.delenv(var)
 
     result = CliRunner().invoke(
