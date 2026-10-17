@@ -18,6 +18,14 @@ class ServerConfig(_Section):
 class DataConfig(_Section):
     dir: Path = Path("data")
 
+    @property
+    def trials_db(self) -> Path:
+        return self.dir / "trials.db"
+
+    @property
+    def app_db(self) -> Path:
+        return self.dir / "app.db"
+
 
 class UpdateConfig(_Section):
     schedule: str = "daily"

@@ -34,7 +34,7 @@ known-first-party = ["trial_al", "trial_al_sample"]
 [tool.mypy]
 python_version = "3.13"
 strict = true
-files = ["core/src", "core/tests", "plugins/*/src", "plugins/*/tests"]
+files = ["core/src", "core/tests", "plugins/*/src", "plugins/*/tests", "bench"]
 plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]

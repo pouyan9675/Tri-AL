@@ -7,6 +7,7 @@ import typer
 
 from trial_al import __version__
 from trial_al.cli import plugins
+from trial_al.cli.doctor import doctor
 from trial_al.config import ConfigError, load_config
 from trial_al.plugins import PluginError, load_plugins
 
@@ -17,10 +18,9 @@ STUBS = {
     "serve": "Start the API and the job worker.",
     "worker": "Run the job worker on its own.",
     "backup": "Copy the databases while the app is running.",
-    "doctor": "Check config, files, versions and plugins.",
     "bench": "Run the benchmark suite.",
 }
-CORE_COMMANDS = {*STUBS, "plugins"}
+CORE_COMMANDS = {*STUBS, "doctor", "plugins"}
 
 
 def create_app() -> typer.Typer:
@@ -34,6 +34,7 @@ def create_app() -> typer.Typer:
     app.callback()(_root)
     for name, help_text in STUBS.items():
         app.command(name, help=f"{help_text} (Not implemented yet.)")(_stub(name))
+    app.command("doctor")(doctor)
     app.add_typer(plugins.app, name="plugins")
     _mount_plugins(app)
     return app

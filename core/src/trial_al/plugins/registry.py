@@ -1,20 +1,35 @@
 """What a plugin's ``register`` function receives (docs/design.md §5.6)."""
 
-from collections.abc import Callable
+import sqlite3
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import NoReturn
+from typing import Literal, NoReturn
 
 import typer
 from pydantic import BaseModel
 
 from trial_al.plugins.errors import PluginError
+from trial_al.storage import Migration, MigrationError, SqliteExtension
+from trial_al.storage.migrations import check_migrations
+
+type Database = Literal["trials", "app"]
+DATABASES: tuple[Database, ...] = ("trials", "app")
 
 
 @dataclass
 class Contributions:
-    """Everything the enabled plugins registered, keyed by plugin name."""
+    """Everything the enabled plugins registered."""
 
+    # by plugin
     cli: dict[str, typer.Typer] = field(default_factory=dict)
+    # by extension name
+    sqlite_extensions: dict[str, SqliteExtension] = field(default_factory=dict)
+    # by database, then plugin
+    migrations: dict[Database, dict[str, tuple[Migration, ...]]] = field(default_factory=dict)
+
+    def migrations_for(self, database: Database) -> dict[str, tuple[Migration, ...]]:
+        """Each plugin's migrations for ``database``, in plugin load order."""
+        return dict(self.migrations.get(database, {}))
 
 
 class Registry:
@@ -42,6 +57,38 @@ class Registry:
             raise PluginError(f"plugin {self._plugin!r} already added a CLI")
         self._contributions.cli[self._plugin] = app
 
+    def add_sqlite_extension(self, name: str, load: Callable[[sqlite3.Connection], None]) -> None:
+        """Load a SQLite extension into every database connection (docs/design.md §5.2).
+
+        ``load(conn)`` gets each new ``sqlite3.Connection`` with extension loading switched
+        on just for the call; ``sqlite_vec.load`` is an example. If it fails, startup stops
+        with an error naming this plugin.
+        """
+        existing = self._contributions.sqlite_extensions.get(name)
+        if existing is not None:
+            raise PluginError(
+                f"SQLite extension {name!r} was already added by plugin {existing.plugin!r}"
+            )
+        self._contributions.sqlite_extensions[name] = SqliteExtension(name, load, self._plugin)
+
+    def add_migrations(self, database: Database, migrations: Sequence[Migration]) -> None:
+        """Migrations for this plugin's own tables in ``trials.db`` or ``app.db``.
+
+        They're tracked under the plugin's name, numbered 1, 2, 3, ..., and run after the
+        core's migrations and after every SQLite extension has loaded. Prefix table names
+        with the plugin's name.
+        """
+        if database not in DATABASES:
+            raise PluginError(f"unknown database {database!r}; use 'trials' or 'app'")
+        per_plugin = self._contributions.migrations.setdefault(database, {})
+        if self._plugin in per_plugin:
+            raise PluginError(f"plugin {self._plugin!r} already added {database} migrations")
+        try:
+            check_migrations(self._plugin, migrations)
+        except MigrationError as exc:
+            raise PluginError(str(exc)) from None
+        per_plugin[self._plugin] = tuple(migrations)
+
     # The rest of the base registry API arrives with later milestones (design §14).
 
     def add_source(self, source: object) -> None:
@@ -61,12 +108,6 @@ class Registry:
 
     def add_routes(self, router: object) -> None:
         _not_yet("add_routes")
-
-    def add_migrations(self, migrations: object) -> None:
-        _not_yet("add_migrations")
-
-    def add_sqlite_extension(self, name: str, load: Callable[[object], None]) -> None:
-        _not_yet("add_sqlite_extension")
 
     def add_job(self, job: object) -> None:
         _not_yet("add_job")

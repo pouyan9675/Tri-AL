@@ -46,13 +46,14 @@ So a daily update is **1–2 API pages**. The data is tiny next to what SQLite c
                          └───────────────────┘                   └───────────────────┘
                          ┌───────────────────┐
                          │  data/app.db      │  jobs + progress,
-                         │  app state        │  plugin settings
+                         │  app state        │  enricher state
                          └───────────────────┘
 ```
 
 **Two SQLite files, on purpose:**
 - **`trials.db`** holds only data that comes from sources. Only the pipeline writes to it, inside the worker. A rebuild can build a new file and swap it in.
-- **`app.db`** holds state the app changes (jobs, settings). Job progress keeps updating while an update holds the write lock on `trials.db`, because it's in a different file and so a different lock.
+- **`app.db`** holds state the app changes (jobs, enricher state). Job progress keeps updating while an update holds the write lock on `trials.db`, because it's in a different file and so a different lock.
+- **Plugin on/off state and settings** live in `trial-al.toml` (§5.6), not in either database.
 
 No Redis and no separate database server. The cache lives in memory in each API worker, keyed by `data_version`.
 
@@ -94,7 +95,7 @@ Each plugin is its own package with its own `pyproject.toml`, tests and migratio
 - **Python runtime:** Python ≥ 3.13, managed by uv and pinned in `.python-version`. The interpreter's `sqlite3` module must be able to load extensions:
   - macOS's built-in Python can't (checked 2026-10-17: `/Library/Developer/CommandLineTools/usr/bin/python3` has no `enable_load_extension`).
   - uv's CPython 3.13.9 can, and it ships SQLite 3.50.
-- **SQLite version:** requires SQLite ≥ 3.45, for JSONB (the trigram tokenizer needs 3.34).
+- **SQLite version:** requires SQLite ≥ 3.45, for JSONB (`group_concat(… ORDER BY …)` needs 3.44 and the trigram tokenizer 3.34).
 - **Extension hook:** plugins register SQLite extensions with `registry.add_sqlite_extension(name, load)`, where `load(conn)` is something like `sqlite_vec.load`.
   - Storage loads every registered extension on every new connection (API workers, job worker and CLI), using SQLAlchemy's `connect` event.
   - Each load is wrapped in `enable_load_extension(True)` … `enable_load_extension(False)`, so SQL itself can never call `load_extension()`.
@@ -102,6 +103,8 @@ Each plugin is its own package with its own `pyproject.toml`, tests and migratio
   - If an enabled plugin's extension fails to load, startup stops with a clear error, rather than failing at the first query.
   - Disabling the plugin leaves its tables in place; only queries on those tables fail ("no such module").
 - **Bulk-load settings** (install and rebuild only): `synchronous=OFF`; indexes and full-text search are created after the load; then `ANALYZE` and `PRAGMA optimize`.
+  - `meta.bulk_load_started` is set while a bulk load runs. If one doesn't finish, ordinary write transactions refuse to run (the indexes are incomplete) until a bulk load completes, and `doctor` warns.
+  - Write transactions use `BEGIN IMMEDIATE`; each bulk-load batch commits on its own.
 
 ### 5.3 Pipeline
 Install and update use the same stages; only the fetch step differs.
@@ -143,10 +146,12 @@ fetch ─▶ parse (orjson) ─▶ normalize (source → TrialRecord) ─▶ has
 ### 5.6 Plugin system
 - **Discovery:** Python entry points in the group `trial_al.plugins`. Each plugin exposes a `Plugin` object (name, version, `api_version`, `requires`, settings model) and a `register(registry)` function.
 - **Loading:** the core loads the plugins enabled in config, ordered by `requires`. It refuses any plugin whose `api_version` doesn't match.
+- **On/off state and settings live in `trial-al.toml`.** Installed plugins are enabled unless their `[plugins.<name>]` section says `enabled = false`, and the rest of that section is the plugin's settings. `trial-al plugins enable|disable` (and later the API) edit the file and keep its comments, and `TRIAL_AL_PLUGINS__<NAME>__…` variables override it. Plugins load at startup, so changes apply on the next start. No database holds plugin state.
 - **Registry API (base):**
   - `add_source`, `add_enricher`, `add_chart`, `add_filter_field`, `add_search_provider`
   - `add_routes(router)`, mounted at `/api/x/<plugin>/`
-  - `add_migrations`, `add_sqlite_extension` (see §5.2), `add_job`, `add_cli`, `on(event, handler)`
+  - `add_migrations(database, migrations)` for `"trials"` or `"app"`, tracked under the plugin's name; `add_sqlite_extension(name, load)` (see §5.2)
+  - `add_job`, `add_cli`, `on(event, handler)`
   - `set_access_policy` (see §5.8)
 - **Events:** `update.started`, `trials.changed(ids, kind)`, `update.finished(summary)`, `install.finished`. Handlers run in the process that fires the event; pipeline events fire in the worker.
 - **Rules:**
@@ -181,7 +186,7 @@ All GET responses use orjson, an `ETag` derived from `data_version` (unchanged d
 | `GET /api/stats/{chart_id}` | Chart data, precomputed or filtered |
 | `GET /api/events` | SSE stream: `data_version` changes, job progress |
 | `POST /api/jobs/update`, `GET /api/jobs[/{id}]` | Start an update, job status |
-| `GET/PATCH /api/plugins[/{name}]` | List plugins, enable/disable, settings |
+| `GET/PATCH /api/plugins[/{name}]` | List plugins; PATCH enables, disables or changes settings by editing `trial-al.toml` (applies on the next start) |
 
 A TypeScript client for `web/` is generated from the OpenAPI schema.
 
@@ -202,20 +207,21 @@ A TypeScript client for `web/` is generated from the OpenAPI schema.
 | Table | Contents |
 |---|---|
 | `trials` | Narrow and fast to scan. See the column groups below this table. |
-| `trial_text` | brief_summary, description, eligibility_criteria, outcomes (primary, secondary, other) |
+| `trial_text` | brief_summary, description, eligibility_criteria |
+| `trial_outcomes` | trial_id, position, kind (primary, secondary, other), measure, description, time_frame |
 | `trial_docs` | Raw study JSON (stored as SQLite JSONB), kept apart so `trials` stays narrow |
 | `conditions`, `trial_conditions` | Conditions and links to trials |
-| `mesh_terms`, `trial_mesh` | MeSH terms and ancestors from `derivedSection`, kind = condition or intervention |
-| `interventions`, `intervention_aliases`, `trial_interventions` | Interventions, their other names, and links |
-| `sponsors`, `trial_sponsors` | Sponsors and links, role = lead or collaborator |
-| `countries`, `trial_countries` | Countries (seeded with ISO codes) and links |
-| `locations` | trial_id, facility, city, state, country_code, status, lat/lon |
+| `mesh_terms`, `trial_mesh` | MeSH terms (by descriptor code) and ancestors from `derivedSection`; the link has kind = condition or intervention, and an ancestor flag |
+| `interventions`, `trial_interventions`, `intervention_aliases` | Interventions, links (with the intervention type), and each trial's other names for them |
+| `sponsors`, `trial_sponsors` | Sponsors and links (with role = lead or collaborator, and the sponsor class) |
+| `countries`, `trial_countries` | Countries (seeded with ISO 3166-1 codes; the alpha-2 code is the key) and links |
+| `locations` | trial_id, position, facility, city, state, country_code, status, lat/lon |
 | `trial_changes` | trial_id, run_id, field, old, new: replaces v1's `simple_history` and its `first_*` fields |
 | `runs` | Install and update runs: stage checkpoints and summary |
 | `stats` | chart_id, data_version, payload |
-| `meta` | `data_version`, update cursor, schema info |
-| `trials_fts` | FTS5 (porter/unicode61) over `trial_text` plus title, conditions and interventions |
-| `names_fts` | FTS5 trigram over condition, intervention and sponsor names, for fuzzy lookup |
+| `meta` | `data_version`, update cursor, schema info, `bulk_load_started` |
+| `trials_fts` | FTS5 (porter/unicode61) over titles, conditions, interventions and their other names, `trial_text` and outcomes. External content: it reads the view `trials_fts_content`, so the text isn't stored twice |
+| `names_fts` | FTS5 trigram over condition, intervention and sponsor names (with kind and row id), for fuzzy lookup |
 
 The `trials` table has these columns:
 - **Identity:** id, source, source_id
@@ -231,10 +237,12 @@ The `trials` table has these columns:
 Notes:
 - **Dates** are stored as ISO text `YYYY-MM-DD`. Month-only dates become the 1st of the month; the exact original stays in `trial_docs`.
 - **Ages** are converted to days, so age ranges are simple numeric filters (v1 stored them as strings).
-- **Link tables** use `WITHOUT ROWID` with primary key `(trial_id, x_id)` plus a reverse index `(x_id, trial_id)`.
-- **`trials` indexes** cover the dashboard's main filters: `status`, `phase`, `(phase, status)`, `start_date`, `last_update`, `lead_sponsor_class`.
+- **Link tables** use `WITHOUT ROWID` with primary key `(trial_id, x_id)` plus a reverse index `(x_id, trial_id)`. A `position` column keeps the source's order.
+- **Entities are identified by name** (MeSH terms by code). Per-trial details, such as an intervention's type or a sponsor's class, are on the link, so each trial reads back exactly as written. A trial that lists the same entity twice keeps the first.
+- **Outcomes are rows, not JSON:** FTS5 can't read virtual tables such as `json_each` through its content view.
+- **`trials` indexes** cover the dashboard's main filters: `status`, `(phase, status)` (which also serves `phase` alone), `start_date`, `last_update`, `lead_sponsor_class`.
 
-`app.db` holds `jobs`, `plugin_state`, `enricher_state` and `_migrations`.
+`app.db` holds `jobs`, `enricher_state` and `_migrations`. Plugin state stays in `trial-al.toml` (§5.6).
 
 ## 7. Plugin interfaces (base)
 

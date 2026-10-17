@@ -6,9 +6,13 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "pydantic>=2.12",
+    "sqlalchemy>=2.1",
     "tomlkit>=0.13",
     "typer>=0.20",
 ]
+
+[project.optional-dependencies]
+testing = ["pytest>=9.1"]
 
 [project.scripts]
 trial-al = "trial_al.cli:main"

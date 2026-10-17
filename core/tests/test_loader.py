@@ -18,6 +18,7 @@ from trial_al.plugins import (
     load_plugins,
 )
 from trial_al.plugins.registry import Contributions
+from trial_al.storage import Migration, SqliteExtension
 
 if TYPE_CHECKING:
     from conftest import MakeEntryPoint, MakePlugin
@@ -264,3 +265,54 @@ def test_registry_methods_from_later_milestones_are_stubs() -> None:
 
     with pytest.raises(NotImplementedError, match=r"Registry\.add_source is not implemented yet"):
         registry.add_source(object())
+
+
+def load_nothing(conn: object) -> None:
+    pass
+
+
+def test_registry_add_sqlite_extension_records_the_plugin() -> None:
+    contributions = Contributions()
+
+    Registry("vectors", None, contributions).add_sqlite_extension("vec0", load_nothing)
+
+    assert contributions.sqlite_extensions == {
+        "vec0": SqliteExtension("vec0", load_nothing, "vectors")
+    }
+    with pytest.raises(PluginError, match="'vec0' was already added by plugin 'vectors'"):
+        Registry("other", None, contributions).add_sqlite_extension("vec0", load_nothing)
+
+
+def test_registry_add_migrations_per_database_in_load_order() -> None:
+    contributions = Contributions()
+    first = (Migration(1, "a", "SELECT 1;"),)
+    second = (Migration(1, "b", "SELECT 1;"), Migration(2, "c", "SELECT 1;"))
+
+    Registry("zeta", None, contributions).add_migrations("trials", first)
+    Registry("alpha", None, contributions).add_migrations("trials", second)
+    Registry("alpha", None, contributions).add_migrations("app", first)
+
+    assert contributions.migrations_for("trials") == {"zeta": first, "alpha": second}
+    assert contributions.migrations_for("app") == {"alpha": first}
+
+
+@pytest.mark.parametrize(
+    ("database", "migrations", "message"),
+    [
+        ("trials", [Migration(2, "a", "")], "must be 1, 2, 3"),
+        ("stats", [Migration(1, "a", "")], "unknown database 'stats'"),
+    ],
+)
+def test_registry_add_migrations_checks_its_input(
+    database: str, migrations: list[Migration], message: str
+) -> None:
+    with pytest.raises(PluginError, match=message):
+        Registry("alpha", None, Contributions()).add_migrations(database, migrations)  # type: ignore[arg-type]
+
+
+def test_registry_add_migrations_once_per_database() -> None:
+    registry = Registry("alpha", None, Contributions())
+    registry.add_migrations("trials", [Migration(1, "a", "")])
+
+    with pytest.raises(PluginError, match="already added trials migrations"):
+        registry.add_migrations("trials", [Migration(1, "a", "")])
