@@ -10,6 +10,7 @@ from tri_al.stats.counts import (
     DateField,
     LinkDimension,
     SqlCounts,
+    Timeline,
 )
 from tri_al.stats.engine import (
     FACET_PREFIX,
@@ -46,6 +47,7 @@ __all__ = [
     "Rows",
     "SqlCounts",
     "StatsEngine",
+    "Timeline",
     "TrialIndex",
     "UnknownChart",
     "Widget",

@@ -1,5 +1,6 @@
 /** What every widget shares: the rows a chart spec's `x` and `y` keys point at. */
 import type { ChartRow, ChartSpec } from "@/api/client";
+import type { TrialFilter } from "@/lib/filters";
 import { formatCompact, formatNumber } from "@/lib/format";
 
 export type WidgetProps = {
@@ -7,6 +8,8 @@ export type WidgetProps = {
   rows: ChartRow[];
   /** Pixels the widget's plot should take (the layout's height × a row height). */
   height: number;
+  /** The page's filter, which the rows were computed under. */
+  filter?: TrialFilter;
 };
 
 export type Point = { label: string; value: number; row: ChartRow };

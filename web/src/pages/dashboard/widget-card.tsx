@@ -66,7 +66,14 @@ export function WidgetCard({ spec, filter }: { spec: ChartSpec; filter: TrialFil
       <TableWidget spec={spec} rows={query.data.rows} height={height} />
     ) : (
       <Suspense fallback={<Skeleton className="w-full rounded-lg" style={{ height }} />}>
-        {definition && <definition.component spec={spec} rows={query.data.rows} height={height} />}
+        {definition && (
+          <definition.component
+            spec={spec}
+            rows={query.data.rows}
+            height={height}
+            filter={filter}
+          />
+        )}
       </Suspense>
     );
 

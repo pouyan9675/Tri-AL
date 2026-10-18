@@ -9,6 +9,14 @@ the rows' ``x`` and ``y`` keys:
 - ``stat``: one row per tile, ``label`` and ``value``
 - ``map``: one row per country, ``code`` (ISO 3166-1 alpha-2), ``label`` and ``value``
 - ``table``: any columns
+- ``trends``: ranked lists of what is rising, in columns (``group``) for each of a few time
+  windows (``window``). A row with ``type: "window"`` describes a window (``label``,
+  ``since``, ``until``, ``trials``, ``baseline_since``, ``baseline_trials``); a row with
+  ``type: "item"`` is one entry: ``label``, ``value`` (trials in the window), ``baseline``,
+  ``expected``, ``growth`` (adjusted for small counts), ``raw_growth`` (null: none before),
+  ``confidence`` (``high``, ``medium`` or ``low``) from ``p`` and ``q`` (corrected for the
+  ``tested`` entries), ``new``, ``sponsors``, ``series`` (trials per month, oldest first; the
+  last ``recent`` are the window) and ``filter`` (query parameters that list its trials)
 
 Charts marked ``precompute`` are computed with no filter in the same transaction as each
 update and stored in ``stats``; filtered views are computed on request and cached.
@@ -23,8 +31,8 @@ from sqlalchemy import Connection
 from tri_al.filters import TrialFilter
 from tri_al.stats.counts import Count, Counts
 
-type Widget = Literal["bar", "line", "area", "pie", "stat", "table", "map"]
-WIDGETS: tuple[Widget, ...] = ("bar", "line", "area", "pie", "stat", "table", "map")
+type Widget = Literal["bar", "line", "area", "pie", "stat", "table", "map", "trends"]
+WIDGETS: tuple[Widget, ...] = ("bar", "line", "area", "pie", "stat", "table", "map", "trends")
 
 type Rows = list[dict[str, Any]]
 
@@ -63,6 +71,7 @@ class Chart:
     precompute: bool = True
     layout: Layout = field(default_factory=Layout)
     description: str = ""
+    section: str = ""  # the dashboard section it goes in; "" is the first, untitled one
     x: str = "label"  # the row key for categories, points or tiles
     y: str = "value"  # the row key for the number
     plugin: str = ""  # set by the registry

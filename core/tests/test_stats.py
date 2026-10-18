@@ -15,6 +15,7 @@ from tri_al.pipeline import Pipeline
 from tri_al.schema import Intervention, MeshTerm, Sponsor, TrialRecord
 from tri_al.stats import (
     CORE_FACETS,
+    LINK_DIMENSIONS,
     Chart,
     ChartContext,
     Rows,
@@ -33,11 +34,19 @@ PHASES = ["PHASE1", "PHASE2", "PHASE3", "PHASE2_PHASE3", "NA", None]
 CONDITIONS = ["Alzheimer Disease", "Dementia", "Aging", "Sleep", "Depression", "Pain"]
 COUNTRIES = ["US", "DE", "FR", "JP", "BR", "CA"]
 TYPES = ["DRUG", "BEHAVIORAL", "DEVICE", None]
+MESH = [
+    MeshTerm("D000544", "Alzheimer Disease", "condition"),
+    MeshTerm("D003863", "Depression", "condition"),
+    MeshTerm("D010146", "Pain", "condition"),
+    MeshTerm("C000612089", "lecanemab", "intervention"),
+    MeshTerm("D000077265", "Donepezil", "intervention"),
+]
 
 
 def varied(count: int, seed: int = 7) -> list[TrialRecord]:
     """Trials with every filterable field spread out, missing values included."""
     rng = random.Random(seed)
+    terms = random.Random(seed + 1)  # its own sequence, so the other fields stay as they were
 
     def maybe_date() -> date | None:
         return (
@@ -65,9 +74,12 @@ def varied(count: int, seed: int = 7) -> list[TrialRecord]:
                 enrollment=None if rng.random() < 0.1 else rng.randrange(2000),
                 has_results=rng.random() < 0.3,
                 conditions=rng.sample(CONDITIONS, rng.randrange(1, 3)),
-                mesh_terms=[MeshTerm("D003704", "Dementia", "condition", ancestor=True)]
-                if rng.random() < 0.3
-                else [],
+                mesh_terms=(
+                    [MeshTerm("D003704", "Dementia", "condition", ancestor=True)]
+                    if rng.random() < 0.3
+                    else []
+                )
+                + terms.sample(MESH, terms.randrange(3)),
                 interventions=[Intervention(name, rng.choice(TYPES)) for name in drugs],
                 sponsors=[
                     Sponsor(
@@ -128,19 +140,30 @@ def answers(counts: Any) -> dict[str, Any]:
             f"by {field}": counts.by(field)
             for field in ("status", "phase", "study_type", "sponsor_class", "has_results")
         },
-        **{
-            f"top {d}": counts.top(d, 4)
-            for d in ("conditions", "interventions", "sponsors", "countries")
-        },
+        **{f"top {d}": counts.top(d, 4) for d in LINK_DIMENSIONS},
         "types": counts.intervention_types(),
-        **{
-            f"distinct {d}": counts.distinct(d)
-            for d in ("conditions", "interventions", "sponsors", "countries")
-        },
+        **{f"distinct {d}": counts.distinct(d) for d in LINK_DIMENSIONS},
         "drugs": counts.distinct("interventions", intervention_type="DRUG"),
         "latest": counts.latest("last_update"),
         "per day": counts.per_day("start_date", date(2016, 1, 1), date(2018, 12, 31)),
+        **{
+            f"timelines {d}": counts.timelines(d, "first_posted", EDGES, recent=3, at_least=2)
+            for d in LINK_DIMENSIONS
+            if d != "countries"
+        },
+        "one period": counts.timelines("conditions", "start_date", EDGES[:2]),
+        **{
+            f"first {d}": counts.first_dates(d, "first_posted", values)
+            for d, values in (
+                ("conditions", CONDITIONS),
+                ("mesh_conditions", [term.code for term in MESH]),
+                ("interventions", ["Lecanemab", "Nobody uses this"]),
+            )
+        },
     }
+
+
+EDGES = [date(2015, 6, 1), *(date(year, 1, 1) for year in range(2016, 2026)), date(2025, 6, 9)]
 
 
 @pytest.mark.parametrize("filter", FILTERS, ids=lambda f: "+".join(f.active) or "all")

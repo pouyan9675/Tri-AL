@@ -347,9 +347,14 @@ export interface components {
              * Widget
              * @enum {string}
              */
-            widget: "bar" | "line" | "area" | "pie" | "stat" | "table" | "map";
+            widget: "bar" | "line" | "area" | "pie" | "stat" | "table" | "map" | "trends";
             /** Description */
             description: string;
+            /**
+             * Section
+             * @description The dashboard section; empty for the first, untitled one.
+             */
+            section: string;
             /** X */
             x: string;
             /** Y */

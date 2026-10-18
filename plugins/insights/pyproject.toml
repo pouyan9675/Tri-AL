@@ -1,0 +1,16 @@
+[project]
+name = "tri-al-insights"
+version = "0.1.0"
+description = "Research Intelligence for Tri-AL: emerging research trends on the dashboard."
+requires-python = ">=3.13"
+dependencies = ["tri-al"]
+
+[project.entry-points."tri_al.plugins"]
+insights = "tri_al_insights:plugin"
+
+[tool.uv.sources]
+tri-al = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.9.5,<0.10.0"]
+build-backend = "uv_build"

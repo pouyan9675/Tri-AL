@@ -2263,13 +2263,19 @@
               "pie",
               "stat",
               "table",
-              "map"
+              "map",
+              "trends"
             ],
             "title": "Widget"
           },
           "description": {
             "type": "string",
             "title": "Description"
+          },
+          "section": {
+            "type": "string",
+            "title": "Section",
+            "description": "The dashboard section; empty for the first, untitled one."
           },
           "x": {
             "type": "string",
@@ -2298,6 +2304,7 @@
           "title",
           "widget",
           "description",
+          "section",
           "x",
           "y",
           "layout",

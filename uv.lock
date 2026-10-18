@@ -11,6 +11,7 @@ members = [
     "tri-al",
     "tri-al-charts",
     "tri-al-ctgov",
+    "tri-al-insights",
     "tri-al-sample",
 ]
 
@@ -24,6 +25,7 @@ dev = [
     { name = "tri-al", editable = "core" },
     { name = "tri-al-charts", editable = "plugins/charts" },
     { name = "tri-al-ctgov", editable = "plugins/ctgov" },
+    { name = "tri-al-insights", editable = "plugins/insights" },
     { name = "tri-al-sample", editable = "plugins/sample" },
 ]
 
@@ -912,6 +914,17 @@ requires-dist = [
     { name = "orjson", specifier = ">=3.13.0" },
     { name = "tri-al", editable = "core" },
 ]
+
+[[package]]
+name = "tri-al-insights"
+version = "0.1.0"
+source = { editable = "plugins/insights" }
+dependencies = [
+    { name = "tri-al" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "tri-al", editable = "core" }]
 
 [[package]]
 name = "tri-al-sample"

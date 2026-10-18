@@ -205,8 +205,9 @@ class LayoutOut(_Out):
 class ChartSpecOut(_Out):
     id: str
     title: str
-    widget: Literal["bar", "line", "area", "pie", "stat", "table", "map"]
+    widget: Literal["bar", "line", "area", "pie", "stat", "table", "map", "trends"]
     description: str
+    section: str = Field(description="The dashboard section; empty for the first, untitled one.")
     x: str
     y: str
     layout: LayoutOut

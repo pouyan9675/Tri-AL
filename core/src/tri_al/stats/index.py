@@ -31,6 +31,7 @@ from tri_al.stats.counts import (
     Count,
     DateField,
     LinkDimension,
+    Timeline,
 )
 from tri_al.storage import Cursor, Sort
 from tri_al.storage import tables as t
@@ -44,6 +45,9 @@ NULL_DAY = np.iinfo(np.int32).min
 
 NULL_NUMBER = -1
 """A missing enrollment."""
+
+NO_SPONSOR = -1
+"""A trial without a lead sponsor."""
 
 _EPOCH = date(1970, 1, 1)
 _CHUNK = 65_536
@@ -93,6 +97,7 @@ class TrialIndex:
         coded: dict[str, _Coded],
         dates: dict[str, npt.NDArray[np.int32]],
         enrollment: npt.NDArray[np.int64],
+        lead_sponsors: Ids,
         links: dict[str, _Linked],
         countries: tuple[str, ...],
         intervention_types: _Linked,
@@ -105,6 +110,7 @@ class TrialIndex:
         self._coded = coded
         self._dates = dates
         self._enrollment = enrollment
+        self._lead_sponsors = lead_sponsors
         self._links = links
         self._countries = countries
         self._country_index = {code: i for i, code in enumerate(countries)}
@@ -120,7 +126,12 @@ class TrialIndex:
     @property
     def nbytes(self) -> int:
         """Memory the arrays use."""
-        arrays: list[npt.NDArray[Any]] = [self.present, self._enrollment, self._drug_links]
+        arrays: list[npt.NDArray[Any]] = [
+            self.present,
+            self._enrollment,
+            self._lead_sponsors,
+            self._drug_links,
+        ]
         arrays += [c.values for c in self._coded.values()]
         arrays += list(self._dates.values())
         arrays += [
@@ -143,11 +154,13 @@ class TrialIndex:
             name: np.full(size, NULL_DAY, np.int32) for name in DATE_COLUMNS
         }
         enrollment = np.full(size, NULL_NUMBER, np.int64)
+        lead_sponsors = np.full(size, NO_SPONSOR, np.int32)
         day = "coalesce(CAST(julianday({0}) - 2440587.5 AS INTEGER), {1})"
         cursor = raw.execute(  # type: ignore[union-attr]
             f"SELECT id, {', '.join(coded_columns)}, "
             + ", ".join(day.format(name, NULL_DAY) for name in DATE_COLUMNS)
-            + f", coalesce(enrollment, {NULL_NUMBER}) FROM trials"
+            + f", coalesce(enrollment, {NULL_NUMBER}), coalesce(lead_sponsor_id, {NO_SPONSOR})"
+            + " FROM trials"
         )
         while rows := cursor.fetchmany(_CHUNK):
             columns = list(zip(*rows, strict=True))
@@ -162,7 +175,8 @@ class TrialIndex:
             offset = 1 + len(coded_columns)
             for j, name in enumerate(DATE_COLUMNS):
                 dates[name][ids] = np.fromiter(columns[offset + j], np.int32, len(rows))
-            enrollment[ids] = np.fromiter(columns[-1], np.int64, len(rows))
+            enrollment[ids] = np.fromiter(columns[-2], np.int64, len(rows))
+            lead_sponsors[ids] = np.fromiter(columns[-1], np.int32, len(rows))
         names = ("status", "phase", "study_type", "sponsor_class", "has_results")
         coded_by_name = {
             name: _Coded(values, tuple(sorted(mapping, key=mapping.__getitem__)))
@@ -188,16 +202,22 @@ class TrialIndex:
         links["countries"] = _read_pairs(
             raw, "SELECT trial_id, country_code FROM trial_countries", country_index.__getitem__
         )
-        type_codes: dict[str | None, int] = {}
-        chunks: list[npt.NDArray[np.int32]] = []
-        cursor = raw.execute("SELECT trial_id, intervention_id, type FROM trial_interventions")  # type: ignore[union-attr]
-        while rows := cursor.fetchmany(_CHUNK):
-            flat = itertools.chain.from_iterable(
-                (trial, intervention, type_codes.setdefault(type_, len(type_codes)))
-                for trial, intervention, type_ in rows
+        # Both kinds of MeSH link in one pass over the table; ancestors are left out.
+        triples = _read_triples(
+            raw,
+            "SELECT trial_id, mesh_term_id, kind = 'condition' FROM trial_mesh WHERE NOT ancestor",
+        )
+        for dimension, is_condition in (("mesh_conditions", 1), ("mesh_interventions", 0)):
+            rows = triples[triples[:, 2] == is_condition]
+            links[dimension] = _Linked(
+                rows[:, 0].copy(), rows[:, 1].copy(), int(rows[:, 1].max()) + 1 if len(rows) else 0
             )
-            chunks.append(np.fromiter(flat, np.int32, 3 * len(rows)).reshape(-1, 3))
-        triples = np.concatenate(chunks) if chunks else np.zeros((0, 3), np.int32)
+        type_codes: dict[str | None, int] = {}
+        triples = _read_triples(
+            raw,
+            "SELECT trial_id, intervention_id, type FROM trial_interventions",
+            lambda type_: type_codes.setdefault(type_, len(type_codes)),
+        )
         trial_arr, type_arr = triples[:, 0].copy(), triples[:, 2].copy()
         intervention_arr = triples[:, 1].copy()
         links["interventions"] = _Linked(
@@ -217,6 +237,7 @@ class TrialIndex:
             coded_by_name,
             dates,
             enrollment,
+            lead_sponsors,
             links,
             countries,
             intervention_types,
@@ -296,11 +317,7 @@ class TrialIndex:
 
     def _named(self, conn: Connection, name: str, names: Sequence[str]) -> Mask:
         link = LINKS[name]
-        ids = (
-            conn.execute(select(link.entity_key).where(link.entity.c.name.in_(names)))
-            .scalars()
-            .all()
-        )
+        ids = conn.execute(select(link.entity_key).where(link.value.in_(names))).scalars().all()
         return self._linked_mask(self._links[name], ids)
 
     def _from_sql(self, conn: Connection, filter: TrialFilter) -> Mask:
@@ -475,14 +492,19 @@ class IndexCounts:
                 Count(code, names[code], int(counts[i]))
                 for code, i in zip(codes, chosen, strict=True)
             ]
-        link = LINKS[dimension]
         ids = [int(i) for i in chosen]
-        names = dict(
-            self._conn.execute(
-                select(link.entity_key, link.entity.c.name).where(link.entity_key.in_(ids))
-            ).all()
-        )
-        return [Count(names[i], names[i], int(counts[i])) for i in ids]
+        names = self._names(dimension, ids)
+        return [Count(*names[i], int(counts[i])) for i in ids]
+
+    def _names(self, dimension: LinkDimension, ids: Sequence[int]) -> dict[int, tuple[Any, str]]:
+        """The value a filter takes and the label of each entity id (not for countries)."""
+        link = LINKS[dimension]
+        return {
+            key: (value, label)
+            for key, value, label in self._conn.execute(
+                select(link.entity_key, link.value, link.label).where(link.entity_key.in_(ids))
+            )
+        }
 
     def intervention_types(self) -> dict[str, int]:
         types = self._index._types
@@ -514,6 +536,99 @@ class IndexCounts:
         days = self._index._dates[field][self._mask]
         days = days[days != NULL_DAY]
         return None if len(days) == 0 else from_day_number(int(days.max()))
+
+    def timelines(
+        self,
+        dimension: LinkDimension,
+        field: DateField,
+        edges: Sequence[date],
+        *,
+        recent: int = 1,
+        at_least: int = 1,
+    ) -> list[Timeline]:
+        periods = len(edges) - 1
+        if periods < 1:
+            return []
+        if dimension == "countries":
+            raise ValueError("the index has no timelines of countries")
+        link = self._index._links[dimension]
+        bounds = np.array([day_number(edge) for edge in edges], np.int64)
+        rows = self._mask[link.trial]
+        trials = link.trial[rows]
+        days = self._index._dates[field][trials].astype(np.int64)
+        inside = (days >= bounds[0]) & (days < bounds[-1])
+        trials, days = trials[inside], days[inside]
+        period = np.searchsorted(bounds, days, side="right") - 1
+        # Entity ids in ascending order, and each link row's place among them.
+        found, entity = np.unique(link.value[rows][inside], return_inverse=True)
+        cells = len(found) * periods
+        by_entity = np.bincount(entity * periods + period, minlength=cells).reshape(-1, periods)
+        recent_trials = by_entity[:, max(periods - recent, 0) :].sum(axis=1)
+        chosen = np.flatnonzero(recent_trials >= max(at_least, 1))
+        chosen = chosen[np.argsort(-recent_trials[chosen], kind="stable")]
+        if len(chosen) == 0:
+            return []
+        # Each (entity, lead sponsor) pair counts once, in the latest period it appears in.
+        sponsor = self._index._lead_sponsors[trials].astype(np.int64)
+        has = sponsor != NO_SPONSOR
+        pair_entity, pair_sponsor, pair_period = entity[has], sponsor[has], period[has]
+        order = np.lexsort((pair_period, pair_sponsor, pair_entity))
+        pair_entity, pair_sponsor = pair_entity[order], pair_sponsor[order]
+        pair_period = pair_period[order]
+        last = np.ones(len(order), np.bool_)
+        last[:-1] = (pair_entity[1:] != pair_entity[:-1]) | (pair_sponsor[1:] != pair_sponsor[:-1])
+        latest = np.bincount(
+            pair_entity[last] * periods + pair_period[last], minlength=cells
+        ).reshape(-1, periods)
+        names = self._names(dimension, [int(found[i]) for i in chosen])
+        return [
+            Timeline(
+                *names[int(found[i])],
+                tuple(int(n) for n in by_entity[i]),
+                tuple(int(n) for n in latest[i]),
+            )
+            for i in chosen
+        ]
+
+    def first_dates(
+        self, dimension: LinkDimension, field: DateField, values: Sequence[str]
+    ) -> dict[str, date]:
+        if not values:
+            return {}
+        if dimension == "countries":
+            raise ValueError("the index has no first dates of countries")
+        link = LINKS[dimension]
+        ids = dict(
+            self._conn.execute(
+                select(link.entity_key, link.value).where(link.value.in_(values))
+            ).all()
+        )
+        linked = self._index._links[dimension]
+        rows = self._mask[linked.trial] & np.isin(linked.value, list(ids))
+        days = self._index._dates[field][linked.trial[rows]]
+        entities = linked.value[rows]
+        dated = days != NULL_DAY
+        first = np.full(linked.size, np.iinfo(np.int32).max, np.int32)
+        np.minimum.at(first, entities[dated], days[dated])
+        return {
+            ids[key]: from_day_number(int(first[key]))
+            for key in ids
+            if first[key] != np.iinfo(np.int32).max
+        }
+
+
+def _read_triples(
+    raw: Any, sql: str, convert: Callable[[Any], int] | None = None
+) -> npt.NDArray[np.int32]:
+    """Rows of three integers, the third converted by ``convert``, as an (n, 3) array."""
+    cursor = raw.execute(sql)
+    chunks: list[npt.NDArray[np.int32]] = []
+    while rows := cursor.fetchmany(_CHUNK):
+        flat = itertools.chain.from_iterable(
+            rows if convert is None else ((a, b, convert(c)) for a, b, c in rows)
+        )
+        chunks.append(np.fromiter(flat, np.int32, 3 * len(rows)).reshape(-1, 3))
+    return np.concatenate(chunks) if chunks else np.zeros((0, 3), np.int32)
 
 
 def _read_pairs(raw: Any, sql: str, convert: Callable[[Any], int] | None = None) -> _Linked:

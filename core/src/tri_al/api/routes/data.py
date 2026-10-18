@@ -357,6 +357,7 @@ def get_dashboard(request: Request, state: State) -> Response:
                     "title": chart.title,
                     "widget": chart.widget,
                     "description": chart.description,
+                    "section": chart.section,
                     "x": chart.x,
                     "y": chart.y,
                     "layout": chart.layout,

@@ -13,6 +13,7 @@ function spec(overrides: Partial<ChartSpec>): ChartSpec {
     title: "A chart",
     widget: "bar",
     description: "",
+    section: "",
     x: "label",
     y: "value",
     layout: { width: 2, height: 1, order: 0 },
@@ -36,6 +37,7 @@ describe("the widget registry", () => {
       "pie",
       "stat",
       "table",
+      "trends",
     ]);
   });
 

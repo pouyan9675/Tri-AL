@@ -10,6 +10,7 @@ import { PieWidget } from "./pie";
 import { AreaWidget, LineWidget } from "./series";
 import { StatWidget } from "./stat";
 import { TableWidget } from "./table";
+import { TrendsWidget } from "./trends";
 
 export type WidgetDefinition = {
   component: ComponentType<WidgetProps>;
@@ -29,6 +30,7 @@ export const WIDGETS: Record<string, WidgetDefinition> = {
   pie: { component: PieWidget, card: true, table: true },
   table: { component: TableWidget, card: true, table: false },
   map: { component: MapWidget, card: true, table: true },
+  trends: { component: TrendsWidget, card: true, table: false },
 };
 
 export function widgetFor(type: string): WidgetDefinition | undefined {
