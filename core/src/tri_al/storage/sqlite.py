@@ -2,37 +2,48 @@
 
 import json
 import re
+import sqlite3
+import threading
 from collections import Counter
 from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, date, datetime
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Self
+from typing import Any, Self, cast
 
 from sqlalchemy import (
     ColumnElement,
     Connection,
     Engine,
+    Float,
+    Integer,
     Select,
     Table,
     TextClause,
     bindparam,
+    column,
     delete,
     func,
     insert,
+    literal,
     select,
+    table,
     text,
+    tuple_,
     update,
 )
 from sqlalchemy.exc import DatabaseError
 from sqlalchemy.sql.elements import KeyedColumnElement
 
+from tri_al.filters import EVERY_TRIAL, TrialFilter
 from tri_al.schema import (
     Intervention,
     Location,
     MeshTerm,
     Outcome,
+    OutcomeKind,
     Sponsor,
     TrialRecord,
     without_repeats,
@@ -40,12 +51,17 @@ from tri_al.schema import (
 from tri_al.storage import docs
 from tri_al.storage import tables as t
 from tri_al.storage.base import (
-    ALL_TRIALS,
+    NEWEST_FIRST,
+    Cursor,
     NameHit,
     NameKind,
     SearchHit,
+    SearchResult,
+    SnippetPart,
+    Sort,
     StorageError,
-    TrialQuery,
+    TrialChange,
+    TrialPage,
     TrialSummary,
 )
 from tri_al.storage.core_migrations import COMPONENT, TRIALS_MIGRATIONS
@@ -55,20 +71,58 @@ from tri_al.storage.engine import (
     create_engine,
     raw_connection,
 )
-from tri_al.storage.migrations import Migration, MigrationError, migrate
+from tri_al.storage.filtering import match_expression, matching_ids, where
+from tri_al.storage.migrations import (
+    Migration,
+    MigrationCallback,
+    MigrationError,
+    migrate,
+    pending,
+)
 
 BULK_LOAD_KEY = "bulk_load_started"
 """``meta`` key set while a bulk load is running or after one that didn't finish."""
 
-_FTS_COLUMNS = (
-    "title, official_title, conditions, interventions, other_names, "
-    "summary, description, eligibility, outcomes"
+DATA_VERSION_KEY = "data_version"
+
+SEARCH_CANDIDATES = 20_000
+"""Matches a search ranks at most: the most recently registered ones (design §15).
+
+Ranking costs about 2 µs a match, so a word in nearly every trial would take over a
+second to rank; ranking only the newest 20,000 keeps the worst case near 50 ms, and a
+search with fewer matches is ranked exactly.
+"""
+
+NAME_CANDIDATES = 5_000
+"""Names a lookup sorts by length at most. A three-letter word like "the" is inside about a
+fifth of all names, and sorting them all takes 75 ms; past this many, the shortest of the
+first matches are good enough."""
+
+SUMMARY_CONDITIONS = 10
+"""Conditions a list row carries, at most."""
+
+FTS_COLUMNS = (
+    "title",
+    "official_title",
+    "conditions",
+    "interventions",
+    "other_names",
+    "summary",
+    "description",
+    "eligibility",
+    "outcomes",
 )
-_WORD = re.compile(r"\w+")
+"""What ``trials_fts`` indexes, in its column order."""
+
+_FTS_INSERT = (
+    f"INSERT INTO trials_fts (rowid, {', '.join(FTS_COLUMNS)}) "
+    f"VALUES (:rowid, {', '.join(':' + name for name in FTS_COLUMNS)})"
+)
 _FTS_INTEGRITY_CHECKS = (
-    "INSERT INTO trials_fts (trials_fts, rank) VALUES ('integrity-check', 1)",
+    "INSERT INTO trials_fts (trials_fts) VALUES ('integrity-check')",
     "INSERT INTO names_fts (names_fts) VALUES ('integrity-check')",
 )
+_WORD = re.compile(r"\w+")
 
 
 def components(
@@ -81,12 +135,21 @@ def components(
     return {COMPONENT: core, **plugins}
 
 
+@dataclass(frozen=True, slots=True)
+class StoredStats:
+    """A precomputed chart or facet from the ``stats`` table."""
+
+    data_version: int
+    payload: bytes  # JSON
+
+
 class SQLiteStorage:
     """Trials in a SQLite file. Thread-safe: each call takes a pooled connection."""
 
     def __init__(self, engine: Engine) -> None:
         self._engine = engine
         self._decoder = docs.Decoder()
+        self._snippets = _Snippets()
 
     @classmethod
     def open(
@@ -95,15 +158,44 @@ class SQLiteStorage:
         *,
         extensions: Sequence[SqliteExtension] = (),
         plugin_migrations: Mapping[str, Sequence[Migration]] | None = None,
+        starting: MigrationCallback | None = None,
     ) -> Self:
         """Open (or create) ``trials.db`` at ``path`` and apply pending migrations.
 
         ``plugin_migrations`` maps each plugin's name to its ``trials`` migrations; they run
-        after the core's, and after every extension has loaded.
+        after the core's, and after every extension has loaded. ``starting`` hears about
+        each migration before it runs.
         """
         engine = create_engine(path, extensions=extensions)
         try:
-            migrate(engine, components(TRIALS_MIGRATIONS, plugin_migrations))
+            migrate(engine, components(TRIALS_MIGRATIONS, plugin_migrations), starting=starting)
+        except BaseException:
+            engine.dispose()
+            raise
+        return cls(engine)
+
+    @classmethod
+    def attach(
+        cls,
+        path: Path,
+        *,
+        extensions: Sequence[SqliteExtension] = (),
+        plugin_migrations: Mapping[str, Sequence[Migration]] | None = None,
+    ) -> Self:
+        """Open an existing ``trials.db`` without migrating it, as API workers do.
+
+        Raises StorageError if the file is missing or has migrations still to run.
+        """
+        if not path.exists():
+            raise StorageError(f"there's no database at {path}; run `tri-al install` first")
+        engine = create_engine(path, extensions=extensions)
+        try:
+            todo = pending(engine, components(TRIALS_MIGRATIONS, plugin_migrations))
+            if todo:
+                raise StorageError(
+                    f"{path} needs migrations ({', '.join(todo)}); start `tri-al serve` or run "
+                    "`tri-al update` once to apply them"
+                )
         except BaseException:
             engine.dispose()
             raise
@@ -114,6 +206,7 @@ class SQLiteStorage:
         return self._engine
 
     def close(self) -> None:
+        self._snippets.close()
         self._engine.dispose()
 
     def __enter__(self) -> Self:
@@ -129,96 +222,58 @@ class SQLiteStorage:
 
     # --- reads ------------------------------------------------------------------------------
 
+    @contextmanager
+    def read(self) -> Iterator["SQLiteReader"]:
+        """Reads that all see the same commit, even while an update commits."""
+        with self._engine.connect() as conn, conn.begin():
+            yield SQLiteReader(conn, self._decoder, self._snippets)
+
     def get_trial(self, trial_id: int) -> TrialRecord | None:
-        with self._engine.connect() as conn:
-            return _read_trial(conn, trial_id, self._decoder)
+        with self.read() as reader:
+            return reader.get_trial(trial_id)
 
     def find_trial(self, source: str, source_id: str) -> TrialRecord | None:
-        with self._engine.connect() as conn:
-            return _find_trial(conn, source, source_id, self._decoder)
+        with self.read() as reader:
+            return reader.find_trial(source, source_id)
 
     def content_hashes(
         self, source: str, source_ids: Iterable[str] | None = None
     ) -> dict[str, bytes | None]:
-        with self._engine.connect() as conn:
-            return _content_hashes(conn, source, source_ids)
+        with self.read() as reader:
+            return reader.content_hashes(source, source_ids)
 
-    def query_trials(self, query: TrialQuery = ALL_TRIALS) -> list[TrialSummary]:
-        stmt = _filtered(
-            select(
-                t.trials.c.id,
-                t.trials.c.source,
-                t.trials.c.source_id,
-                t.trials.c.title,
-                t.trials.c.status,
-                t.trials.c.phase,
-                t.trials.c.start_date,
-                t.trials.c.last_update,
-                t.trials.c.enrollment,
-            ),
-            query,
-        )
-        if query.after_id is not None:
-            stmt = stmt.where(t.trials.c.id > query.after_id)
-        stmt = stmt.order_by(t.trials.c.id).limit(query.limit)
-        with self._engine.connect() as conn:
-            return [TrialSummary(*row) for row in conn.execute(stmt)]
+    def query_trials(
+        self,
+        filter: TrialFilter = EVERY_TRIAL,
+        *,
+        sort: Sort = NEWEST_FIRST,
+        after: Cursor | None = None,
+        limit: int = 100,
+    ) -> TrialPage:
+        with self.read() as reader:
+            return reader.query_trials(filter, sort=sort, after=after, limit=limit)
 
-    def count_trials(self, query: TrialQuery = ALL_TRIALS) -> int:
-        stmt = _filtered(select(func.count()).select_from(t.trials), query)
-        with self._engine.connect() as conn:
-            return conn.execute(stmt).scalar_one()
+    def count_trials(self, filter: TrialFilter = EVERY_TRIAL) -> int:
+        with self.read() as reader:
+            return reader.count_trials(filter)
 
-    def search(self, text: str, *, limit: int = 20) -> list[SearchHit]:
-        words = _WORD.findall(text)
-        if not words or limit <= 0:
-            return []
-        # Quoting each word makes FTS5 syntax (AND, NOT, *, column:) plain text.
-        match = " ".join(f'"{word}"' for word in words)
-        stmt = _sql(
-            """
-            SELECT t.id, t.source, t.source_id, t.title, -f.rank
-            FROM (
-                SELECT rowid, rank FROM trials_fts WHERE trials_fts MATCH :match
-                ORDER BY rank LIMIT :limit
-            ) AS f
-            JOIN trials AS t ON t.id = f.rowid
-            ORDER BY f.rank
-            """
-        )
-        with self._engine.connect() as conn:
-            rows = conn.execute(stmt, {"match": match, "limit": limit})
-            return [SearchHit(*row) for row in rows]
+    def search(
+        self, text: str, *, filter: TrialFilter = EVERY_TRIAL, limit: int = 20
+    ) -> SearchResult:
+        with self.read() as reader:
+            return reader.search(text, filter=filter, limit=limit)
 
     def lookup_names(
         self, text: str, *, kind: NameKind | None = None, limit: int = 20
     ) -> list[NameHit]:
-        words = [word for word in _WORD.findall(text) if len(word) >= 3]
-        params: dict[str, object] = {"kind": kind, "limit": limit}
-        if words:
-            # The trigram tokenizer matches each quoted word anywhere in a name.
-            condition = "names_fts MATCH :match"
-            params["match"] = " ".join(f'"{word}"' for word in words)
-        elif text.strip():
-            condition = r"name LIKE :prefix ESCAPE '\'"
-            params["prefix"] = re.sub(r"([\\%_])", r"\\\1", text.strip()) + "%"
-        else:
-            return []
-        stmt = _sql(
-            f"""
-            SELECT kind, ref, name FROM names_fts
-            WHERE {condition} AND (:kind IS NULL OR kind = :kind)
-            ORDER BY length(name), name LIMIT :limit
-            """
-        )
-        with self._engine.connect() as conn:
-            return [NameHit(*row) for row in conn.execute(stmt, params)]
+        with self.read() as reader:
+            return reader.lookup_names(text, kind=kind, limit=limit)
 
     def check(self, *, full_text: bool = True) -> None:
         """Raise StorageError unless the database is sound.
 
         Runs SQLite's ``quick_check``, makes sure no bulk load is unfinished and, with
-        ``full_text``, checks both full-text indexes against the data they index.
+        ``full_text``, checks both full-text indexes' structure.
         """
         with self._engine.connect() as conn:
             problems = conn.exec_driver_sql("PRAGMA quick_check").scalars().all()
@@ -234,7 +289,7 @@ class SQLiteStorage:
                     for statement in _FTS_INTEGRITY_CHECKS:
                         conn.execute(_sql(statement))
                 except DatabaseError as exc:
-                    raise StorageError(f"a full-text index doesn't match the data: {exc}") from exc
+                    raise StorageError(f"a full-text index is damaged: {exc}") from exc
                 finally:
                     conn.rollback()
 
@@ -274,6 +329,212 @@ class SQLiteStorage:
                 raw.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             finally:
                 raw.execute("PRAGMA synchronous = NORMAL")
+
+
+class SQLiteReader:
+    """Reads inside one read transaction, so they all see the same commit."""
+
+    def __init__(self, conn: Connection, decoder: docs.Decoder, snippets: "_Snippets") -> None:
+        self._conn = conn
+        self._decoder = decoder
+        self._snippets = snippets
+
+    @property
+    def connection(self) -> Connection:
+        return self._conn
+
+    def data_version(self) -> int:
+        """Bumped by every install and every update that changes something."""
+        return int(self.meta(DATA_VERSION_KEY) or 0)
+
+    def meta(self, key: str) -> str | None:
+        stmt = select(t.meta.c.value).where(t.meta.c.key == key)
+        value: str | None = self._conn.execute(stmt).scalar_one_or_none()
+        return value
+
+    def get_trial(self, trial_id: int, *, raw: bool = True) -> TrialRecord | None:
+        """The trial, with its raw document unless ``raw`` is False (that saves unpacking it)."""
+        return _read_trial(self._conn, trial_id, self._decoder, raw=raw)
+
+    def find_trial(self, source: str, source_id: str, *, raw: bool = True) -> TrialRecord | None:
+        return _find_trial(self._conn, source, source_id, self._decoder, raw=raw)
+
+    def find_ids(self, source_id: str) -> list[tuple[str, int]]:
+        """``(source, id)`` of every trial called ``source_id``, one per registry at most."""
+        stmt = (
+            select(t.trials.c.source, t.trials.c.id)
+            .where(t.trials.c.source_id == source_id)
+            .order_by(t.trials.c.source)
+        )
+        return [(source, id_) for source, id_ in self._conn.execute(stmt)]
+
+    def content_hashes(
+        self, source: str, source_ids: Iterable[str] | None = None
+    ) -> dict[str, bytes | None]:
+        return _content_hashes(self._conn, source, source_ids)
+
+    def query_trials(
+        self,
+        filter: TrialFilter = EVERY_TRIAL,
+        *,
+        sort: Sort = NEWEST_FIRST,
+        after: Cursor | None = None,
+        limit: int = 100,
+    ) -> TrialPage:
+        keys, more = _page(self._conn, filter, sort, after, limit)
+        last = keys[-1] if more and keys else None
+        return TrialPage(
+            self.summaries([trial_id for _, trial_id in keys]),
+            None if last is None else (_cursor_value(last[0]), last[1]),
+        )
+
+    def summaries(self, ids: Sequence[int]) -> list[TrialSummary]:
+        """List rows for ``ids``, in that order; ids that aren't stored are left out."""
+        return _summaries(self._conn, ids)
+
+    def count_trials(self, filter: TrialFilter = EVERY_TRIAL) -> int:
+        stmt = select(func.count()).select_from(t.trials).where(*where(filter))
+        count: int = self._conn.execute(stmt).scalar_one()
+        return count
+
+    def search(
+        self,
+        text: str,
+        *,
+        filter: TrialFilter = EVERY_TRIAL,
+        limit: int = 20,
+        snippets: bool = True,
+    ) -> SearchResult:
+        scored, candidates = self.rank(text, filter=filter, limit=limit)
+        hits = self.describe_hits(scored, text if snippets else None)
+        return SearchResult(hits, candidates, candidates >= SEARCH_CANDIDATES)
+
+    def rank(
+        self, text: str, *, filter: TrialFilter = EVERY_TRIAL, limit: int = 20
+    ) -> tuple[list[tuple[int, float]], int]:
+        """``rank_matches`` in this read transaction."""
+        return rank_matches(self._conn, text, filter=filter, limit=limit)
+
+    def describe_hits(
+        self, scored: Sequence[tuple[int, float]], text: str | None
+    ) -> list[SearchHit]:
+        """Hits for ``(id, score)`` pairs, in that order, with snippets matching ``text``."""
+        ids = [trial_id for trial_id, _ in scored]
+        if not ids:
+            return []
+        c = t.trials.c
+        rows = {
+            row.id: row
+            for row in self._conn.execute(
+                select(c.id, c.source, c.source_id, c.title, c.status, c.phase).where(
+                    _in(c.id, ids)
+                )
+            )
+        }
+        snippets = {} if text is None else self._snippets.build(self._snippet_text(ids), text)
+        return [
+            SearchHit(
+                trial_id,
+                rows[trial_id].source,
+                rows[trial_id].source_id,
+                rows[trial_id].title,
+                rows[trial_id].status,
+                rows[trial_id].phase,
+                score,
+                snippets.get(trial_id, ()),
+            )
+            for trial_id, score in scored
+            if trial_id in rows
+        ]
+
+    def _snippet_text(self, ids: Sequence[int]) -> dict[int, list[str | None]]:
+        """The searchable text of each trial apart from its titles, in _Snippets.COLUMNS order."""
+        conn = self._conn
+        joined: dict[int, dict[str, list[str]]] = {trial_id: {} for trial_id in ids}
+        for trial_id, kind, name in conn.execute(
+            _sql(
+                "SELECT tc.trial_id, 'conditions', c.name FROM trial_conditions AS tc "
+                "JOIN conditions AS c ON c.id = tc.condition_id WHERE tc.trial_id IN "
+                + _JSON_IDS
+                + " UNION ALL SELECT ti.trial_id, 'interventions', i.name "
+                "FROM trial_interventions AS ti JOIN interventions AS i "
+                "ON i.id = ti.intervention_id WHERE ti.trial_id IN "
+                + _JSON_IDS
+                + " UNION ALL SELECT trial_id, 'other_names', alias FROM intervention_aliases "
+                "WHERE trial_id IN " + _JSON_IDS
+            ),
+            _ids(ids),
+        ):
+            joined[trial_id].setdefault(kind, []).append(name)
+        texts = _texts(conn, ids, self._decoder)
+        result: dict[int, list[str | None]] = {}
+        for trial_id in ids:
+            text_ = texts.get(trial_id, docs.TrialText())
+            names = joined[trial_id]
+            result[trial_id] = [
+                text_.brief_summary,
+                text_.description,
+                text_.eligibility_criteria,
+                _outcome_text(text_.outcomes),
+                " ".join(names.get("conditions", ())) or None,
+                " ".join(names.get("interventions", ())) or None,
+                " ".join(names.get("other_names", ())) or None,
+            ]
+        return result
+
+    def lookup_names(
+        self, text: str, *, kind: NameKind | None = None, limit: int = 20
+    ) -> list[NameHit]:
+        words = [word for word in _WORD.findall(text) if len(word) >= 3]
+        params: dict[str, object] = {"kind": kind, "limit": limit}
+        if words:
+            # The trigram tokenizer matches each quoted word anywhere in a name.
+            condition = "names_fts MATCH :match"
+            params["match"] = " ".join(f'"{word}"' for word in words)
+        elif text.strip():
+            condition = r"name LIKE :prefix ESCAPE '\'"
+            params["prefix"] = re.sub(r"([\\%_])", r"\\\1", text.strip()) + "%"
+        else:
+            return []
+        stmt = _sql(
+            f"""
+            SELECT kind, ref, name FROM (
+                SELECT kind, ref, name FROM names_fts
+                WHERE {condition} AND (:kind IS NULL OR kind = :kind)
+                LIMIT :candidates
+            )
+            ORDER BY length(name), name LIMIT :limit
+            """
+        )
+        params["candidates"] = NAME_CANDIDATES
+        return [NameHit(*row) for row in self._conn.execute(stmt, params)]
+
+    def changes(self, trial_id: int) -> list[TrialChange]:
+        """What updates changed in the trial, newest first."""
+        c, r = t.trial_changes.c, t.runs.c
+        stmt = (
+            select(c.run_id, r.finished_at, c.field, c.old, c.new)
+            .join(t.runs, r.id == c.run_id)
+            .where(c.trial_id == trial_id)
+            .order_by(c.run_id.desc(), c.id)
+        )
+        return [
+            TrialChange(
+                run_id,
+                finished_at,
+                field,
+                None if old is None else json.loads(old),
+                None if new is None else json.loads(new),
+            )
+            for run_id, finished_at, field, old, new in self._conn.execute(stmt)
+        ]
+
+    def stored_stats(self, chart_id: str) -> StoredStats | None:
+        """A chart or facet the pipeline precomputed, whatever data version it was made for."""
+        row = self._conn.execute(
+            select(t.stats.c.data_version, t.stats.c.payload).where(t.stats.c.chart_id == chart_id)
+        ).one_or_none()
+        return None if row is None else StoredStats(row.data_version, bytes(row.payload))
 
 
 class SQLiteTransaction:
@@ -347,8 +608,8 @@ class _Names:
         """Make sure every key has a row; return the rows created."""
         missing = {key for key in keys if key not in self.ids}
         if missing and not self.complete:
-            column = self.table.c[self.key]
-            stmt = select(column, self.table.c.id).where(_in(column, missing))
+            column_ = self.table.c[self.key]
+            stmt = select(column_, self.table.c.id).where(_in(column_, missing))
             self.ids.update(conn.execute(stmt).all())
             missing -= self.ids.keys()
         if not missing:
@@ -405,37 +666,49 @@ class _MeshTerms:
         return self.rows[code][0]
 
 
-class _Docs:
-    """Compresses raw documents for ``trial_docs``, training the dictionary when it can."""
+class _Codec:
+    """Compresses one kind of blob (``docs.DOC`` or ``docs.TEXT``), training its dictionary."""
 
-    def __init__(self, conn: Connection) -> None:
+    def __init__(self, conn: Connection, kind: str) -> None:
+        self._kind = kind
         latest = conn.execute(
-            select(t.doc_dicts.c.id, t.doc_dicts.c.dict).order_by(t.doc_dicts.c.id.desc()).limit(1)
+            select(t.doc_dicts.c.id, t.doc_dicts.c.dict)
+            .where(t.doc_dicts.c.kind == kind)
+            .order_by(t.doc_dicts.c.id.desc())
+            .limit(1)
         ).one_or_none()
         self._encoder = docs.Encoder() if latest is None else docs.Encoder(*latest)
         self._trained = latest is not None
 
-    def rows(self, conn: Connection, raws: Sequence[tuple[int, bytes]]) -> list[dict[str, Any]]:
-        if not self._trained and (content := docs.train([raw for _, raw in raws])):
+    def rows(
+        self, conn: Connection, blobs: Sequence[tuple[int, bytes]], column_: str
+    ) -> list[dict[str, Any]]:
+        if not self._trained and (content := docs.train([blob for _, blob in blobs])):
             dict_id = _next_id(conn, t.doc_dicts)
             conn.execute(
                 insert(t.doc_dicts),
-                {"id": dict_id, "dict": content, "created_at": datetime.now(UTC)},
+                {
+                    "id": dict_id,
+                    "dict": content,
+                    "created_at": datetime.now(UTC),
+                    "kind": self._kind,
+                },
             )
             self._encoder = docs.Encoder(dict_id, content)
             self._trained = True
         encoder = self._encoder
         return [
-            {"trial_id": trial_id, "doc": encoder.encode(raw), "dict_id": encoder.dict_id}
-            for trial_id, raw in raws
+            {"trial_id": trial_id, column_: encoder.encode(blob), "dict_id": encoder.dict_id}
+            for trial_id, blob in blobs
         ]
 
 
 class _Writer:
     """Upserts batches of trials on one connection, inside the caller's transaction.
 
-    ``bulk`` skips the full-text upkeep that ``_finish_bulk_load`` redoes in one pass, and
-    keeps every entity id in memory across batches.
+    The full-text index is contentless, so every write feeds it the trials' text. ``bulk``
+    leaves ``names_fts`` to ``_finish_bulk_load``, which refills it in one pass, and keeps
+    every entity id in memory across batches.
     """
 
     def __init__(self, conn: Connection, *, bulk: bool) -> None:
@@ -445,7 +718,8 @@ class _Writer:
         self._interventions = _Names(t.interventions, "name", "intervention")
         self._sponsors = _Names(t.sponsors, "name", "sponsor")
         self._mesh = _MeshTerms()
-        self._docs = _Docs(conn)
+        self._docs = _Codec(conn, docs.DOC)
+        self._texts = _Codec(conn, docs.TEXT)
         self._countries = frozenset(conn.execute(select(t.countries.c.code)).scalars())
         if bulk:
             for names in (self._conditions, self._interventions, self._sponsors, self._mesh):
@@ -459,14 +733,10 @@ class _Writer:
         ids, existing = self._assign_ids(records)
         conn = self._conn
         if existing:
-            if not self._bulk:
-                # FTS5 reads the old text from trials_fts_content to delete it, so this must
-                # run before anything that text comes from changes.
-                conn.execute(
-                    _sql("DELETE FROM trials_fts WHERE rowid IN " + _JSON_IDS), _ids(existing)
-                )
-            for table in t.LINK_TABLES:
-                conn.execute(delete(table).where(_in(table.c.trial_id, existing)))
+            # Contentless with contentless_delete: a trial's row goes by rowid alone.
+            conn.execute(_sql("DELETE FROM trials_fts WHERE rowid IN " + _JSON_IDS), _ids(existing))
+            for table_ in t.LINK_TABLES:
+                conn.execute(delete(table_).where(_in(table_.c.trial_id, existing)))
 
         new_names = self._resolve_names(records)
         now = datetime.now(UTC)
@@ -482,17 +752,12 @@ class _Writer:
         if changed:
             conn.execute(update(t.trials).where(t.trials.c.id == bindparam("b_id")), changed)
         self._insert_children(records, ids)
-
-        if not self._bulk:
-            conn.execute(
-                _sql(
-                    f"INSERT INTO trials_fts (rowid, {_FTS_COLUMNS}) "
-                    f"SELECT id, {_FTS_COLUMNS} FROM trials_fts_content WHERE id IN {_JSON_IDS}"
-                ),
-                _ids(ids),
-            )
-            if new_names:
-                conn.execute(_sql("INSERT INTO names_fts VALUES (:name, :kind, :ref)"), new_names)
+        conn.execute(
+            _sql(_FTS_INSERT),
+            [_fts_row(record, id_) for record, id_ in zip(records, ids, strict=True)],
+        )
+        if not self._bulk and new_names:
+            conn.execute(_sql("INSERT INTO names_fts VALUES (:name, :kind, :ref)"), new_names)
         return ids
 
     def _check(self, records: Sequence[TrialRecord]) -> None:
@@ -583,28 +848,11 @@ class _Writer:
         }
 
     def _insert_children(self, records: Sequence[TrialRecord], ids: Sequence[int]) -> None:
-        rows: dict[Table, list[dict[str, Any]]] = {table: [] for table in t.LINK_TABLES}
+        rows: dict[Table, list[dict[str, Any]]] = {table_: [] for table_ in t.LINK_TABLES}
         raws: list[tuple[int, bytes]] = []
+        texts: list[tuple[int, bytes]] = []
         for record, trial_id in zip(records, ids, strict=True):
-            rows[t.trial_text].append(
-                {
-                    "trial_id": trial_id,
-                    "brief_summary": record.brief_summary,
-                    "description": record.description,
-                    "eligibility_criteria": record.eligibility_criteria,
-                }
-            )
-            rows[t.trial_outcomes] += (
-                {
-                    "trial_id": trial_id,
-                    "position": position,
-                    "kind": outcome.kind,
-                    "measure": outcome.measure,
-                    "description": outcome.description,
-                    "time_frame": outcome.time_frame,
-                }
-                for position, outcome in enumerate(record.outcomes)
-            )
+            texts.append((trial_id, _trial_text(record).pack()))
             if record.raw is not None:
                 raws.append((trial_id, record.raw))
             rows[t.trial_conditions] += (
@@ -672,10 +920,52 @@ class _Writer:
                 }
                 for position, location in enumerate(record.locations)
             )
-        rows[t.trial_docs] = self._docs.rows(self._conn, raws)
-        for table, table_rows in rows.items():
+        rows[t.trial_text] = self._texts.rows(self._conn, texts, "text")
+        rows[t.trial_docs] = self._docs.rows(self._conn, raws, "doc")
+        for table_, table_rows in rows.items():
             if table_rows:
-                self._conn.execute(insert(table), table_rows)
+                self._conn.execute(insert(table_), table_rows)
+
+
+def _trial_text(record: TrialRecord) -> docs.TrialText:
+    return docs.TrialText(
+        record.brief_summary,
+        record.description,
+        record.eligibility_criteria,
+        tuple(
+            (outcome.kind, outcome.measure, outcome.description, outcome.time_frame)
+            for outcome in record.outcomes
+        ),
+    )
+
+
+def _outcome_text(outcomes: Iterable[docs.PackedOutcome]) -> str | None:
+    """Outcome measures and descriptions as one text, the way ``trials_fts`` indexes them."""
+    return (
+        " ".join(
+            " ".join(part for part in (measure, description) if part)
+            for _, measure, description, _ in outcomes
+        )
+        or None
+    )
+
+
+def _fts_row(record: TrialRecord, trial_id: int) -> dict[str, Any]:
+    """What ``trials_fts`` indexes for a trial (after ``without_repeats``)."""
+    return {
+        "rowid": trial_id,
+        "title": record.title,
+        "official_title": record.official_title,
+        "conditions": " ".join(record.conditions) or None,
+        "interventions": " ".join(i.name for i in record.interventions) or None,
+        "other_names": " ".join(a for i in record.interventions for a in i.other_names) or None,
+        "summary": record.brief_summary,
+        "description": record.description,
+        "eligibility": record.eligibility_criteria,
+        "outcomes": _outcome_text(
+            (o.kind, o.measure, o.description, o.time_frame) for o in record.outcomes
+        ),
+    }
 
 
 def _start_bulk_load(conn: Connection) -> None:
@@ -688,14 +978,12 @@ def _start_bulk_load(conn: Connection) -> None:
     )
     for index in t.DEFERRED_INDEXES:
         index.drop(conn, checkfirst=True)
-    conn.execute(_sql("INSERT INTO trials_fts (trials_fts) VALUES ('delete-all')"))
     conn.execute(_sql("DELETE FROM names_fts"))
 
 
 def _finish_bulk_load(conn: Connection) -> None:
     for index in t.DEFERRED_INDEXES:
         index.create(conn, checkfirst=True)
-    conn.execute(_sql("INSERT INTO trials_fts (trials_fts) VALUES ('rebuild')"))
     conn.execute(_sql("INSERT INTO trials_fts (trials_fts) VALUES ('optimize')"))
     conn.execute(
         _sql(
@@ -724,36 +1012,55 @@ def _content_hashes(
 
 
 def _find_trial(
-    conn: Connection, source: str, source_id: str, decoder: docs.Decoder
+    conn: Connection, source: str, source_id: str, decoder: docs.Decoder, *, raw: bool = True
 ) -> TrialRecord | None:
     trial_id = conn.execute(
         select(t.trials.c.id).where(t.trials.c.source == source, t.trials.c.source_id == source_id)
     ).scalar_one_or_none()
-    return None if trial_id is None else _read_trial(conn, trial_id, decoder)
+    return None if trial_id is None else _read_trial(conn, trial_id, decoder, raw=raw)
 
 
-def _read_trial(conn: Connection, trial_id: int, decoder: docs.Decoder) -> TrialRecord | None:
+def _dict_loader(conn: Connection) -> Any:
+    def load(dict_id: int) -> bytes:
+        stmt = select(t.doc_dicts.c.dict).where(t.doc_dicts.c.id == dict_id)
+        return bytes(conn.execute(stmt).scalar_one())
+
+    return load
+
+
+def _texts(
+    conn: Connection, ids: Sequence[int], decoder: docs.Decoder
+) -> dict[int, docs.TrialText]:
+    load = _dict_loader(conn)
+    stmt = select(t.trial_text.c.trial_id, t.trial_text.c.text, t.trial_text.c.dict_id).where(
+        _in(t.trial_text.c.trial_id, ids)
+    )
+    return {
+        trial_id: docs.TrialText.unpack(decoder.decode(blob, dict_id, load))
+        for trial_id, blob, dict_id in conn.execute(stmt)
+    }
+
+
+def _read_trial(
+    conn: Connection, trial_id: int, decoder: docs.Decoder, *, raw: bool = True
+) -> TrialRecord | None:
     trial = conn.execute(select(t.trials).where(t.trials.c.id == trial_id)).one_or_none()
     if trial is None:
         return None
 
-    def rows(stmt: Select[Any], table: Table) -> Iterator[Any]:
+    def rows(stmt: Select[Any], table_: Table) -> Iterator[Any]:
         return iter(
-            conn.execute(stmt.where(table.c.trial_id == trial_id).order_by(table.c.position))
+            conn.execute(stmt.where(table_.c.trial_id == trial_id).order_by(table_.c.position))
         )
 
-    text_row = conn.execute(
-        select(t.trial_text).where(t.trial_text.c.trial_id == trial_id)
-    ).one_or_none()
-    doc = conn.execute(
-        select(t.trial_docs.c.doc, t.trial_docs.c.dict_id).where(
-            t.trial_docs.c.trial_id == trial_id
-        )
-    ).one_or_none()
-
-    def load_dict(dict_id: int) -> bytes:
-        stmt = select(t.doc_dicts.c.dict).where(t.doc_dicts.c.id == dict_id)
-        return bytes(conn.execute(stmt).scalar_one())
+    text_ = _texts(conn, [trial_id], decoder).get(trial_id, docs.TrialText())
+    doc = None
+    if raw:
+        doc = conn.execute(
+            select(t.trial_docs.c.doc, t.trial_docs.c.dict_id).where(
+                t.trial_docs.c.trial_id == trial_id
+            )
+        ).one_or_none()
 
     aliases: dict[int, list[str]] = {}
     for intervention_id, alias in rows(
@@ -785,12 +1092,12 @@ def _read_trial(conn: Connection, trial_id: int, decoder: docs.Decoder) -> Trial
         max_age_days=trial.max_age_days,
         sex=trial.sex,
         healthy_volunteers=trial.healthy_volunteers,
-        brief_summary=None if text_row is None else text_row.brief_summary,
-        description=None if text_row is None else text_row.description,
-        eligibility_criteria=None if text_row is None else text_row.eligibility_criteria,
+        brief_summary=text_.brief_summary,
+        description=text_.description,
+        eligibility_criteria=text_.eligibility_criteria,
         outcomes=[
-            Outcome(row.kind, row.measure, row.description, row.time_frame)
-            for row in rows(select(t.trial_outcomes), t.trial_outcomes)
+            Outcome(cast(OutcomeKind, kind), measure, description, time_frame)
+            for kind, measure, description, time_frame in text_.outcomes
         ],
         conditions=[
             row.name
@@ -838,18 +1145,251 @@ def _read_trial(conn: Connection, trial_id: int, decoder: docs.Decoder) -> Trial
             )
             for row in rows(select(t.locations), t.locations)
         ],
-        raw=None if doc is None else decoder.decode(doc.doc, doc.dict_id, load_dict),
+        raw=None if doc is None else decoder.decode(doc.doc, doc.dict_id, _dict_loader(conn)),
         content_hash=trial.content_hash,
         ingested_at=trial.ingested_at,
     )
 
 
-def _filtered[S: Select[Any]](stmt: S, query: TrialQuery) -> S:
-    if query.status is not None:
-        stmt = stmt.where(t.trials.c.status.in_(query.status))
-    if query.phase is not None:
-        stmt = stmt.where(t.trials.c.phase.in_(query.phase))
-    return stmt
+def _summaries(conn: Connection, ids: Sequence[int]) -> list[TrialSummary]:
+    if not ids:
+        return []
+    c = t.trials.c
+    stmt = (
+        select(
+            c.id,
+            c.source,
+            c.source_id,
+            c.title,
+            c.status,
+            c.phase,
+            c.study_type,
+            c.start_date,
+            c.completion_date,
+            c.last_update,
+            c.enrollment,
+            c.has_results,
+            c.num_sites,
+            t.sponsors.c.name,
+        )
+        .outerjoin(t.sponsors, t.sponsors.c.id == c.lead_sponsor_id)
+        .where(_in(c.id, ids))
+    )
+    rows = {row.id: row for row in conn.execute(stmt)}
+    conditions: dict[int, list[str]] = {}
+    for trial_id, name in conn.execute(
+        select(t.trial_conditions.c.trial_id, t.conditions.c.name)
+        .join(t.conditions)
+        .where(_in(t.trial_conditions.c.trial_id, ids))
+        .order_by(t.trial_conditions.c.trial_id, t.trial_conditions.c.position)
+    ):
+        conditions.setdefault(trial_id, []).append(name)
+    summaries = []
+    for trial_id in ids:
+        row = rows.get(trial_id)
+        if row is not None:
+            summaries.append(
+                TrialSummary(
+                    id=row.id,
+                    source=row.source,
+                    source_id=row.source_id,
+                    title=row.title,
+                    status=row.status,
+                    phase=row.phase,
+                    study_type=row.study_type,
+                    start_date=row.start_date,
+                    completion_date=row.completion_date,
+                    last_update=row.last_update,
+                    enrollment=row.enrollment,
+                    has_results=row.has_results,
+                    num_sites=row.num_sites,
+                    lead_sponsor=row.name,
+                    conditions=tuple(conditions.get(trial_id, ())[:SUMMARY_CONDITIONS]),
+                )
+            )
+    return summaries
+
+
+def _page(
+    conn: Connection, filter: TrialFilter, sort: Sort, after: Cursor | None, limit: int
+) -> tuple[list[tuple[Any, int]], bool]:
+    """``(sort value, id)`` of up to ``limit`` trials after ``after``, and whether there are more.
+
+    SQLite orders NULL before every value, so a descending list has the trials without a
+    value at the end. Each part is its own query, so both can walk the sort column's index.
+    """
+    clauses = where(filter)
+    id_ = t.trials.c.id
+    desc = sort.descending
+    if sort.key == "id":
+        stmt = select(id_, id_).where(*clauses)
+        if after is not None:
+            stmt = stmt.where(id_ < after[1] if desc else id_ > after[1])
+        rows = conn.execute(stmt.order_by(id_.desc() if desc else id_).limit(limit + 1)).all()
+        return [(value, trial_id) for value, trial_id in rows[:limit]], len(rows) > limit
+    col = t.trials.c[sort.key]
+    parts = ["values", "nulls"] if desc else ["nulls", "values"]
+    if after is not None:
+        parts = parts[parts.index("nulls" if after[0] is None else "values") :]
+    found: list[tuple[Any, int]] = []
+    order: tuple[Any, ...]
+    for part in parts:
+        if part == "values":
+            stmt = select(col, id_).where(*clauses, col.is_not(None))
+            if after is not None and after[0] is not None:
+                bound = tuple_(literal(_bind_value(sort, after[0]), col.type), literal(after[1]))
+                stmt = stmt.where(tuple_(col, id_) < bound if desc else tuple_(col, id_) > bound)
+            order = (col.desc(), id_.desc()) if desc else (col, id_)
+        else:
+            stmt = select(col, id_).where(*clauses, col.is_(None))
+            if after is not None and after[0] is None:
+                stmt = stmt.where(id_ < after[1] if desc else id_ > after[1])
+            order = (id_.desc(),) if desc else (id_,)
+        result = conn.execute(stmt.order_by(*order).limit(limit + 1 - len(found)))
+        found += [(value, trial_id) for value, trial_id in result]
+        if len(found) > limit:
+            break
+    return found[:limit], len(found) > limit
+
+
+def _bind_value(sort: Sort, value: Any) -> Any:
+    if sort.key == "enrollment":
+        return int(value)
+    return date.fromisoformat(value) if isinstance(value, str) else value
+
+
+def _cursor_value(value: Any) -> Any:
+    return value.isoformat() if isinstance(value, date) else value
+
+
+def rank_matches(
+    conn: Connection, text: str, *, filter: TrialFilter = EVERY_TRIAL, limit: int = 20
+) -> tuple[list[tuple[int, float]], int]:
+    """The best ``limit`` matches of ``text`` as ``(id, score)``, and how many were ranked.
+
+    At most ``SEARCH_CANDIDATES`` matches are ranked: the most recently registered.
+    """
+    match = match_expression(text)
+    if match is None or limit <= 0:
+        return [], 0
+    fts = table("trials_fts", column("rowid", Integer), column("rank", Float))
+    inner = select(fts.c.rowid, fts.c.rank).where(
+        _sql("trials_fts MATCH :fts_search").bindparams(fts_search=match)
+    )
+    if not filter.is_empty:
+        inner = inner.where(fts.c.rowid.in_(matching_ids(filter)))
+    ranked = inner.order_by(fts.c.rowid.desc()).limit(SEARCH_CANDIDATES).subquery()
+    stmt = (
+        select(ranked.c.rowid, ranked.c.rank, func.count().over())
+        .order_by(ranked.c.rank, ranked.c.rowid.desc())
+        .limit(limit)
+    )
+    rows = conn.execute(stmt).all()
+    return [(rowid, -rank) for rowid, rank, _ in rows], rows[0][2] if rows else 0
+
+
+# --- snippets -----------------------------------------------------------------------------
+
+_OPEN, _CLOSE = "\x02", "\x03"
+_MARKS = re.compile(f"({_OPEN}|{_CLOSE})")
+_SPACES = re.compile(r"\s+")
+
+
+class _Snippets:
+    """Snippets for search hits, built in a small in-memory FTS5 table per thread.
+
+    ``trials_fts`` is contentless, so it can't make snippets itself. The hits' text is
+    unpacked into a temporary table with the same tokenizer, whose ``snippet()`` then marks
+    the same words the search matched.
+    """
+
+    COLUMNS = (
+        "summary",
+        "description",
+        "eligibility",
+        "outcomes",
+        "conditions",
+        "interventions",
+        "other_names",
+    )
+    TOKENS = 24
+
+    def __init__(self) -> None:
+        self._local = threading.local()
+        self._lock = threading.Lock()
+        self._conns: list[sqlite3.Connection] = []
+
+    def _conn(self) -> sqlite3.Connection:
+        conn: sqlite3.Connection | None = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = sqlite3.connect(":memory:", check_same_thread=False)
+            conn.execute(
+                f"CREATE VIRTUAL TABLE snip USING fts5({', '.join(self.COLUMNS)}, "
+                "tokenize = 'porter unicode61 remove_diacritics 2')"
+            )
+            with self._lock:
+                self._conns.append(conn)
+            self._local.conn = conn
+        return conn
+
+    def build(
+        self, texts: Mapping[int, Sequence[str | None]], words: str
+    ) -> dict[int, tuple[SnippetPart, ...]]:
+        """A snippet per trial in ``texts`` (columns in ``COLUMNS`` order) for ``words``.
+
+        Any of the words counts, since a search's words may be split between the title and
+        the text. A trial whose text has none of them gets the start of its first text.
+        """
+        match = match_expression(words, any_word=True)
+        if not texts or match is None:
+            return {}
+        conn = self._conn()
+        placeholders = ", ".join("?" * len(self.COLUMNS))
+        with conn:
+            conn.execute("DELETE FROM snip")
+            conn.executemany(
+                f"INSERT INTO snip (rowid, {', '.join(self.COLUMNS)}) VALUES (?, {placeholders})",
+                [(trial_id, *columns) for trial_id, columns in texts.items()],
+            )
+            found = {
+                rowid: _parts(snippet)
+                for rowid, snippet in conn.execute(
+                    "SELECT rowid, snippet(snip, -1, ?, ?, '…', ?) FROM snip WHERE snip MATCH ?",
+                    (_OPEN, _CLOSE, self.TOKENS, match),
+                )
+            }
+        for trial_id, columns in texts.items():
+            if trial_id not in found:
+                first = next((value for value in columns if value), None)
+                if first is not None:
+                    found[trial_id] = (SnippetPart(_leading_words(first, self.TOKENS), False),)
+        return found
+
+    def close(self) -> None:
+        with self._lock:
+            for conn in self._conns:
+                conn.close()
+            self._conns.clear()
+
+
+def _parts(snippet: str) -> tuple[SnippetPart, ...]:
+    parts: list[SnippetPart] = []
+    inside = False
+    for piece in _MARKS.split(_SPACES.sub(" ", snippet)):
+        if piece in (_OPEN, _CLOSE):
+            inside = piece == _OPEN
+        elif piece:
+            if parts and parts[-1].match == inside:
+                parts[-1] = SnippetPart(parts[-1].text + piece, inside)
+            else:
+                parts.append(SnippetPart(piece, inside))
+    return tuple(parts)
+
+
+def _leading_words(text_: str, count: int) -> str:
+    """The first ``count`` words of ``text_``, on one line."""
+    words = text_.split()
+    return " ".join(words[:count]) + ("…" if len(words) > count else "")
 
 
 # --- helpers ------------------------------------------------------------------------------
@@ -861,14 +1401,14 @@ def _ids(ids: Iterable[int]) -> dict[str, str]:
     return {"ids": json.dumps(list(ids))}
 
 
-def _in(column: KeyedColumnElement[Any], values: Iterable[object]) -> ColumnElement[bool]:
+def _in(column_: KeyedColumnElement[Any], values: Iterable[object]) -> ColumnElement[bool]:
     """``column IN values``, sent as one JSON parameter, so any number of values fits."""
     each = func.json_each(json.dumps(list(values))).table_valued("value")
-    return column.in_(select(each.c.value))
+    return column_.in_(select(each.c.value))
 
 
-def _next_id(conn: Connection, table: Table) -> int:
-    return int(conn.execute(select(func.coalesce(func.max(table.c.id), 0) + 1)).scalar_one())
+def _next_id(conn: Connection, table_: Table) -> int:
+    return int(conn.execute(select(func.coalesce(func.max(table_.c.id), 0) + 1)).scalar_one())
 
 
 def _sql(statement: str) -> TextClause:

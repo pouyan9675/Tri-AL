@@ -1,5 +1,8 @@
 """The core's migrations for ``trials.db`` and ``app.db``. Frozen once released: add, don't edit."""
 
+import itertools
+from datetime import UTC, datetime
+
 from sqlalchemy import Connection
 
 from tri_al.storage import docs
@@ -277,6 +280,98 @@ def _trials_2(conn: Connection) -> None:
     )
 
 
+_TRIALS_3 = """\
+ALTER TABLE doc_dicts ADD COLUMN kind TEXT NOT NULL DEFAULT 'doc';
+
+CREATE TABLE trial_text_3 (
+    trial_id INTEGER NOT NULL PRIMARY KEY REFERENCES trials (id) ON DELETE CASCADE,
+    text BLOB NOT NULL,
+    dict_id INTEGER REFERENCES doc_dicts (id)
+);
+
+-- Contentless: the index keeps no copy of the text. The pipeline feeds it as it writes
+-- each trial, and contentless_delete lets it drop a trial's row by rowid alone.
+CREATE VIRTUAL TABLE trials_fts_3 USING fts5(
+    title, official_title, conditions, interventions, other_names,
+    summary, description, eligibility, outcomes,
+    content = '',
+    contentless_delete = 1,
+    tokenize = 'porter unicode61 remove_diacritics 2'
+);
+INSERT INTO trials_fts_3 (trials_fts_3, rank)
+VALUES ('rank', 'bm25(10.0, 5.0, 8.0, 8.0, 6.0, 3.0, 1.0, 1.0, 1.5)');
+INSERT INTO trials_fts_3 (
+    rowid, title, official_title, conditions, interventions, other_names,
+    summary, description, eligibility, outcomes
+)
+SELECT
+    id, title, official_title, conditions, interventions, other_names,
+    summary, description, eligibility, outcomes
+FROM trials_fts_content;
+"""
+
+_TRIALS_3_SWAP = """\
+DROP TABLE trials_fts;
+DROP VIEW trials_fts_content;
+DROP TABLE trial_outcomes;
+DROP TABLE trial_text;
+ALTER TABLE trial_text_3 RENAME TO trial_text;
+ALTER TABLE trials_fts_3 RENAME TO trials_fts;
+INSERT INTO trials_fts (trials_fts) VALUES ('optimize');
+"""
+
+_TEXT_BATCH = 5_000
+
+
+def _trials_3(conn: Connection) -> None:
+    """Make the full-text index contentless and keep each trial's text compressed.
+
+    The external-content index read its text from plain copies in ``trial_text`` and
+    ``trial_outcomes``, 3.8 GB at 607k trials; compressed, the text is about 1 GB. The
+    index is filled from the old copies here, before they go.
+    """
+    run_script(conn, _TRIALS_3)
+    ids = conn.exec_driver_sql("SELECT id FROM trials ORDER BY id").scalars().all()
+    encoder: docs.Encoder | None = None
+    for batch in itertools.batched(ids, _TEXT_BATCH, strict=False):
+        low, high = batch[0], batch[-1]
+        texts = {
+            row[0]: row[1:]
+            for row in conn.exec_driver_sql(
+                "SELECT trial_id, brief_summary, description, eligibility_criteria "
+                "FROM trial_text WHERE trial_id BETWEEN ? AND ?",
+                (low, high),
+            )
+        }
+        outcomes: dict[int, list[docs.PackedOutcome]] = {}
+        for trial_id, kind, measure, description, time_frame in conn.exec_driver_sql(
+            "SELECT trial_id, kind, measure, description, time_frame FROM trial_outcomes "
+            "WHERE trial_id BETWEEN ? AND ? ORDER BY trial_id, position",
+            (low, high),
+        ):
+            outcomes.setdefault(trial_id, []).append((kind, measure, description, time_frame))
+        packed = []
+        for trial_id in batch:
+            summary, description, eligibility = texts.get(trial_id, (None, None, None))
+            trial_text = docs.TrialText(
+                summary, description, eligibility, tuple(outcomes.get(trial_id, ()))
+            )
+            packed.append((trial_id, trial_text.pack()))
+        if encoder is None:
+            encoder = docs.Encoder()
+            if content := docs.train([blob for _, blob in packed]):
+                dict_id = conn.exec_driver_sql(
+                    "INSERT INTO doc_dicts (dict, created_at, kind) VALUES (?, ?, ?) RETURNING id",
+                    (content, datetime.now(UTC).isoformat(), docs.TEXT),
+                ).scalar_one()
+                encoder = docs.Encoder(dict_id, content)
+        conn.exec_driver_sql(
+            "INSERT INTO trial_text_3 (trial_id, text, dict_id) VALUES (?, ?, ?)",
+            [(trial_id, encoder.encode(blob), encoder.dict_id) for trial_id, blob in packed],
+        )
+    run_script(conn, _TRIALS_3_SWAP)
+
+
 _APP_1 = """\
 CREATE TABLE jobs (
     id INTEGER NOT NULL PRIMARY KEY,
@@ -303,8 +398,23 @@ CREATE TABLE enricher_state (
 ) WITHOUT ROWID;
 """
 
+_APP_2 = """\
+ALTER TABLE jobs ADD COLUMN stage TEXT;
+ALTER TABLE jobs ADD COLUMN unit TEXT;
+ALTER TABLE jobs ADD COLUMN error TEXT;
+ALTER TABLE jobs ADD COLUMN origin TEXT NOT NULL DEFAULT 'api';
+ALTER TABLE jobs ADD COLUMN cancel_requested BOOLEAN NOT NULL DEFAULT 0;
+ALTER TABLE jobs ADD COLUMN worker TEXT;
+ALTER TABLE jobs ADD COLUMN updated_at TEXT;
+CREATE INDEX jobs_by_update ON jobs (updated_at);
+"""
+
 TRIALS_MIGRATIONS = (
     Migration(1, "initial trials schema", _trials_1),
     Migration(2, "compressed raw documents; Kosovo and former countries", _trials_2),
+    Migration(3, "contentless full-text index; compressed trial text", _trials_3),
 )
-APP_MIGRATIONS = (Migration(1, "initial app schema", _APP_1),)
+APP_MIGRATIONS = (
+    Migration(1, "initial app schema", _APP_1),
+    Migration(2, "job stages, errors, origin and cancelling", _APP_2),
+)

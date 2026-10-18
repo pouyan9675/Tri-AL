@@ -17,7 +17,7 @@ from tri_al.storage import (
     open_app_db,
     run_script,
 )
-from tri_al.storage.core_migrations import TRIALS_MIGRATIONS
+from tri_al.storage.core_migrations import APP_MIGRATIONS, TRIALS_MIGRATIONS
 from tri_al.storage.migrations import current_version
 
 
@@ -59,7 +59,7 @@ PLUGIN = (
 
 
 def test_migrating_twice_changes_nothing(engine: Engine) -> None:
-    assert migrate(engine, {"core": TRIALS_MIGRATIONS}) == {"core": [1, 2]}
+    assert migrate(engine, {"core": TRIALS_MIGRATIONS}) == {"core": [1, 2, 3]}
     before = schema(engine)
 
     assert migrate(engine, {"core": TRIALS_MIGRATIONS}) == {"core": []}
@@ -212,7 +212,9 @@ def test_app_db_has_jobs_and_enricher_state(tmp_path: Path) -> None:
     try:
         assert {"jobs", "enricher_state", "_migrations"} <= tables(engine)
         assert "plugin_state" not in tables(engine)
-        assert recorded(engine) == [("core", 1, "initial app schema")]
+        assert recorded(engine) == [
+            ("core", migration.version, migration.description) for migration in APP_MIGRATIONS
+        ]
     finally:
         engine.dispose()
 

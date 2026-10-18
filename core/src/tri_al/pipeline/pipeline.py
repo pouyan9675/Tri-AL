@@ -25,7 +25,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Self
 
-from sqlalchemy import Connection, func, insert, select
+from sqlalchemy import Connection, func, insert, select, update
 from sqlalchemy.exc import DatabaseError
 
 from tri_al.pipeline import changes as change_log
@@ -61,6 +61,7 @@ from tri_al.pipeline.source import (
 )
 from tri_al.pipeline.summary import RunSummary, SourceCounts
 from tri_al.schema import TrialRecord
+from tri_al.stats import CORE_FACETS, Chart, Facet, precompute
 from tri_al.storage import (
     BulkLoader,
     Migration,
@@ -97,6 +98,8 @@ class Pipeline:
     trials_migrations: Mapping[str, Sequence[Migration]] = field(default_factory=dict)
     app_migrations: Mapping[str, Sequence[Migration]] = field(default_factory=dict)
     subscriptions: Mapping[str, Sequence[Subscription]] = field(default_factory=dict)
+    charts: Sequence[Chart] = ()  # precomputed with every install and update
+    facets: Sequence[Facet] = CORE_FACETS
     workers: int = field(default_factory=default_workers)  # 0: normalize in this process
     batch_size: int = BATCH_SIZE
     check_full_text: bool = True  # an install checks its full-text indexes before the swap
@@ -121,6 +124,7 @@ class Pipeline:
             subscriptions={
                 event: list(subs) for event, subs in contributions.subscriptions.items()
             },
+            charts=list(contributions.charts.values()),
             workers=default_workers() if workers is None else workers,
         )
 
@@ -246,13 +250,28 @@ class Pipeline:
         with self._open(self.trials_db) as storage:
             return _Update(self, storage, progress).run()
 
-    # --- stages milestone 4 fills in ----------------------------------------------------------
+    # --- enrich and stats ----------------------------------------------------------------------
 
     def enrich(self, conn: Connection, trial_ids: Sequence[int] | None) -> None:
-        """Run enrichers over ``trial_ids`` (None: every trial). Enrichers come in milestone 4."""
+        """Run enrichers over ``trial_ids`` (None: every trial). Enrichers come later."""
 
-    def compute_stats(self, conn: Connection) -> None:
-        """Recompute the precomputed stats. The stats engine comes in milestone 4."""
+    def compute_stats(self, conn: Connection, data_version: int) -> list[str]:
+        """Store the precomputed charts and facets for ``data_version``; return errors.
+
+        Runs in the caller's transaction, so readers get the new stats with the new data.
+        """
+        return precompute(conn, self.charts, self.facets, data_version)
+
+    def stats_are_current(self, conn: Connection, data_version: int) -> bool:
+        """Whether ``stats`` holds every precomputed chart and facet for ``data_version``."""
+        wanted = {chart.id for chart in self.charts if chart.precompute}
+        wanted |= {f"facet:{facet.field}" for facet in self.facets}
+        stored = set(
+            conn.execute(
+                select(t.stats.c.chart_id).where(t.stats.c.data_version == data_version)
+            ).scalars()
+        )
+        return wanted <= stored
 
     # --- helpers ----------------------------------------------------------------------------
 
@@ -323,9 +342,14 @@ class _Install:
                 started = time.monotonic()
                 self.progress(Progress("index", message="building indexes and full-text search"))
             self._checkpoint("index", time.monotonic() - started)
+        version = self.pipeline.current_data_version() + 1
+
+        def stats(conn: Connection) -> None:
+            self.summary.stats_errors = self.pipeline.compute_stats(conn, version)
+
         stages: dict[str, Callable[[Connection], None]] = {
             "enrich": lambda conn: self.pipeline.enrich(conn, None),
-            "stats": self.pipeline.compute_stats,
+            "stats": stats,
         }
         for stage, action in stages.items():
             if stage not in done:
@@ -387,6 +411,9 @@ class _Install:
         version = self.pipeline.current_data_version() + 1
         with self.storage.engine.begin() as conn:
             set_meta(conn, DATA_VERSION, str(version))
+            # The stats stage already counted this data; a resumed install may have run it
+            # when the old database had another version.
+            conn.execute(update(t.stats).values(data_version=version))
             for source in self.pipeline.sources:
                 latest = _latest_update(conn, source.name)
                 if latest is not None:
@@ -520,14 +547,15 @@ class _Update:
             changed_ids = new_ids + updated_ids
             with self._timed("enrich"):
                 self.pipeline.enrich(conn, changed_ids)
-            with self._timed("stats"):
-                self.pipeline.compute_stats(conn)
 
             version = data_version(conn)
             if changed_ids:
                 version += 1
                 set_meta(conn, DATA_VERSION, str(version))
             self.summary.data_version = version
+            if changed_ids or not self.pipeline.stats_are_current(conn, version):
+                with self._timed("stats"):
+                    self.summary.stats_errors = self.pipeline.compute_stats(conn, version)
             started = time.monotonic()
             self.progress(Progress("commit"))
             finish_run(conn, self.run_, self.summary)

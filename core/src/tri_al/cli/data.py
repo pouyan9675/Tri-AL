@@ -7,14 +7,22 @@ every few seconds.
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 
 from tri_al.config import ConfigError, load_config
-from tri_al.pipeline import FetchError, Pipeline, PipelineError, Progress, RunSummary
+from tri_al.jobs import JobCancelled, JobConflict, JobProgress, JobQueue
+from tri_al.pipeline import (
+    FetchError,
+    Pipeline,
+    PipelineError,
+    Progress,
+    ProgressCallback,
+    RunSummary,
+)
 from tri_al.plugins import PluginError, load_plugins
-from tri_al.storage import StorageError
+from tri_al.storage import StorageError, open_app_db
 
 DataDir = Annotated[
     Path | None,
@@ -49,8 +57,12 @@ def install(
     """Download every trial and build the database."""
     pipeline = _pipeline(data_dir, workers)
     started = time.monotonic()
-    summary = _run(
-        lambda: pipeline.run_install(ProgressPrinter(), from_file=from_file, force=force)
+    payload = {"from_file": None if from_file is None else str(from_file), "force": force}
+    summary = _as_job(
+        pipeline,
+        "install",
+        payload,
+        lambda progress: pipeline.run_install(progress, from_file=from_file, force=force),
     )
     typer.echo(
         f"\nInstalled into {pipeline.trials_db} in {duration(time.monotonic() - started)} "
@@ -63,7 +75,7 @@ def update(data_dir: DataDir = None) -> None:
     """Fetch the trials changed since the last update."""
     pipeline = _pipeline(data_dir, workers=0)
     started = time.monotonic()
-    summary = _run(lambda: pipeline.run_update(ProgressPrinter()))
+    summary = _as_job(pipeline, "update", {}, pipeline.run_update)
     typer.echo(
         f"\nUpdated {pipeline.trials_db} in {duration(time.monotonic() - started)} "
         f"(data version {summary.data_version})."
@@ -136,15 +148,55 @@ def _pipeline(data_dir: Path | None, workers: int | None) -> Pipeline:
     return Pipeline.from_plugins(config, plugins, data_dir=data_dir, workers=workers)
 
 
-def _run(action: Callable[[], RunSummary]) -> RunSummary:
+def _as_job(
+    pipeline: Pipeline,
+    job_type: str,
+    payload: dict[str, Any],
+    action: Callable[[ProgressCallback], RunSummary],
+) -> RunSummary:
+    """Run ``action`` as a job in ``app.db``, so the server shows it and waits for it.
+
+    Only one install or update runs at a time, whichever process starts it.
+    """
+    pipeline.data_dir.mkdir(parents=True, exist_ok=True)
     try:
-        return action()
-    except (PipelineError, StorageError, FetchError) as exc:
+        engine = open_app_db(
+            pipeline.app_db,
+            extensions=pipeline.extensions,
+            plugin_migrations=pipeline.app_migrations,
+        )
+    except StorageError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(1) from None
-    except KeyboardInterrupt:
-        typer.echo("\ninterrupted; run the same command again to carry on", err=True)
-        raise typer.Exit(130) from None
+    queue = JobQueue(engine)
+    try:
+        try:
+            job = queue.start(job_type, payload, origin="cli")
+        except JobConflict as exc:
+            typer.echo(f"error: {exc}; wait for it to finish, or cancel it", err=True)
+            raise typer.Exit(1) from None
+        try:
+            with JobProgress(queue, job.id, also=ProgressPrinter()) as progress:
+                summary = action(progress)
+        except JobCancelled:
+            queue.cancelled(job.id)
+            typer.echo("\ncancelled; nothing was changed", err=True)
+            raise typer.Exit(1) from None
+        except (PipelineError, StorageError, FetchError) as exc:
+            queue.fail(job.id, str(exc))
+            typer.echo(f"error: {exc}", err=True)
+            raise typer.Exit(1) from None
+        except KeyboardInterrupt:
+            queue.fail(job.id, "interrupted")
+            typer.echo("\ninterrupted; run the same command again to carry on", err=True)
+            raise typer.Exit(130) from None
+        except BaseException as exc:
+            queue.fail(job.id, str(exc) or type(exc).__name__)
+            raise
+        queue.finish(job.id, summary.as_dict())
+        return summary
+    finally:
+        engine.dispose()
 
 
 def _report(summary: RunSummary) -> None:
@@ -162,3 +214,5 @@ def _report(summary: RunSummary) -> None:
             typer.echo(f"  {failure}", err=True)
     for error in summary.handler_errors:
         typer.echo(f"warning: {error}", err=True)
+    for error in summary.stats_errors:
+        typer.echo(f"warning: a chart couldn't be precomputed: {error}", err=True)

@@ -55,6 +55,7 @@ def test_passes_on_a_working_install(install: Install, make_plugin: MakePlugin) 
         "extension loading",
         "config",
         "plugins",
+        "server",
         "trials.db",
         "app.db",
     ]
@@ -188,3 +189,32 @@ def test_warns_about_an_unfinished_bulk_load(install: Install) -> None:
     assert result.exit_code == 0
     assert "didn't finish" in lines(result)["trials.db"]
     assert fixes(result) == ["run `tri-al rebuild`"]
+
+
+def test_warns_when_the_server_listens_beyond_this_machine(
+    install: Install, make_plugin: MakePlugin
+) -> None:
+    install(make_plugin("alpha"))
+    Path("tri-al.toml").write_text('[server]\nhost = "0.0.0.0"\n')
+
+    result = run_doctor()
+
+    assert result.exit_code == 0, result.output
+    assert lines(result)["server"].startswith("warn  the server listens on 0.0.0.0")
+    assert 'set server.host = "127.0.0.1" in tri-al.toml' in fixes(result)
+
+
+def test_an_access_plugin_silences_the_server_warning(
+    install: Install, make_plugin: MakePlugin
+) -> None:
+    class Everyone:
+        def allows(self, request: object, action: str) -> bool:
+            return True
+
+    def register(registry: Registry) -> None:
+        registry.set_access_policy(Everyone())
+
+    install(make_plugin("auth", register=register))
+    Path("tri-al.toml").write_text('[server]\nhost = "0.0.0.0"\n')
+
+    assert lines(run_doctor())["server"] == "ok  0.0.0.0:8000, with an access policy"

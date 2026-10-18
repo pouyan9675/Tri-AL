@@ -49,6 +49,11 @@ def load_config(path: Path | None = None, env: Mapping[str, str] | None = None) 
 
 def set_plugin_enabled(path: Path, name: str, enabled: bool) -> None:
     """Set ``enabled`` in ``[plugins.<name>]``, keeping the file's comments and layout."""
+    edit_plugin_section(path, name, {"enabled": enabled})
+
+
+def edit_plugin_section(path: Path, name: str, changes: Mapping[str, Any]) -> None:
+    """Set keys in ``[plugins.<name>]`` (None removes one), keeping comments and layout."""
     try:
         text = path.read_text(encoding="utf-8") if path.exists() else ""
         doc = tomlkit.parse(text)
@@ -60,7 +65,11 @@ def set_plugin_enabled(path: Path, name: str, enabled: bool) -> None:
     section = plugins.setdefault(name, tomlkit.table())
     if not isinstance(section, dict):
         raise ConfigError(f"{path}: 'plugins.{name}' must be a table")
-    section["enabled"] = enabled
+    for key, value in changes.items():
+        if value is None:
+            section.pop(key, None)
+        else:
+            section[key] = value
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(tomlkit.dumps(doc), encoding="utf-8")
     tmp.replace(path)

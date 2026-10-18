@@ -56,12 +56,22 @@ def check_migrations(component: str, migrations: Sequence[Migration]) -> None:
         )
 
 
-def migrate(engine: Engine, components: Mapping[str, Sequence[Migration]]) -> dict[str, list[int]]:
+type MigrationCallback = Callable[[str, Migration], None]
+
+
+def migrate(
+    engine: Engine,
+    components: Mapping[str, Sequence[Migration]],
+    *,
+    starting: MigrationCallback | None = None,
+) -> dict[str, list[int]]:
     """Apply each component's pending migrations, components in the order given.
 
-    Returns the versions applied per component (empty lists when up to date). Raises
-    MigrationError if a migration fails, or if the database has a component at a version
-    these migrations don't reach (it was migrated by a newer tri-al or plugin).
+    ``starting(component, migration)`` is called before each one runs, so a caller can say
+    that a slow one is under way. Returns the versions applied per component (empty lists
+    when up to date). Raises MigrationError if a migration fails, or if the database has a
+    component at a version these migrations don't reach (it was migrated by a newer tri-al
+    or plugin).
     """
     for component, migrations in components.items():
         check_migrations(component, migrations)
@@ -71,9 +81,21 @@ def migrate(engine: Engine, components: Mapping[str, Sequence[Migration]]) -> di
         with conn.begin():
             conn.exec_driver_sql(MIGRATIONS_TABLE)
         for component, migrations in components.items():
-            while (migration := _apply_next(conn, component, migrations)) is not None:
+            while (migration := _apply_next(conn, component, migrations, starting)) is not None:
                 applied[component].append(migration.version)
     return applied
+
+
+def pending(engine: Engine, components: Mapping[str, Sequence[Migration]]) -> list[str]:
+    """Descriptions of the migrations ``migrate`` would apply, without applying them."""
+    with engine.connect() as conn:
+        raw = conn.connection.driver_connection
+        assert isinstance(raw, sqlite3.Connection)
+        return [
+            f"{component} {migration.version} ({migration.description})"
+            for component, migrations in components.items()
+            for migration in migrations[current_version(raw, component) :]
+        ]
 
 
 def run_script(conn: Connection, script: str) -> None:
@@ -105,7 +127,10 @@ def current_version(conn: sqlite3.Connection, component: str) -> int:
 
 
 def _apply_next(
-    conn: Connection, component: str, migrations: Sequence[Migration]
+    conn: Connection,
+    component: str,
+    migrations: Sequence[Migration],
+    starting: MigrationCallback | None,
 ) -> Migration | None:
     with conn.begin():
         row = conn.exec_driver_sql(
@@ -126,6 +151,8 @@ def _apply_next(
         if latest == len(migrations):
             return None
         migration = migrations[latest]
+        if starting is not None:
+            starting(component, migration)
         try:
             if isinstance(migration.apply, str):
                 run_script(conn, migration.apply)

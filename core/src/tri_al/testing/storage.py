@@ -12,13 +12,14 @@ override the ``storage`` fixture to yield a new, empty, migrated storage:
 
 from collections.abc import Iterable, Sequence
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Protocol
 
 import pytest
 
+from tri_al.filters import DateRange, IntRange, TrialFilter
 from tri_al.schema import Intervention, Location, MeshTerm, Outcome, Sponsor, TrialRecord
-from tri_al.storage import Storage, StorageError, TrialQuery, TrialSummary
+from tri_al.storage import Sort, Storage, StorageError, TrialSummary
 from tri_al.testing.fixtures import (
     completed_behavioral_trial,
     minimal_trial,
@@ -265,50 +266,135 @@ class StorageContract:
 
     # --- queries ----------------------------------------------------------------------------
 
-    def test_query_trials_lists_every_trial_in_id_order(
-        self, storage: Storage, ids: list[int]
-    ) -> None:
-        summaries = storage.query_trials()
+    def test_query_trials_lists_every_trial(self, storage: Storage, ids: list[int]) -> None:
+        page = storage.query_trials(sort=Sort("id", descending=False))
 
-        assert [summary.id for summary in summaries] == sorted(ids)
+        assert [summary.id for summary in page.items] == sorted(ids)
+        assert page.next is None
         trial = phase3_trial()
-        assert summaries[0] == TrialSummary(
+        assert page.items[0] == TrialSummary(
             ids[0],
             trial.source,
             trial.source_id,
             trial.title,
             trial.status,
             trial.phase,
+            trial.study_type,
             trial.start_date,
+            trial.completion_date,
             trial.last_update,
             trial.enrollment,
+            trial.has_results,
+            trial.num_sites,
+            "Tri-AL Test Pharma",
+            ("Alzheimer Disease", "Mild Cognitive Impairment"),
         )
 
     @pytest.mark.parametrize(
-        ("query", "expected"),
+        ("filter", "expected"),
         [
-            (TrialQuery(status=("RECRUITING",)), ["NCT90000001"]),
-            (TrialQuery(status=("COMPLETED", "WITHDRAWN")), ["NCT90000002", "ISRCTN00000001"]),
-            (TrialQuery(phase=("PHASE2_PHASE3",)), ["NCT90000002"]),
-            (TrialQuery(phase=("PHASE3", "NA")), ["NCT90000001", "ISRCTN00000001"]),
-            (TrialQuery(status=("COMPLETED",), phase=("PHASE2_PHASE3",)), ["NCT90000002"]),
-            (TrialQuery(status=("RECRUITING",), phase=("PHASE2_PHASE3",)), []),
-            (TrialQuery(status=()), []),
+            (TrialFilter(), ["NCT90000001", "NCT90000002", "NCT90000003", "ISRCTN00000001"]),
+            (TrialFilter(status=("RECRUITING",)), ["NCT90000001"]),
+            (TrialFilter(status=("COMPLETED", "WITHDRAWN")), ["NCT90000002", "ISRCTN00000001"]),
+            (TrialFilter(phase=("PHASE2_PHASE3",)), ["NCT90000002"]),
+            (TrialFilter(phase=("PHASE3", "NA")), ["NCT90000001", "ISRCTN00000001"]),
+            (TrialFilter(status=("COMPLETED",), phase=("PHASE2_PHASE3",)), ["NCT90000002"]),
+            (TrialFilter(status=("RECRUITING",), phase=("PHASE2_PHASE3",)), []),
+            (
+                TrialFilter(study_type=("INTERVENTIONAL",)),
+                ["NCT90000001", "NCT90000002", "ISRCTN00000001"],
+            ),
+            (TrialFilter(conditions=("Alzheimer Disease",)), ["NCT90000001", "NCT90000002"]),
+            (TrialFilter(conditions=("Aging", "Agitation")), ["NCT90000002", "ISRCTN00000001"]),
+            (TrialFilter(mesh=("D003704",)), ["NCT90000001"]),  # an ancestor term
+            (TrialFilter(interventions=("Placebo",)), ["NCT90000001"]),
+            (TrialFilter(intervention_types=("BEHAVIORAL",)), ["NCT90000002", "ISRCTN00000001"]),
+            (
+                TrialFilter(sponsors=("National Institute on Aging (NIA)",)),
+                ["NCT90000001", "NCT90000002"],
+            ),
+            (TrialFilter(sponsor_class=("NIH",)), ["NCT90000002"]),
+            (TrialFilter(countries=("de",)), ["NCT90000001"]),
+            (TrialFilter(countries=("FR", "CA")), ["NCT90000001", "ISRCTN00000001"]),
+            (TrialFilter(start=DateRange.parse("2024")), ["NCT90000001"]),
+            (TrialFilter(start=DateRange.parse("..2020-01")), ["NCT90000002"]),
+            (
+                TrialFilter(completion=DateRange(since=date(2023, 4, 1))),
+                ["NCT90000001", "NCT90000002"],
+            ),
+            (TrialFilter(first_posted=DateRange.parse("2019-08..2019-08")), ["NCT90000002"]),
+            (TrialFilter(last_update=DateRange.parse("2026..")), ["NCT90000001"]),
+            (TrialFilter(enrollment=IntRange.parse("300..400")), ["NCT90000002"]),
+            (TrialFilter(enrollment=IntRange.parse("1000..")), ["NCT90000001"]),
+            (TrialFilter(has_results=True), ["NCT90000002"]),
+            (TrialFilter(has_results=False), ["NCT90000001", "NCT90000003", "ISRCTN00000001"]),
+            (TrialFilter(q="music"), ["ISRCTN00000001"]),
+            (TrialFilter(q="alzheimer", status=("COMPLETED",)), ["NCT90000002"]),
+            (TrialFilter(q="!!"), ["NCT90000001", "NCT90000002", "NCT90000003", "ISRCTN00000001"]),
         ],
     )
-    def test_query_trials_filters_by_status_and_phase(
-        self, storage: Storage, ids: list[int], query: TrialQuery, expected: list[str]
+    def test_query_trials_filters(
+        self, storage: Storage, ids: list[int], filter: TrialFilter, expected: list[str]
     ) -> None:
-        assert source_ids(storage.query_trials(query)) == expected
-        assert storage.count_trials(query) == len(expected)
+        page = storage.query_trials(filter, sort=Sort("id", descending=False))
 
-    def test_query_trials_pages_with_after_id(self, storage: Storage, ids: list[int]) -> None:
-        first = storage.query_trials(TrialQuery(limit=3))
-        second = storage.query_trials(TrialQuery(limit=3, after_id=first[-1].id))
+        assert source_ids(page.items) == expected
+        assert storage.count_trials(filter) == len(expected)
 
-        assert [summary.id for summary in first + second] == sorted(ids)
-        assert storage.query_trials(TrialQuery(after_id=max(ids))) == []
-        assert storage.count_trials(TrialQuery(limit=1, after_id=max(ids))) == len(ids)
+    def test_query_trials_pages_with_a_cursor(self, storage: Storage, ids: list[int]) -> None:
+        by_id = Sort("id", descending=False)
+        first = storage.query_trials(sort=by_id, limit=3)
+        assert first.next is not None
+        second = storage.query_trials(sort=by_id, limit=3, after=first.next)
+
+        assert [summary.id for summary in first.items + second.items] == sorted(ids)
+        assert second.next is None
+        last = storage.query_trials(sort=by_id, limit=4)
+        assert last.next is None  # exactly a page: no empty page after it
+
+    @pytest.mark.parametrize(
+        ("sort", "expected"),
+        [
+            # Trials without a value come last when descending, first when ascending.
+            ("-last_update", ["NCT90000001", "NCT90000002", "ISRCTN00000001", "NCT90000003"]),
+            ("last_update", ["NCT90000003", "ISRCTN00000001", "NCT90000002", "NCT90000001"]),
+            ("-start_date", ["NCT90000001", "NCT90000002", "ISRCTN00000001", "NCT90000003"]),
+            ("start_date", ["NCT90000003", "ISRCTN00000001", "NCT90000002", "NCT90000001"]),
+            ("-enrollment", ["NCT90000001", "NCT90000002", "ISRCTN00000001", "NCT90000003"]),
+            ("-id", ["ISRCTN00000001", "NCT90000003", "NCT90000002", "NCT90000001"]),
+        ],
+    )
+    def test_query_trials_sorts_and_pages_one_at_a_time(
+        self, storage: Storage, ids: list[int], sort: str, expected: list[str]
+    ) -> None:
+        whole = storage.query_trials(sort=Sort.parse(sort))
+        assert source_ids(whole.items) == expected
+
+        paged: list[str] = []
+        after = None
+        for _ in expected:
+            page = storage.query_trials(sort=Sort.parse(sort), after=after, limit=1)
+            paged += source_ids(page.items)
+            after = page.next
+        assert paged == expected
+        assert after is None
+
+    def test_query_trials_pages_through_ties(self, storage: Storage) -> None:
+        records = [
+            replace(minimal_trial(), source_id=f"NCT{i}", start_date=date(2020, 1, 1))
+            for i in range(5)
+        ]
+        storage.upsert_batch(records)
+
+        seen: list[str] = []
+        after = None
+        while True:
+            page = storage.query_trials(sort=Sort.parse("-start_date"), after=after, limit=2)
+            seen += source_ids(page.items)
+            if page.next is None:
+                break
+            after = page.next
+        assert seen == [f"NCT{i}" for i in reversed(range(5))]
 
     # --- full-text search -------------------------------------------------------------------
 
@@ -333,28 +419,53 @@ class StorageContract:
     def test_search_finds_every_field(
         self, storage: Storage, ids: list[int], text: str, expected: str
     ) -> None:
-        assert source_ids(storage.search(text)) == [expected]
+        assert source_ids(storage.search(text).hits) == [expected]
 
     @pytest.mark.parametrize("text", ["infusion", "INFUSED", "randomizing"])
     def test_search_matches_other_forms_of_a_word(
         self, storage: Storage, ids: list[int], text: str
     ) -> None:
-        assert source_ids(storage.search(text)) == ["NCT90000001"]
+        assert source_ids(storage.search(text).hits) == ["NCT90000001"]
 
     def test_search_needs_every_word(self, storage: Storage, ids: list[int]) -> None:
-        assert storage.search("amyloid treadmill") == []
-        assert source_ids(storage.search("amyloid remternetug")) == ["NCT90000001"]
+        assert storage.search("amyloid treadmill").hits == []
+        assert source_ids(storage.search("amyloid remternetug").hits) == ["NCT90000001"]
 
     def test_search_hits_identify_the_trial(self, storage: Storage, ids: list[int]) -> None:
-        [hit] = storage.search("remternetug")
+        [hit] = storage.search("remternetug").hits
 
         trial = phase3_trial()
-        assert (hit.id, hit.source, hit.source_id, hit.title) == (
+        assert (hit.id, hit.source, hit.source_id, hit.title, hit.status, hit.phase) == (
             ids[0],
             trial.source,
             trial.source_id,
             trial.title,
+            trial.status,
+            trial.phase,
         )
+
+    def test_search_hits_carry_a_snippet(self, storage: Storage, ids: list[int]) -> None:
+        [hit] = storage.search("plaques").hits
+
+        matched = {part.text.lower() for part in hit.snippet if part.match}
+        assert matched
+        assert matched <= {"plaque", "plaques"}  # stemmed like the search
+        assert "plaque" in "".join(part.text for part in hit.snippet).lower()
+
+    def test_a_title_only_match_gets_the_start_of_the_text(
+        self, storage: Storage, ids: list[int]
+    ) -> None:
+        [hit] = storage.search("aerobic exercise memory older").hits
+
+        assert hit.source_id == "NCT90000002"
+        assert hit.snippet  # the conditions or summary, matched words marked if any
+
+    def test_search_within_a_filter(self, storage: Storage, ids: list[int]) -> None:
+        result = storage.search("alzheimer", filter=TrialFilter(status=("COMPLETED",)))
+
+        assert source_ids(result.hits) == ["NCT90000002"]
+        assert result.candidates == 1
+        assert not result.capped
 
     def test_search_ranks_title_matches_first(self, storage: Storage) -> None:
         in_description = replace(
@@ -363,15 +474,16 @@ class StorageContract:
         in_title = replace(minimal_trial(), source_id="NCT2", title="Zebrafish models of tau")
         storage.upsert_batch([in_description, in_title])
 
-        hits = storage.search("zebrafish")
+        hits = storage.search("zebrafish").hits
 
         assert source_ids(hits) == ["NCT2", "NCT1"]
         assert hits[0].score > hits[1].score
 
     def test_search_limit(self, storage: Storage, ids: list[int]) -> None:
-        assert len(storage.search("alzheimer")) == 2
-        assert len(storage.search("alzheimer", limit=1)) == 1
-        assert storage.search("alzheimer", limit=0) == []
+        assert len(storage.search("alzheimer").hits) == 2
+        assert len(storage.search("alzheimer", limit=1).hits) == 1
+        assert storage.search("alzheimer", limit=1).candidates == 2
+        assert storage.search("alzheimer", limit=0).hits == []
 
     def test_search_follows_updates(self, storage: Storage, ids: list[int]) -> None:
         changed = replace(
@@ -382,10 +494,10 @@ class StorageContract:
 
         storage.upsert_batch([changed])
 
-        assert storage.search("infusions") == []
-        assert storage.search("TAL-0451") == []
-        assert source_ids(storage.search("enrollment closed")) == ["NCT90000001"]
-        assert source_ids(storage.search("lecanemab")) == ["NCT90000001"]
+        assert storage.search("infusions").hits == []
+        assert storage.search("TAL-0451").hits == []
+        assert source_ids(storage.search("enrollment closed").hits) == ["NCT90000001"]
+        assert source_ids(storage.search("lecanemab").hits) == ["NCT90000001"]
 
     @pytest.mark.parametrize(
         "text",
@@ -394,10 +506,10 @@ class StorageContract:
     def test_search_treats_query_syntax_as_text(
         self, storage: Storage, ids: list[int], text: str
     ) -> None:
-        assert isinstance(storage.search(text), list)
+        assert isinstance(storage.search(text).hits, list)
 
     def test_search_reads_quoted_words(self, storage: Storage, ids: list[int]) -> None:
-        assert source_ids(storage.search('"remternetug')) == ["NCT90000001"]
+        assert source_ids(storage.search('"remternetug').hits) == ["NCT90000001"]
 
     # --- name lookup ------------------------------------------------------------------------
 
@@ -458,7 +570,7 @@ class StorageContract:
             write_then_fail()
 
         assert storage.count_trials() == 0
-        assert storage.search("remternetug") == []
+        assert storage.search("remternetug").hits == []
         assert storage.lookup_names("alzheimer") == []
 
     # --- bulk loads -------------------------------------------------------------------------
@@ -470,9 +582,9 @@ class StorageContract:
             ids = load.upsert_batch(records[:2]) + load.upsert_batch(records[2:])
 
         assert_round_trips(storage, records, ids)
-        assert source_ids(storage.search("remternetug")) == ["NCT90000001"]
+        assert source_ids(storage.search("remternetug").hits) == ["NCT90000001"]
         assert [hit.name for hit in storage.lookup_names("zheim")] == ["Alzheimer Disease"]
-        assert storage.count_trials(TrialQuery(status=("RECRUITING",))) == 1
+        assert storage.count_trials(TrialFilter(status=("RECRUITING",))) == 1
 
     def test_bulk_load_replaces_existing_trials(self, storage: Storage, ids: list[int]) -> None:
         changed = replace(phase3_trial(), title="Renamed", brief_summary="Nothing to see.")
@@ -481,9 +593,9 @@ class StorageContract:
             assert load.upsert_batch([changed]) == [ids[0]]
 
         assert_round_trips(storage, [changed], [ids[0]])
-        assert storage.search("infusions") == []
-        assert source_ids(storage.search("renamed")) == ["NCT90000001"]
-        assert source_ids(storage.search("treadmill")) == ["NCT90000002"]
+        assert storage.search("infusions").hits == []
+        assert source_ids(storage.search("renamed").hits) == ["NCT90000001"]
+        assert source_ids(storage.search("treadmill").hits) == ["NCT90000002"]
 
     def test_writes_after_a_bulk_load(self, storage: Storage) -> None:
         with storage.bulk_load() as load:
@@ -491,9 +603,9 @@ class StorageContract:
 
         storage.upsert_batch([completed_behavioral_trial(), replace(phase3_trial(), title="New")])
 
-        assert source_ids(storage.search("treadmill")) == ["NCT90000002"]
-        assert source_ids(storage.search("new")) == ["NCT90000001"]
-        assert storage.search("TRAIL") == []
+        assert source_ids(storage.search("treadmill").hits) == ["NCT90000002"]
+        assert source_ids(storage.search("new").hits) == ["NCT90000001"]
+        assert storage.search("TRAIL").hits == []
 
     def test_a_rejected_bulk_batch_writes_nothing(self, storage: Storage) -> None:
         with storage.bulk_load() as load:
@@ -501,7 +613,7 @@ class StorageContract:
                 load.upsert_batch([phase3_trial(), replace(minimal_trial(), countries=["XX"])])
             load.upsert_batch([other_registry_trial()])
 
-        assert source_ids(storage.query_trials()) == ["ISRCTN00000001"]
+        assert source_ids(storage.query_trials().items) == ["ISRCTN00000001"]
         assert storage.lookup_names("remternetug") == []
 
     def test_an_unfinished_bulk_load_blocks_writes(self, storage: Storage) -> None:
@@ -519,5 +631,5 @@ class StorageContract:
         with storage.bulk_load() as load:
             load.upsert_batch([minimal_trial()])
         storage.upsert_batch([other_registry_trial()])
-        assert source_ids(storage.search("remternetug")) == ["NCT90000001"]
+        assert source_ids(storage.search("remternetug").hits) == ["NCT90000001"]
         assert storage.count_trials() == 3

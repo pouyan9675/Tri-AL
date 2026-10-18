@@ -26,8 +26,9 @@ from pathlib import Path
 
 from sqlalchemy import text
 
+from tri_al.filters import TrialFilter
 from tri_al.schema import Intervention, Location, MeshTerm, Outcome, Sponsor, TrialRecord
-from tri_al.storage import SQLiteStorage, TrialQuery
+from tri_al.storage import Sort, SQLiteStorage
 from tri_al.storage.countries import COUNTRIES
 
 STATUSES = {
@@ -288,29 +289,29 @@ def main() -> None:
             size = sum(f.stat().st_size for f in path.parent.glob(path.name + "*"))
             rows.append(("Database size", f"{size / 2**20:,.0f} MB"))
 
-            ids = [r.id for r in storage.query_trials(TrialQuery(limit=args.trials))]
+            ids = [r.id for r in storage.query_trials(sort=Sort("id"), limit=args.trials).items]
             rng = random.Random(args.seed)
             queries: list[tuple[str, Callable[[], object], int]] = [
                 ("get_trial (random id)", lambda: storage.get_trial(rng.choice(ids)), 200),
                 (
                     "count_trials(status=RECRUITING)",
-                    lambda: storage.count_trials(TrialQuery(status=("RECRUITING",))),
+                    lambda: storage.count_trials(TrialFilter(status=("RECRUITING",))),
                     args.repeat,
                 ),
                 (
                     "count_trials(phase=PHASE2/PHASE3)",
-                    lambda: storage.count_trials(TrialQuery(phase=("PHASE2", "PHASE3"))),
+                    lambda: storage.count_trials(TrialFilter(phase=("PHASE2", "PHASE3"))),
                     args.repeat,
                 ),
                 (
                     "query_trials(status=RECRUITING, limit=100)",
-                    lambda: storage.query_trials(TrialQuery(status=("RECRUITING",))),
+                    lambda: storage.query_trials(TrialFilter(status=("RECRUITING",))),
                     args.repeat,
                 ),
                 (
                     "query_trials(phase=PHASE3, status=COMPLETED, limit=100)",
                     lambda: storage.query_trials(
-                        TrialQuery(phase=("PHASE3",), status=("COMPLETED",))
+                        TrialFilter(phase=("PHASE3",), status=("COMPLETED",))
                     ),
                     args.repeat,
                 ),

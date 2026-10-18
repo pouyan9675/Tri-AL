@@ -1,22 +1,33 @@
-"""Raw source documents in ``trial_docs``, compressed with zstd (docs/design.md §6).
+"""Compressed blobs: raw documents in ``trial_docs`` and text in ``trial_text`` (design §6).
 
-Study documents are small and alike, so each one is compressed on its own against a shared
-dictionary trained on the data. That keeps any single document quick to read back, and
-compresses about as well as one big archive would: real ClinicalTrials.gov documents
-shrink to about a fifth of their size.
+Study documents are small and alike, so each one is compressed on its own with zstd against
+a shared dictionary trained on the data. That keeps any single document quick to read
+back, and compresses about as well as one big archive would: real ClinicalTrials.gov
+documents shrink to about a fifth of their size, and their text to under a third.
 
-The first batch written with at least ``MIN_SAMPLES`` documents trains the dictionary, and
-every later write uses it. ``doc_dicts`` keeps each dictionary for good, and each row of
-``trial_docs`` names the one it was compressed with (NULL means none).
+The first batch written with at least ``MIN_SAMPLES`` blobs of a kind trains that kind's
+dictionary, and every later write uses it. ``doc_dicts`` keeps each dictionary for good,
+with its ``kind`` (``DOC`` or ``TEXT``), and each compressed row names the one it was
+compressed with (NULL means none).
 """
 
 import sys
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from typing import Any
+
+import orjson
 
 if sys.version_info >= (3, 14):
     from compression import zstd
 else:
     from backports import zstd
+
+DOC = "doc"
+"""``doc_dicts.kind`` of dictionaries for raw documents."""
+
+TEXT = "text"
+"""``doc_dicts.kind`` of dictionaries for trial text."""
 
 LEVEL = 3
 """zstd's default level: about 450 MB/s with a dictionary, within a few percent of level 9."""
@@ -68,3 +79,37 @@ class Decoder:
         if zstd_dict is None:
             zstd_dict = self._dicts[dict_id] = zstd.ZstdDict(load(dict_id))
         return zstd.decompress(doc, zstd_dict=zstd_dict.as_digested_dict)
+
+
+type PackedOutcome = tuple[str, str, str | None, str | None]  # kind, measure, description, time
+
+
+@dataclass(frozen=True, slots=True)
+class TrialText:
+    """A trial's long text, as ``trial_text`` keeps it (one compressed blob per trial)."""
+
+    brief_summary: str | None = None
+    description: str | None = None
+    eligibility_criteria: str | None = None
+    outcomes: tuple[PackedOutcome, ...] = ()
+
+    def pack(self) -> bytes:
+        """The text as compact JSON, ready to compress."""
+        return orjson.dumps(
+            [
+                self.brief_summary,
+                self.description,
+                self.eligibility_criteria,
+                [list(outcome) for outcome in self.outcomes],
+            ]
+        )
+
+    @classmethod
+    def unpack(cls, data: bytes) -> "TrialText":
+        summary, description, eligibility, outcomes = orjson.loads(data)
+        return cls(summary, description, eligibility, tuple(_outcome(o) for o in outcomes))
+
+
+def _outcome(row: list[Any]) -> PackedOutcome:
+    kind, measure, description, time_frame = row
+    return (kind, measure, description, time_frame)

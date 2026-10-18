@@ -66,7 +66,7 @@ def test_foreign_keys_are_enforced(tmp_path: Path) -> None:
         pytest.raises(IntegrityError, match="FOREIGN KEY"),
         storage.engine.begin() as conn,
     ):
-        conn.execute(text("INSERT INTO trial_text (trial_id) VALUES (42)"))
+        conn.execute(text("INSERT INTO trial_text (trial_id, text) VALUES (42, x'00')"))
 
 
 @pytest.mark.parametrize("version", [(3, 44, 2), (3, 8, 0)])

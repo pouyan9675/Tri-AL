@@ -1,6 +1,6 @@
 # Tri-AL v2 — System Design
 
-Status: **draft; decisions recorded in [§15](#15-decisions)** (2026-10-17, branch `v2`). Scope: the base platform only. AI features come later and plug into the extension points listed in [§12](#12-extension-points-reserved-for-ai).
+Status: **draft; decisions recorded in [§15](#15-decisions)** (2026-10-17, branch `v2`; milestones 1–4 built). Scope: the base platform only. AI features come later and plug into the extension points listed in [§12](#12-extension-points-reserved-for-ai).
 
 ## 1. Goals
 
@@ -58,7 +58,7 @@ So a daily update is **1–2 API pages**. The data is tiny next to what SQLite c
 - **`app.db`** holds state the app changes (jobs, enricher state). Job progress keeps updating while an update holds the write lock on `trials.db`, because it's in a different file and so a different lock.
 - **Plugin on/off state and settings** live in `tri-al.toml` (§5.6), not in either database.
 
-No Redis and no separate database server. The cache lives in memory in each API worker, keyed by `data_version`.
+No Redis and no separate database server. The cache lives in memory in each API worker, keyed by `data_version`. Each API worker also keeps an in-memory column index of every trial for counting under filters (§5.5), about 60 MB at 607k trials.
 
 ## 4. Repository layout
 
@@ -68,11 +68,13 @@ One repo managed as a uv workspace:
 core/                 Python package `tri-al` (src/tri_al/…)
   src/tri_al/
     schema/  storage/  pipeline/  jobs/  stats/  plugins/  config/  access/  api/  cli/
+    filters.py        TrialFilter, the one filter language (§5.5)
+    search.py         search providers and how their results merge
     testing/          contract test suites that plugins reuse
   tests/
 plugins/
   ctgov/              tri-al-ctgov       ClinicalTrials.gov source (installed by default)
-  charts/             tri-al-charts      default dashboard charts (installed by default)
+  charts/             tri-al-charts      default dashboard charts (installed by default; built in milestone 4)
 web/                  React + Vite + TypeScript + Tailwind + shadcn/ui
 bench/                benchmark suite and dataset fetch script
 docs/
@@ -90,6 +92,8 @@ Each plugin is its own package with its own `pyproject.toml`, tests and migratio
 
 ### 5.2 Storage
 - **SQLAlchemy Core (no ORM)** for tables and queries. The storage interface (`get_trial`, `query_trials`, `search`, `upsert_batch`, …) is the contract a future Postgres plugin would implement.
+- **Reads in one snapshot:** `SQLiteStorage.read()` gives a reader whose every query runs in one read transaction, so an API request sees one commit: its data version, data and precomputed stats always agree, even while an update commits.
+- **API workers don't migrate:** `serve` applies pending migrations once at startup; API workers open `trials.db` with `SQLiteStorage.attach`, which refuses a database that still needs migrations.
 - **Database-specific features** (full-text search, JSON) live inside the storage backend.
 - **Migrations:** a small built-in runner. Every component (the core and each plugin) ships ordered migrations, tracked in `_migrations(component, version)`. Alembic's per-plugin branches aren't worth the extra complexity.
 - **Connection settings (PRAGMAs)** on every connection:
@@ -124,29 +128,33 @@ fetch ─▶ parse (orjson) ─▶ normalize (source → TrialRecord) ─▶ has
 - **Parallel work:** during install, parsing, hashing and normalizing run in a process pool (spawned, at most 8 workers; about 77 µs per study on one core) while a single writer inserts batches of 5,000 trials. The writer is the bottleneck. Updates (about 1,500 trials) run in one process.
 - **Failures:** a study that doesn't parse or normalize is skipped and counted, and the first 100 messages go in the run summary; one odd study doesn't stop an install of 600k.
 - **Resuming:** each install stage (`load`, `index`, `enrich`, `stats`, `check`) is checkpointed in the `runs` row inside `trials.db.new`. A re-run skips finished stages. Within the load stage, trials already stored with the same hash are skipped cheaply. The bulk endpoint ignores HTTP `Range` (§2), so an interrupted download starts over; a download that finished (it's written to `.part` and renamed, with its size and SHA-256 in `ctg-studies.json.zip.json`) is reused when an install resumes, and downloaded again for a new install.
-- **Entry points:** `Pipeline.run_install(progress, from_file=, force=)` and `Pipeline.run_update(progress)`, built from the loaded plugins with `Pipeline.from_plugins`. Both return a `RunSummary` (counts per source, seconds per stage, failures, the source's notes). `progress` receives `Progress(stage, done, total, unit, message)` reports, often; milestone 4's job throttles them to `app.db`, and can stop a run by raising from the callback.
+- **Entry points:** `Pipeline.run_install(progress, from_file=, force=)` and `Pipeline.run_update(progress)`, built from the loaded plugins with `Pipeline.from_plugins`. Both return a `RunSummary` (counts per source, seconds per stage, failures, the source's notes). `progress` receives `Progress(stage, done, total, unit, message)` reports, often; a job throttles them to `app.db` (§5.4), and stops a run by raising from the callback.
 - **Reconcile:** an optional weekly job pages through just the NCT IDs to catch studies that were removed.
 
 ### 5.4 Jobs
-- **Storage:** the `jobs` table in `app.db`. Columns: type, status, progress, total, message, payload, heartbeat, and timestamps.
-- **Claiming:** the worker claims a job with `UPDATE … WHERE status='queued' … RETURNING`.
-- **One data job at a time:** a partial unique index allows only one running job of the kinds install, update or rebuild.
-- **Progress:** written to `app.db` at most twice a second, so it stays visible during the data transaction.
-- **Crash recovery:** on startup, the worker marks running jobs whose heartbeat has gone stale as failed.
-- **Scheduler:** a small built-in scheduler in the worker, configured in `update.schedule` (default: daily).
+- **Storage:** the `jobs` table in `app.db`: type, status (`queued`, `running`, `succeeded`, `failed`, `cancelled`), stage, progress, total, unit, message, error, payload, result (the run summary), origin (`api`, `schedule`, `cli`, `plugin`), cancel_requested, worker, heartbeat, and timestamps (`tri_al.jobs.JobQueue`).
+- **Claiming:** the worker claims the oldest job that can run with `UPDATE … WHERE id = (SELECT … WHERE status='queued' …) RETURNING`.
+- **One data job at a time:** install, update and rebuild are data jobs. Queuing one while another is queued or running is refused (the API answers 409 with that job), `claim` skips them while one runs, and a partial unique index allows only one running. `tri-al install` and `tri-al update` record themselves as running jobs too, so a shell command and the server never write at once, and the server shows their progress.
+- **Progress:** the pipeline reports often; `JobProgress` writes to `app.db` at most twice a second. A report that comes too soon is held, and a heartbeat thread writes it half a second later, so each stage's last state still lands. Progress stays visible during the data transaction, since `app.db` is another file.
+- **Heartbeat and crash recovery:** a running job's row gets a heartbeat at least every 5 seconds. When the worker starts, and every minute after, it fails running jobs whose heartbeat is over 60 seconds old ("the process running it stopped").
+- **Cancelling:** `POST /api/jobs/{id}/cancel` cancels a queued job at once; a running one stops at its next progress report (`JobCancelled`), and its transaction rolls back.
+- **Scheduler:** between jobs the worker queues an update when `update.schedule` says one is due: `off`, `hourly`, `daily` (the default), `weekly`, `daily at 06:30` or `every 6 hours`. Due means the last successful install or update is that old; after a failed one it waits an hour. It never queues one before the first install.
+- **Plugin jobs:** `registry.add_job(JobType(name, run))`. They never count as data jobs.
 
 ### 5.5 Stats engine
-- **Chart specs** come from plugins: `id`, `title`, `widget`, `query(conn, filters) → rows`, a `precompute` flag, and a layout hint.
-- **Default view:** after an update, every chart marked `precompute` is calculated with no filters and stored in the `stats` table in `trials.db`, in the same transaction as the data.
-- **Filtered views** are calculated on request and kept in a per-worker in-memory LRU cache keyed by `(chart, filter, data_version)`.
-- **One filter language everywhere:** `TrialFilter` is used by the trial list, charts and facets. It covers:
-  - status, phase, conditions (including MeSH), interventions, sponsors and sponsor class, countries
-  - date ranges, enrollment range, has-results
-  - text query
-  - filter fields that plugins declare
+- **Chart specs** come from plugins (`tri_al.stats.Chart`, §7): `id`, `title`, `widget`, `query(ctx, filter) → rows`, a `precompute` flag, a layout hint (`width` and `height` on a four-column grid, and `order`), and which row keys the widget reads (`x`, `y`). Rows are JSON-compatible dicts; the front end only draws them.
+- **Default view:** every chart marked `precompute`, and every facet, is computed with no filter in the update's own transaction (the pipeline's stats stage) and stored in the `stats` table with its data version. Readers get the new stats with the new data. An update that changes nothing skips this unless the stored stats are for another version. A chart that raises is left out and listed in the run summary's `stats_errors`; it is computed on request instead. On the full dataset the stage takes 2.7 s.
+- **Counting, two ways:** charts and facets ask questions of `Counts` (how many trials, how many per status, the top conditions, distinct interventions, trials per day, …), so each is written once. `SqlCounts` answers in SQLite, for the pipeline's precompute. `IndexCounts` answers from the API worker's `TrialIndex`.
+- **The trial index:** SQLite answers a narrow filter quickly, but a broad one makes it visit hundreds of thousands of rows per chart: "top conditions among completed trials" takes about 450 ms, and the facets for one broad filter 1–8 s. Each API worker therefore keeps the columns that filters, facets and charts use in numpy arrays (coded trial columns, dates, enrollment, and the condition, intervention, sponsor and country links), 58 MB at 607k trials, built in 2.6 s from one snapshot in a background thread. A filter becomes a boolean mask; each count is one vectorized pass (the same question takes 6 ms). MeSH, text queries and plugin filter fields are asked of SQLite and turned into masks. The index belongs to one data version; after an update the worker builds the next one and answers from SQLite meanwhile. It also pages the trial list: its sort orders match SQLite's, cursors included, which the tests check.
+- **Filtered views** are computed on request and kept in a per-worker LRU cache bounded by bytes (64 MB), keyed by `(what, filter, data_version)`; masks are cached the same way, so a list, its facets and its charts share one. The first request for a new data version empties the cache.
+- **One filter language everywhere:** `TrialFilter` (`tri_al.filters`) is used by the trial list, charts, facets and search. It covers:
+  - status, phase, study type; conditions (by name) and MeSH terms (by code, narrower terms included); interventions and intervention types; sponsors (lead or collaborator) and the lead sponsor's class; countries
+  - date ranges on start, completion, first posted and last update; an enrollment range; has-results
+  - a text query (every word must match)
+  - filter fields that plugins declare (`FilterField`, a SQL condition)
 
-  Storage turns it into SQL.
-- **Facets** (the counts shown beside each filter option) are just stats with a filter applied.
+  Within a field, any value matches; across fields, all must. Filters are frozen with sorted values, so equal filters are equal cache keys. Storage turns a filter into SQL (`tri_al.storage.filtering`); the index evaluates it in memory.
+- **Facets** (the counts beside each filter option) are stats with a filter applied. Each facet ignores its own field, so choosing one status still shows what the others would add. The core's facets: status, phase, study type, lead sponsor type, results, intervention type, country, condition, intervention and sponsor.
 
 ### 5.6 Plugin system
 - **Discovery:** Python entry points in the group `tri_al.plugins`. Each plugin exposes a `Plugin` object (name, version, `api_version`, `requires`, settings model) and a `register(registry)` function.
@@ -173,32 +181,44 @@ fetch ─▶ parse (orjson) ─▶ normalize (source → TrialRecord) ─▶ has
 ### 5.8 Access (no login by default)
 - **No login by default.** Tri-AL is meant to be installed and used locally, so the base has no users, passwords or roles. Anyone who can reach the app can do everything, including pressing Update.
 - **Local only by default:** `serve` binds to `127.0.0.1`. If you bind to any other address without an access plugin, `serve` and `doctor` print a warning.
-- **Browser protections stay on, even without login.** Requests that change something (starting an update, changing plugin settings) must send a custom header and pass an Origin check, and the `Host` header must match the configured host. This stops other websites open in the same browser from triggering actions on the local server (CSRF and DNS rebinding).
-- **Access hook:** every route that changes something calls a single `require(action)` check. The core's policy allows everything. An optional `auth` plugin could later replace the policy with login and roles for shared servers, with no route changes.
+- **Browser protections stay on, even without login** (`tri_al.access.browser`):
+  - **Host:** every request's `Host` must be one of the server's names (the local names, `server.host` if it's a specific address, and `server.allowed_hosts`; `"*"` turns the check off). It applies to reads too, since a DNS-rebinding page could otherwise read through a name it controls.
+  - **Custom header:** requests that change something (POST, PUT, PATCH, DELETE) must send `X-Tri-AL`. Another origin can't add it without a CORS preflight, which the server never approves.
+  - **Origin:** when such a request has an `Origin`, its host must be one of the server's names; `Sec-Fetch-Site: cross-site` is refused.
+
+  This stops other websites open in the same browser from triggering actions on the local server (CSRF and DNS rebinding).
+- **Access hook:** every route calls a single `require(action)` check: `read` for every read, and `jobs.update`, `jobs.cancel` and `plugins.edit` for changes. The core's policy (`AllowAll`) allows everything. An optional `auth` plugin could later replace it with `registry.set_access_policy(policy)`, where `policy.allows(request, action)`, for login and roles on shared servers, with no route changes.
 
 ### 5.9 API
-All GET responses use orjson, an `ETag` derived from `data_version` (unchanged data returns 304), and gzip.
+FastAPI (`tri_al.api`). Data responses are JSON from orjson with a weak `ETag` made of the data version and the build (an unchanged request gets a 304 before any work) and `Cache-Control: no-cache`; responses over 1 KB are gzipped (level 5). Jobs, plugins and events change without the data version, so they are `no-store`. Every response carries `Server-Timing: app;dur=…`.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/meta` | Version, data_version, last update, counts |
-| `GET /api/trials` | List with `TrialFilter`, sorting, **keyset cursor** pagination (no OFFSET) |
-| `GET /api/trials/{source_id}` | Trial detail |
-| `GET /api/trials/{source_id}/changes` | Change history |
-| `GET /api/search?q=` | Full-text search, merged across search providers |
-| `GET /api/facets` | Counts for filter options under the current filter |
-| `GET /api/dashboard` | Dashboard manifest (charts + layout) |
-| `GET /api/stats/{chart_id}` | Chart data, precomputed or filtered |
-| `GET /api/events` | SSE stream: `data_version` changes, job progress |
-| `POST /api/jobs/update`, `GET /api/jobs[/{id}]` | Start an update, job status |
-| `GET/PATCH /api/plugins[/{name}]` | List plugins; PATCH enables, disables or changes settings by editing `tri-al.toml` (applies on the next start) |
+| `GET /api/meta` | Version, data_version, trial count, last install or update, source cursors, enabled plugins |
+| `GET /api/trials` | List with `TrialFilter`, `sort` (`-last_update` by default; also start date, first posted, enrollment, id) and **keyset cursor** pagination (`next_cursor`, opaque; no OFFSET). The first page carries `total` |
+| `GET /api/trials/{source_id}` | Trial detail (`?source=` if the id is in several registries) |
+| `GET /api/trials/{source_id}/changes` | Change history, newest first |
+| `GET /api/search?q=` | Full-text search, merged across search providers, within the filter. Hits carry snippets; `names` adds matching conditions, interventions and sponsors for jumping to a filter |
+| `GET /api/facets` | Counts for filter options under the current filter, and the filter's total |
+| `GET /api/dashboard` | Dashboard manifest: charts (with layout and row keys) and facets |
+| `GET /api/stats/{chart_id}` | Chart rows, precomputed (no filter) or filtered |
+| `GET /api/events` | SSE stream: `hello`, then `data_version` changes and `job` changes |
+| `POST /api/jobs/update`, `GET /api/jobs[/{id}]`, `POST /api/jobs/{id}/cancel` | Start an update (202, or 409 with the job already queued or running), job status, cancel |
+| `GET/PATCH /api/plugins[/{name}]` | List plugins; PATCH enables, disables or changes settings by editing `tri-al.toml` (checked against the plugin's settings model first; applies on the next start) |
+| `/api/x/<plugin>/…` | Routes plugins add with `registry.add_routes` |
 
-A TypeScript client for `web/` is generated from the OpenAPI schema.
+Filter fields are query parameters named as in `TrialFilter`, repeated for several values (`status=RECRUITING&status=COMPLETED`; names may contain commas). Ranges are `from..to` with either end open (`start=2020..2023`, `enrollment=1000..`). Plugin filter fields use their own names.
+
+- **Events:** each API worker runs one poller while anyone listens. Every half second it reads the data version from `trials.db` and the jobs changed since its last look from `app.db`, and passes changes to every open stream; a quiet stream gets a keep-alive comment every 15 seconds. A poll reports each changed job once as it is then, so a job that finishes between two polls skips straight to its end.
+- **Workers:** handlers are plain functions run in FastAPI's thread pool (SQLite releases the GIL); `server.workers` (default 1) sets the API processes, each with its own cache and index.
+
+The OpenAPI schema is at `/api/openapi.json` (docs at `/api/docs`), with an operation id per route (`listTrials`, `getChartData`, …) and typed response models (`tri_al.api.models`), so `web/` generates a TypeScript client from it. Handlers return orjson bytes rather than the models; the tests check that every response validates against its model.
 
 ### 5.10 CLI (Typer)
 `tri-al install | update | rebuild | serve | worker | backup | doctor | bench`, plus `tri-al plugins list|enable|disable`.
 
-- `serve` starts the API workers and the job worker together.
+- `serve` applies pending migrations, then starts the API workers (uvicorn) and one job worker process together; `--host`, `--port`, `--workers` and `--no-job-worker` override the config. `worker` runs the job worker alone.
+- `install` and `update` run in the shell but record themselves as jobs, so the server shows them and won't start another (§5.4).
 - `backup` uses `VACUUM INTO` (an online copy).
 - `doctor` checks config, files, versions and plugins. It fails with a fix-it message when:
   - SQLite is older than 3.45
@@ -212,10 +232,9 @@ A TypeScript client for `web/` is generated from the OpenAPI schema.
 | Table | Contents |
 |---|---|
 | `trials` | Narrow and fast to scan. See the column groups below this table. |
-| `trial_text` | brief_summary, description, eligibility_criteria |
-| `trial_outcomes` | trial_id, position, kind (primary, secondary, other), measure, description, time_frame |
+| `trial_text` | A trial's brief summary, description, eligibility criteria and outcomes (kind, measure, description, time frame), packed as one JSON array and compressed with zstd against a text dictionary (`dict_id`). See "Text" below |
 | `trial_docs` | Raw study JSON, byte for byte, compressed with zstd against a shared dictionary (`dict_id`); kept apart so `trials` stays narrow. See "Raw documents" below |
-| `doc_dicts` | The zstd dictionaries `trial_docs` rows were compressed with, kept for good |
+| `doc_dicts` | The zstd dictionaries, with their kind (`doc` or `text`), kept for good |
 | `conditions`, `trial_conditions` | Conditions and links to trials |
 | `mesh_terms`, `trial_mesh` | MeSH terms (by descriptor code) and ancestors from `derivedSection`; the link has kind = condition or intervention, and an ancestor flag |
 | `interventions`, `trial_interventions`, `intervention_aliases` | Interventions, links (with the intervention type), and each trial's other names for them |
@@ -224,9 +243,9 @@ A TypeScript client for `web/` is generated from the OpenAPI schema.
 | `locations` | trial_id, position, facility, city, state, country_code, status, lat/lon |
 | `trial_changes` | trial_id, run_id, field, old, new: replaces v1's `simple_history` and its `first_*` fields |
 | `runs` | Install and update runs: stage checkpoints and summary |
-| `stats` | chart_id, data_version, payload |
+| `stats` | chart_id (`facet:<field>` for facets), data_version, payload (the rows as JSON), computed_at |
 | `meta` | `data_version`, update cursor, schema info, `bulk_load_started` |
-| `trials_fts` | FTS5 (porter/unicode61) over titles, conditions, interventions and their other names, `trial_text` and outcomes. External content: it reads the view `trials_fts_content`, so the text isn't stored twice |
+| `trials_fts` | FTS5 (porter/unicode61) over titles, conditions, interventions and their other names, summary, description, eligibility and outcomes. **Contentless** (`content=''`, `contentless_delete=1`): it keeps only the index, and the writer feeds it each trial's text as it writes. See "Search" below |
 | `names_fts` | FTS5 trigram over condition, intervention and sponsor names (with kind and row id), for fuzzy lookup |
 
 The `trials` table has these columns:
@@ -245,12 +264,15 @@ Notes:
 - **Ages** are converted to days, so age ranges are simple numeric filters (v1 stored them as strings). `tri_al.schema.age_in_days` does it, rounding down, with a year of 365.25 days and a month of a twelfth of that (so "12 Months" equals "1 Year"); filters convert with the same function.
 - **Link tables** use `WITHOUT ROWID` with primary key `(trial_id, x_id)` plus a reverse index `(x_id, trial_id)`. A `position` column keeps the source's order.
 - **Entities are identified by name** (MeSH terms by code). Per-trial details, such as an intervention's type or a sponsor's class, are on the link, so each trial reads back exactly as written. A trial that lists the same entity twice keeps the first.
-- **Outcomes are rows, not JSON:** FTS5 can't read virtual tables such as `json_each` through its content view.
+- **Text** is read by the trial detail and for snippets only, so it is compressed like the raw documents (with its own dictionary, trained on the first batch of at least 1,000 trials): 28% of its JSON size; 1.23 GB at 607k trials with its B-tree pages, instead of 3.8 GB as plain columns. Storage still returns complete trials by itself, without the source plugin (§15, decision 10).
+- **Search** ranks with BM25 and column weights (titles count most). Ranking costs about 2 µs a match, so a query ranks at most the 20,000 most recently registered matches (`SEARCH_CANDIDATES`): exact for queries with fewer matches, about 50 ms for a word in nearly every trial (§15, decision 11). Snippets come from the hits' unpacked text, put into a small in-memory FTS5 table per thread with the same tokenizer, whose `snippet()` marks the same stemmed words; the hits' snippets cost about 8 ms for 20.
 - **`trials` indexes** cover the dashboard's main filters: `status`, `(phase, status)` (which also serves `phase` alone), `start_date`, `last_update`, `lead_sponsor_class`.
 - **Raw documents** are compressed one by one with zstd (level 3) against a 110 KB dictionary that the first batch of at least 1,000 documents trains (`storage/docs.py`). A document is still quick to read alone, and real ones shrink to 19% of their JSON size. As SQLite JSONB they'd be about 10 GB at 607k studies, more than every other table together; compressed they're about 2.5 GB (§15, decision 6). The storage no longer checks that `raw` is JSON; the pipeline has parsed it already.
 - **The change log** records these fields when an update changes them, old and new as JSON text: title, status, phase, study_type, primary_purpose, the start and completion dates, enrollment and its type, arms_count, has_results, lead sponsor, ages, sex, healthy_volunteers, conditions, interventions, countries and num_sites (`pipeline/changes.py`). `last_update` changes with every version, so it isn't logged.
 
 `app.db` holds `jobs`, `enricher_state` and `_migrations`. Plugin state stays in `tri-al.toml` (§5.6).
+
+Size at 607,349 trials (2026-10-16 release), after migration 3 and `VACUUM`: **6.46 GB**, down from 9.10 GB: raw documents 2.53 GB, the full-text index 1.41 GB, text 1.23 GB, everything else 1.3 GB (bench/README.md has the table).
 
 ## 7. Plugin interfaces (base)
 
@@ -279,20 +301,38 @@ class Enricher(Protocol):
     def enrich(self, batch: list[TrialRecord]) -> list[dict]: ...
 
 @dataclass
-class Chart:
+class Chart:                           # tri_al.stats
     id: str
     title: str
     widget: Literal["bar", "line", "area", "pie", "stat", "table", "map"]
-    query: Callable[[Connection, TrialFilter], list[dict]]
+    query: Callable[[ChartContext, TrialFilter], list[dict]]   # ctx.conn, ctx.counts(filter)
     precompute: bool = True
-    layout: Layout = Layout()
+    layout: Layout = Layout()          # width and height on a 4-column grid, order
+    x: str = "label"                   # the row keys the widget reads
+    y: str = "value"
 
-class SearchProvider(Protocol):        # core ships the FTS5 provider
+@dataclass
+class FilterField:                     # tri_al.filters
+    name: str                          # also its query parameter
+    title: str
+    clause: Callable[[tuple[str, ...]], ColumnElement[bool]]   # a condition on trials
+
+class SearchProvider(Protocol):        # tri_al.search; core ships the FTS5 provider
     name: str
-    def search(self, q: str, filter: TrialFilter, limit: int) -> list[Hit]: ...
+    def search(self, conn: Connection, q: str, filter: TrialFilter, limit: int) -> ProviderResult: ...
+
+@dataclass
+class JobType:                         # tri_al.jobs
+    name: str
+    run: Callable[[JobContext], dict | None]   # ctx.job, ctx.progress, ctx.config
+
+class AccessPolicy(Protocol):          # tri_al.access
+    def allows(self, request: Request, action: str) -> bool: ...
 ```
 
 v1's `customize.py` (`@column` functions plus `Database.columns`) becomes an `Enricher`. Its output goes into the plugin's own table instead of being injected into the `Trial` model.
+
+Charts get a `ChartContext` rather than a bare connection so they can be counted from the in-memory index (§5.5); search providers get the request's read connection. Several providers' results merge by reciprocal rank fusion, since their scores don't compare.
 
 ## 8. Flows
 
@@ -307,7 +347,7 @@ v1's `customize.py` (`@column` functions plus `Database.columns`) becomes an `En
 8. Print the URL; `--serve` starts the server straight away. (Milestone 6.)
 
 ### Update (button, schedule or CLI)
-1. `POST /api/jobs/update` adds a job to the queue. The worker claims it, and the lock rejects a second one.
+1. `POST /api/jobs/update` adds a job to the queue (or the schedule does, or `tri-al update` records one and runs it itself). The worker claims it; a second update gets a 409 with the first.
 2. Fetch pages changed since `cursor − 1 day` (typically 1–2 pages), normalize, and check hashes.
 3. In one transaction on `trials.db`:
    - upsert the changed trials, their links, text, full-text index and raw docs
@@ -318,7 +358,7 @@ v1's `customize.py` (`@column` functions plus `Database.columns`) becomes an `En
 
    Then commit.
 4. Fire `update.finished` for any plugin listening. The job's result records new, updated and unchanged counts.
-5. API workers see the new `data_version` and drop their caches. SSE tells open browsers, and the dashboards re-fetch.
+5. Job progress reaches `app.db` at most twice a second all along, and `/api/events` streams it. API workers see the new `data_version`: their caches miss, they build the next trial index in the background, and SSE tells open browsers, whose dashboards re-fetch (each response's ETag changes with the data version).
 
 ## 9. Front end
 
@@ -333,7 +373,7 @@ v1's `customize.py` (`@column` functions plus `Database.columns`) becomes an `En
   - Trial detail: overview, eligibility, outcomes, locations, changes
   - Settings: update and jobs, plugins
   - A global ⌘K command palette for search
-- **Widget registry:** maps a widget type to a component. The dashboard is drawn from `/api/dashboard`, and unknown widget types render a placeholder. Plugins add charts as specs, not as React code.
+- **Widget registry:** maps a widget type to a component. The dashboard is drawn from `/api/dashboard`, and unknown widget types render a placeholder. Plugins add charts as specs, not as React code; the default charts are the backend `charts` plugin's (built in milestone 4), so the front end only renders them.
 - **Live updates:** an `EventSource` on `/api/events` refreshes queries and shows job progress.
 - **Serving:** in production, the built SPA is served by FastAPI on the same port. In development, the Vite dev server proxies `/api`.
 
@@ -341,25 +381,25 @@ v1's `customize.py` (`@column` functions plus `Database.columns`) becomes an `En
 
 Targets on the full dataset, measured on the reference machine:
 
-| What | Target |
-|---|---|
-| `GET /api/stats/{id}` (precomputed) | p95 < 20 ms |
-| Whole dashboard (all chart calls) | < 50 ms server time |
-| Filtered list, facets or chart | p95 < 300 ms |
-| Trial detail | p95 < 30 ms |
-| Full-text search | p95 < 150 ms |
+| What | Target | Measured in milestone 4 (607,349 trials) |
+|---|---|---|
+| `GET /api/stats/{id}` (precomputed) | p95 < 20 ms | 0.8 ms |
+| Whole dashboard (all chart calls) | < 50 ms server time | 5.0 ms (p95 of manifest + 7 charts) |
+| Filtered list, facets or chart | p95 < 300 ms | 23.5 ms (32 filters, cold; 150 ms max) |
+| Trial detail | p95 < 30 ms | 1.5 ms |
+| Full-text search | p95 < 150 ms | 83 ms (30 queries, cold; 103 ms max) |
 | Daily update (~1,500 changed) | < 2 min end to end (milestone 3: 2,606 trials rewritten in 10–17 s) |
 | Full install | < 18 min end to end, download included (milestone 3: 14m50s, of which the download took 1m43s) |
 | Front end | initial JS < 200 KB gzip; dashboard interactive < 1.5 s on a cold load |
 
 How we get there:
-- **Little work per request:** precomputed stats, narrow hot tables, covering indexes and keyset pagination.
+- **Little work per request:** precomputed stats, an in-memory trial index per API worker for filtered counts (§5.5), narrow hot tables, covering indexes, capped search ranking and keyset pagination.
 - **Fast fetches:** bulk fetch with one request per 1,000 trials.
 - **Fast install:** a process pool for parsing, a single batched writer, and indexes built after the load.
 - **Cheap repeat requests:** orjson, ETags/304 and an in-memory cache keyed by data version.
 - **Small, lazy front end:** route-level code splitting and a lazy map chunk.
 
-**Benchmarks** live in `bench/`. A fixed sample (about 50k studies, fetched by script, not committed) runs on every PR, and the full dataset runs nightly. A regression of more than 20% fails CI.
+**Benchmarks** live in `bench/` (`api_bench.py` measures the API targets; results in bench/README.md). A fixed sample (about 50k studies, fetched by script, not committed) runs on every PR, and the full dataset runs nightly. A regression of more than 20% fails CI.
 
 ## 11. Testing and tooling
 
@@ -400,7 +440,7 @@ Nothing AI-specific is in the base, but these hooks exist so AI features plug in
 
 | v1 | v2 |
 |---|---|
-| Admin dashboard charts (map, phases, status, conditions, updates, stat tiles) | Core dashboard + `charts` plugin |
+| Admin dashboard charts (map, phases, status, conditions, updates, stat tiles) | `charts` plugin (backend, milestone 4): totals, trials by country (map) and top countries, by phase, by status, top conditions, recently updated |
 | Trial list, advanced search (dates, agents, biomarkers, status, phase) | Trial explorer + `TrialFilter` + facets + ⌘K (core) |
 | `simple_history` and `first_*` fields | `trial_changes` (core) |
 | `customize.py` columns | `Enricher` plugins |
@@ -428,10 +468,11 @@ Each milestone ends working, tested and measured.
    - Done when: a full install and a real daily update both work, and the install time is recorded.
    - Done 2026-10-17: the `ctgov` plugin, `tri_al.pipeline` and real `install`/`update` commands. A full install of 607,349 studies took 14m50s and makes a 9.1 GB `trials.db`; a real update fetched 2,606 studies in 3.7s (numbers in bench/README.md).
 4. **Jobs, stats and API.**
-   - Build: worker, scheduler, SSE, stats engine, `TrialFilter`, facets, all core endpoints, the access hook and browser protections.
+   - Build: worker, scheduler, SSE, stats engine, `TrialFilter`, facets, all core endpoints, the access hook and browser protections, and the backend `charts` plugin with v1's dashboard set. Search reworked: contentless full-text index, compressed text, capped ranking (migration 3).
    - Done when: the API benchmarks meet §10 on the full dataset.
+   - Done 2026-10-17: `tri_al.jobs`, `tri_al.stats` (with the in-memory trial index), `tri_al.api`, `tri_al.access`, `tri-al serve` and `tri-al worker`, and `tri-al-charts`. Every API target is met on 607,349 trials (§10); `trials.db` went from 9.10 to 6.46 GB; `POST /api/jobs/update` ran a real update with live SSE progress in 6.4 s.
 5. **Front end.**
-   - Build: app shell, dashboard renderer, `charts` plugin, trial explorer, detail page, ⌘K, settings page with the update button.
+   - Build: app shell, dashboard renderer (drawing the `charts` plugin's specs), trial explorer, detail page, ⌘K, settings page with the update button.
    - Done when: the Playwright smoke test passes and the bundle budget is met.
 6. **Install end to end and hardening.**
    - Build: the `uv tool install` + `install` experience, `backup`, `doctor`, a performance pass, docs. A Docker image waits until publishing.
@@ -449,7 +490,16 @@ Decided 2026-10-17:
 
 Decided in milestone 3 (2026-10-17):
 
-6. **Raw documents are compressed with zstd.** Real study JSON is 10.5 GB; as SQLite JSONB it would be about 9.8 GB of a 16.4 GB database. Each document is compressed on its own (level 3) against a 110 KB dictionary trained on the first batch, kept in `doc_dicts`: 19% of the JSON size, 2.5 GB, and still quick to read one document (`storage/docs.py`, migration 2). It needs `backports.zstd` on Python 3.13 (the standard library's `compression.zstd` from 3.14). Not chosen: zlib (standard library, but 27% and a quarter of the speed); dropping `resultsSection` (35% of the bytes, but the planned demographics plugin reads it); dropping text that other tables repeat (the document would no longer be the original). Next, if size matters: compress `trial_text` and `trial_outcomes` too and make `trials_fts` contentless, about 2.7 GB less but no snippets.
+6. **Raw documents are compressed with zstd.** Real study JSON is 10.5 GB; as SQLite JSONB it would be about 9.8 GB of a 16.4 GB database. Each document is compressed on its own (level 3) against a 110 KB dictionary trained on the first batch, kept in `doc_dicts`: 19% of the JSON size, 2.5 GB, and still quick to read one document (`storage/docs.py`, migration 2). It needs `backports.zstd` on Python 3.13 (the standard library's `compression.zstd` from 3.14). Not chosen: zlib (standard library, but 27% and a quarter of the speed); dropping `resultsSection` (35% of the bytes, but the planned demographics plugin reads it); dropping text that other tables repeat (the document would no longer be the original). Next, if size matters: compress `trial_text` and `trial_outcomes` too and make `trials_fts` contentless, about 2.7 GB less but no snippets. (Done in milestone 4, with snippets kept: decision 10.)
 7. **Sources choose what the content hash covers** (`Source.hashable`), because ClinicalTrials.gov stamps every study with the release date (`versionHolder`); hashing it would make each daily update rewrite every study it fetches.
 8. **`install` doesn't replace an existing database** unless `--force`, because a fresh database starts the change log over. Carrying the log across a rebuild is left for the `rebuild` command.
 9. **Countries outside ISO 3166-1** that ClinicalTrials.gov uses get codes: Kosovo `XK` (user-assigned, widely used) and the former Serbia and Montenegro `CS`, Yugoslavia `YU` and Netherlands Antilles `AN` (reserved by ISO 3166-3). Puerto Rico and other territories keep their own codes, so a trial in the US and Puerto Rico has `location_scope = BOTH`.
+
+Decided in milestone 4 (2026-10-17):
+
+10. **Text is stored once more, compressed, not as plain columns.** The external-content index read 3.8 GB of plain text copies. The index is now contentless and fed at write time, and each trial's text is one zstd blob (1.23 GB in all). Chosen by the user over keeping raw documents only (about 5.3 GB in all), where reading a trial's text would need the source plugin to parse its document: storage stays source-agnostic, so a Postgres backend or another registry needs nothing new. Snippets unpack only the hits.
+11. **Broad searches rank only the newest 20,000 matches.** Ranking every match of a word in 572k trials took 1.5 s. Chosen by the user over ranking titles and names only, which measured 420 ms for "study" and still needed a cap. Queries with up to 20,000 matches are ranked exactly; broader ones rank the most recently registered matches, and say so (`capped`). Name lookups cap the same way, at 5,000 names.
+12. **The existing database converts by migration, not reinstall** (the user's choice): migration 3 builds the new index from the old text and drops the plain tables (4m24s on the full database), and `VACUUM INTO` gives back the space (42 s). Runs and the change log are kept. Other installs get the migration at their next `serve` or `update`; the freed space is reused, and a later `compact` command could vacuum it.
+13. **Filtered stats come from an in-memory index in each API worker, with numpy as a core dependency.** SQLite took 1–8 s for the facets of one broad filter (every completed trial, every trial in the US), which no SQL shape or index fixed: the work is visiting hundreds of thousands of link rows. The index (58 MB, built in 2.6 s per data version) answers the same in 8–40 ms. Not chosen: precomputing facets for single-value filters (over 1,000 queries per update, and still nothing for combinations); splitting queries across threads (slower: the merge holds the GIL); Python sets and bitmaps without numpy (too slow for high-cardinality facets).
+14. **The Host check covers every request,** not only changing ones, since DNS rebinding is also a way to read; `server.allowed_hosts` names other hosts.
+15. **The default charts are a backend plugin built in milestone 4** (design had them in milestone 5), so milestone 5 only renders specs from `/api/dashboard`.

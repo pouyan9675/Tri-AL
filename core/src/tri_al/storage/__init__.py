@@ -2,14 +2,22 @@
 
 from tri_al.storage.app_db import open_app_db
 from tri_al.storage.base import (
+    NEWEST_FIRST,
+    SORT_KEYS,
     BulkLoader,
+    Cursor,
     NameHit,
     NameKind,
     SearchHit,
+    SearchResult,
+    SnippetPart,
+    Sort,
+    SortKey,
     Storage,
     StorageError,
     StorageTransaction,
-    TrialQuery,
+    TrialChange,
+    TrialPage,
     TrialSummary,
 )
 from tri_al.storage.engine import (
@@ -22,23 +30,34 @@ from tri_al.storage.engine import (
     load_extension,
 )
 from tri_al.storage.migrations import Migration, MigrationError, migrate, run_script
-from tri_al.storage.sqlite import SQLiteStorage
+from tri_al.storage.sqlite import SEARCH_CANDIDATES, SQLiteReader, SQLiteStorage, StoredStats
 
 __all__ = [
     "MIN_SQLITE_VERSION",
+    "NEWEST_FIRST",
+    "SEARCH_CANDIDATES",
+    "SORT_KEYS",
     "BulkLoader",
+    "Cursor",
     "ExtensionLoadError",
     "Migration",
     "MigrationError",
     "NameHit",
     "NameKind",
+    "SQLiteReader",
     "SQLiteStorage",
     "SearchHit",
+    "SearchResult",
+    "SnippetPart",
+    "Sort",
+    "SortKey",
     "SqliteExtension",
     "Storage",
     "StorageError",
     "StorageTransaction",
-    "TrialQuery",
+    "StoredStats",
+    "TrialChange",
+    "TrialPage",
     "TrialSummary",
     "can_load_extensions",
     "check_sqlite_version",

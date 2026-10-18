@@ -1,9 +1,129 @@
 # Benchmarks
 
+- [API](#api-milestone-4): every §10 API target on the full database, the search rework and
+  the database after it (milestone 4).
 - [Real data](#real-data-milestone-3): a full install of ClinicalTrials.gov and a real update
   (milestone 3), with the database size by table.
 - [Storage benchmark](#storage-benchmark-milestone-2): synthetic trials against the SQLite
   storage layer (milestone 2).
+
+## API (milestone 4)
+
+```bash
+uv run python bench/api_bench.py                  # data/trials.db, with the trial index
+uv run python bench/api_bench.py --compare-sql    # also every filter in SQLite alone (~4 min)
+```
+
+`api_bench.py` runs the app in uvicorn on a free port, as `tri-al serve` does, waits for the
+in-memory trial index, then times each kind of request over HTTP. Times are server times
+from the `Server-Timing` header (until the response starts, gzip included); loopback adds
+about a millisecond. Filtered requests and searches are cold: each of 32 filters and 30
+queries is asked for once, so nothing comes from the result cache. The filters run from
+rare (122 trials) to nearly everything (`q=study`, 572,381), alone and combined; the
+queries from rare words to `the`.
+
+2026-10-17, 607,349 trials (the 2026-10-16 release), same Mac as below, one API worker.
+
+| What | Result | Target (§10) |
+|---|---|---|
+| `GET /api/stats/{id}`, precomputed (7 charts × 30) | 0.6 ms median, **0.8 ms p95** | p95 < 20 ms |
+| Whole dashboard: manifest + 7 charts, server time | 4.8 ms median, **5.0 ms p95** | < 50 ms |
+| Filtered list (first page and total), 32 filters | 5.3 ms median, 30.6 ms p95, 150 ms max | |
+| Filtered facets (all 10 at once), 32 filters | 18.6 ms median, 36.5 ms p95, 37 ms max | |
+| Filtered chart (7 per filter) | 2.7 ms median, 11.1 ms p95, 18 ms max | |
+| Filtered list, facets or chart, all together (288) | 3.4 ms median, **23.5 ms p95**, 150 ms max | p95 < 300 ms |
+| `GET /api/trials/{id}`, 200 random trials | 1.1 ms median, **1.5 ms p95** | p95 < 30 ms |
+| `GET /api/search`, 30 queries | 53 ms median, **83 ms p95**, 103 ms max (`the`) | p95 < 150 ms |
+| Unchanged request (304) | 0.6 ms median | |
+| Paging 20 pages of 50 through completed trials | 4.1 ms median, 4.5 ms p95 | |
+| Trial index: build per API worker | 2.65 s, 58 MB | |
+| *For comparison:* the same filters in SQLite alone | 154 ms median, 1,871 ms p95, 8,261 ms max | |
+| *For comparison:* facets in SQLite alone | 1,415 ms median, 3,794 ms p95 | |
+
+The slowest filtered request is the list for `q=study` (150 ms): a text filter has to ask
+the full-text index for every matching trial, 572k of them. MeSH filters and text filters
+read those ids from SQLite in bulk on the raw cursor (a first version, through SQLAlchemy's
+rows, took 118 ms for "Neoplasms" and 201 ms for `q=study`).
+
+### What the numbers say
+
+- **Precomputed is free:** a chart with no filter is one primary-key read of its stored
+  JSON, wrapped in bytes without parsing: under a millisecond, and the dashboard's eight
+  calls take 5 ms together. A 304 costs the same.
+- **The index is what makes filters fast.** SQLite alone needs 1–8 s for the facets of one
+  broad filter: "top conditions among completed trials" visits 600k link rows, and no SQL
+  shape or index changed that (splitting the query across threads was slower still, as the
+  merge holds the GIL). The in-memory index counts the same in 6 ms; all ten facets for
+  any of the 32 filters take at most 37 ms. It agrees with SQLite exactly (the tests compare
+  every count and every page, cursors included).
+- **Search is fast for every word now.** Ranking ranks at most the 20,000 newest matches,
+  so a word in nearly every trial costs about 50–80 ms instead of 1.5 s, and rare words are
+  ranked exactly. Snippets for 20 hits take about 8 ms. `the` is slowest (103 ms): its
+  doclist is the longest of all.
+- **Name lookups** for ⌘K were the hidden cost of common words: "the" is inside about a
+  fifth of all names, and sorting them by length took 76 ms. Lookups now sort the first
+  5,000 matches (1–14 ms), and `/api/search` skips them for words under three letters,
+  which the trigram index can't help with.
+
+### The search rework and the database
+
+Migration 3 made `trials_fts` contentless and compressed each trial's text (design §15,
+decisions 10–12). On the full database:
+
+| Step | Time |
+|---|---:|
+| Migration 3: build the contentless index from the old text, compress 607k texts, drop the plain tables | 4m24s |
+| `VACUUM INTO` a compact copy | 42s |
+| `quick_check` and the full-text `integrity-check` of the copy | 74s |
+
+`trials.db` went from **9.10 GB to 6.46 GB**:
+
+| Table | Size | Share | Rows |
+|---|---:|---:|---:|
+| `trial_docs` | 2,528 MB | 39.1% | 607,349 |
+| `trials_fts` | 1,412 MB | 21.8% | 607,349 |
+| `trial_text` | 1,230 MB | 19.0% | 607,349 |
+| `trials` | 354 MB | 5.5% | 607,349 |
+| `trial_mesh` | 329 MB | 5.1% | 6,967,028 |
+| `locations` | 296 MB | 4.6% | 3,545,192 |
+| `names_fts` | 124 MB | 1.9% | 775,638 |
+| `interventions` | 43 MB | 0.7% | 538,071 |
+| `trial_sponsors` | 37 MB | 0.6% | 967,780 |
+| `trial_interventions` | 33 MB | 0.5% | 1,008,786 |
+| `trial_conditions` | 26 MB | 0.4% | 1,093,214 |
+| `trial_countries` | 18 MB | 0.3% | 786,023 |
+| `intervention_aliases` | 15 MB | 0.2% | 481,798 |
+| `conditions` | 11 MB | 0.2% | 134,523 |
+| `sponsors` | 8 MB | 0.1% | 103,044 |
+| everything else | < 2 MB | | |
+
+- The plain text and outcome rows (`trial_text` 2,524 MB and `trial_outcomes` 1,265 MB
+  before) became one compressed blob per trial: 1,230 MB. The packed text compresses to 28%
+  of its JSON size; the rest is B-tree pages around blobs averaging 2 KB.
+- The contentless index is the same size as the external-content one (1,412 vs 1,410 MB):
+  an index never held the text, only its view did.
+- A future install writes the index as it loads (it can't be rebuilt from a view any more),
+  and its check stage no longer re-reads all text for the full-text `integrity-check`
+  (84 s in milestone 3). Not measured yet: the next full install will tell.
+
+### A real update through the API
+
+`tri-al serve` on the full database, `POST /api/jobs/update` (Saturday 2026-10-17, so all
+2,606 studies posted since 2026-10-15 were unchanged), followed on `/api/events`:
+
+| Time | Event |
+|---:|---|
+| 0.0 s | `job` queued |
+| 0.5 s | running: `fetch`, "ctgov: changed since 2026-10-15" |
+| 2.0 s | `fetch` 1,000 of 2,606 trials |
+| 3.5 s | `fetch` 2,000 of 2,606 trials |
+| 4.0 s | `write` 0 of 0 |
+| 5.0 s | `stats` |
+| 7.1 s | succeeded (`commit`) |
+
+The job took 6.4 s: fetch 3.7 s, stats 2.7 s (the first precompute of all 7 charts and 10
+facets on this database; an update that changes nothing skips it once the stats are
+current).
 
 ## Real data (milestone 3)
 

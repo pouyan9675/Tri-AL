@@ -11,15 +11,19 @@ python-preference = "only-managed"
 tri-al = { workspace = true }
 tri-al-sample = { workspace = true }
 tri-al-ctgov = { workspace = true }
+tri-al-charts = { workspace = true }
 
 [dependency-groups]
 dev = [
     "tri-al",
     "tri-al-sample",
     "tri-al-ctgov",
+    "tri-al-charts",
     "mypy>=2.4",
     "pytest>=9.1",
     "ruff>=0.17",
+    "httpx>=0.28.1",
+    "httpx2>=2.13",
 ]
 
 [tool.ruff]
@@ -31,7 +35,7 @@ extend-exclude = ["data_manager.py", "manage.py", "panels", "visual", "scheduler
 select = ["E", "W", "F", "I", "UP", "B", "C4", "SIM", "PT", "RUF"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["tri_al", "tri_al_sample", "tri_al_ctgov"]
+known-first-party = ["tri_al", "tri_al_sample", "tri_al_ctgov", "tri_al_charts"]
 
 [tool.mypy]
 python_version = "3.13"

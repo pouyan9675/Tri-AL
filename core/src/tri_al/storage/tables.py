@@ -159,32 +159,22 @@ trials = Table(
     Index("trials_lead_sponsor_class", "lead_sponsor_class"),
 )
 
-trial_text = Table(
-    "trial_text",
-    trials_metadata,
-    _trial_id(primary_key=True),
-    Column("brief_summary", Text),
-    Column("description", Text),
-    Column("eligibility_criteria", Text),
-)
-
-trial_outcomes = Table(
-    "trial_outcomes",
-    trials_metadata,
-    _trial_id(primary_key=True),
-    Column("position", Integer, primary_key=True),
-    Column("kind", Text, nullable=False),
-    Column("measure", Text, nullable=False),
-    Column("description", Text),
-    Column("time_frame", Text),
-)
-
 doc_dicts = Table(
     "doc_dicts",
     trials_metadata,
     Column("id", Integer, primary_key=True),
     Column("dict", BLOB, nullable=False),  # a zstd dictionary (see storage/docs.py)
     Column("created_at", UTCDateTime, nullable=False),
+    Column("kind", Text, nullable=False, server_default=text("'doc'")),  # doc or text
+)
+
+trial_text = Table(
+    "trial_text",
+    trials_metadata,
+    _trial_id(primary_key=True),
+    # Summary, description, eligibility and outcomes, packed and zstd-compressed (docs.py).
+    Column("text", BLOB, nullable=False),
+    Column("dict_id", Integer, ForeignKey("doc_dicts.id")),  # NULL: no dictionary
 )
 
 trial_docs = Table(
@@ -321,7 +311,6 @@ meta = Table(
 ENTITY_TABLES = (conditions, mesh_terms, interventions, sponsors)
 LINK_TABLES = (
     trial_text,
-    trial_outcomes,
     trial_docs,
     trial_conditions,
     trial_mesh,
@@ -360,7 +349,15 @@ jobs = Table(
     Column("created_at", UTCDateTime, nullable=False),
     Column("started_at", UTCDateTime),
     Column("finished_at", UTCDateTime),
+    Column("stage", Text),  # the pipeline stage the progress belongs to
+    Column("unit", Text),  # what progress and total count: trials, bytes, ...
+    Column("error", Text),
+    Column("origin", Text, nullable=False, server_default=text("'api'")),  # api, schedule, cli
+    Column("cancel_requested", Boolean, nullable=False, server_default=text("0")),
+    Column("worker", Text),  # the process running it
+    Column("updated_at", UTCDateTime),
     Index("jobs_by_status", "status", "id"),
+    Index("jobs_by_update", "updated_at"),
 )
 # Only one install, update or rebuild runs at a time (docs/design.md §5.4).
 Index(

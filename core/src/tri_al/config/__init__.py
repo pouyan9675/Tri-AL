@@ -2,6 +2,7 @@ from tri_al.config.loader import (
     CONFIG_ENV,
     ConfigError,
     config_path,
+    edit_plugin_section,
     load_config,
     set_plugin_enabled,
 )
@@ -13,6 +14,7 @@ __all__ = [
     "ConfigError",
     "PluginSection",
     "config_path",
+    "edit_plugin_section",
     "load_config",
     "set_plugin_enabled",
 ]

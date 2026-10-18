@@ -63,7 +63,7 @@ def test_install_from_the_bulk_file(installed: Pipeline, samples: list[bytes]) -
             assert stored.raw == raw
             assert stored.title == expected.title
             assert stored.locations == expected.locations
-        assert [hit.source_id for hit in storage.search("donanemab")] == ["NCT05026866"]
+        assert [hit.source_id for hit in storage.search("donanemab").hits] == ["NCT05026866"]
         assert [hit.name for hit in storage.lookup_names("florbeta")] == ["florbetapir (18F)"]
     meta = dict(query(installed, "SELECT key, value FROM meta"))
     assert meta == {"data_version": "1", "cursor.ctgov": "2026-07-29"}

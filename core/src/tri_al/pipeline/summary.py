@@ -34,6 +34,7 @@ class RunSummary:
     stages: dict[str, float] = field(default_factory=dict)  # seconds each stage took
     failures: list[str] = field(default_factory=list)  # the first MAX_FAILURES problems
     handler_errors: list[str] = field(default_factory=list)  # event handlers that raised
+    stats_errors: list[str] = field(default_factory=list)  # charts that failed to precompute
     notes: dict[str, Any] = field(default_factory=dict)  # FetchContext.notes, by source
 
     def counts(self, source: str) -> SourceCounts:

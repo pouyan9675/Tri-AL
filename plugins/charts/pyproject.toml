@@ -1,0 +1,16 @@
+[project]
+name = "tri-al-charts"
+version = "0.1.0"
+description = "Default dashboard charts for Tri-AL: phases, statuses, conditions, countries, updates and totals."
+requires-python = ">=3.13"
+dependencies = ["tri-al"]
+
+[project.entry-points."tri_al.plugins"]
+charts = "tri_al_charts:plugin"
+
+[tool.uv.sources]
+tri-al = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.9.5,<0.10.0"]
+build-backend = "uv_build"

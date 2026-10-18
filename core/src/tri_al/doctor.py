@@ -58,8 +58,29 @@ def run_checks() -> list[Check]:
         enabled = f"{len(loaded.plugins)} enabled" + (f" ({names})" if names else "")
         checks.append(Check("plugins", "ok", enabled))
         checks += check_extensions(loaded.contributions.sqlite_extensions.values())
+        checks.append(check_server(config, loaded))
     checks += check_databases(config, loaded)
     return checks
+
+
+def exposed_warning(config: Config, loaded: LoadedPlugins) -> str | None:
+    """A warning if the server listens beyond this machine with no access plugin (§5.8)."""
+    if config.server.is_local or loaded.contributions.access_policy is not None:
+        return None
+    return (
+        f"the server listens on {config.server.host}, so other machines can reach it, and "
+        "there's no login: anyone who can connect can start updates and change plugins"
+    )
+
+
+def check_server(config: Config, loaded: LoadedPlugins) -> Check:
+    server = config.server
+    where = f"{server.host}:{server.port}"
+    if warning := exposed_warning(config, loaded):
+        return Check("server", "warn", warning, 'set server.host = "127.0.0.1" in tri-al.toml')
+    if not server.is_local:
+        return Check("server", "ok", f"{where}, with an access policy")
+    return Check("server", "ok", f"{where} (this machine only)")
 
 
 def check_python() -> Check:

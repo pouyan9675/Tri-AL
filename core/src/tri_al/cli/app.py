@@ -6,19 +6,17 @@ from typing import Annotated
 import typer
 
 from tri_al import __version__
-from tri_al.cli import data, plugins
+from tri_al.cli import data, plugins, server
 from tri_al.cli.doctor import doctor
 from tri_al.config import ConfigError, load_config
 from tri_al.plugins import PluginError, load_plugins
 
 STUBS = {
     "rebuild": "Rebuild the database from the downloaded data.",
-    "serve": "Start the API and the job worker.",
-    "worker": "Run the job worker on its own.",
     "backup": "Copy the databases while the app is running.",
     "bench": "Run the benchmark suite.",
 }
-CORE_COMMANDS = {*STUBS, "install", "update", "doctor", "plugins"}
+CORE_COMMANDS = {*STUBS, "install", "update", "serve", "worker", "doctor", "plugins"}
 
 
 def create_app() -> typer.Typer:
@@ -32,6 +30,8 @@ def create_app() -> typer.Typer:
     app.callback()(_root)
     app.command("install")(data.install)
     app.command("update")(data.update)
+    app.command("serve")(server.serve)
+    app.command("worker")(server.worker)
     for name, help_text in STUBS.items():
         app.command(name, help=f"{help_text} (Not implemented yet.)")(_stub(name))
     app.command("doctor")(doctor)
