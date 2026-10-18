@@ -484,6 +484,7 @@ Each milestone ends working, tested and measured.
 6. **Install end to end and hardening.**
    - Build: the `uv tool install` + `install` experience, `backup`, `doctor`, a performance pass, docs. A Docker image waits until publishing.
    - Done when: a fresh machine goes from nothing to a working dashboard with one command.
+   - **Deferred until the first stable release** (§15, decision 20). Until then, Tri-AL runs from a checkout (see CLAUDE.md).
 
 ## 15. Decisions
 
@@ -517,3 +518,15 @@ Decided in milestone 5 (2026-10-18):
 17. **"Initial JS" is the entry and its static imports**, the code every page needs before it draws. Recharts (119 KB gzip) loads with the dashboard, so the dashboard's whole cold load is 289 KB; the 1.5 s target covers that load.
 18. **The API's JSON responses are a `JSONResponse` subclass,** so FastAPI writes each route's `response_model` into the OpenAPI schema; with a plain `Response` it wrote `string` for every response, and a generated client would have had no types. `/api/meta` also sends the labels of coded fields, so the front end keeps no copy.
 19. **Playwright runs against the installed database, locally,** with the installed Google Chrome; CI runs the web lint, type check, unit tests, build and bundle budget. A CI job on a small fixture database could come with milestone 6's install work.
+
+Decided after milestone 5 (2026-10-18):
+
+20. **Milestone 6 waits for the first stable release.** Until then, Tri-AL runs from a checkout of the `v2` branch: `uv sync`, `uv run tri-al install`, `npm ci && npm run build` in `web/`, then `uv run tri-al serve`. When the release comes, milestone 6 covers:
+    - packaging, with the default plugins and the built front end inside the installed package
+    - the first-run experience
+    - the `rebuild`, `backup`, `compact` and `bench` commands
+    - failure handling
+    - a CI job on a small fixture database
+    - the README
+
+    It may be split in two: the one-command install, then maintenance and polish.
