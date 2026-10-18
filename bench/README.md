@@ -1,11 +1,47 @@
 # Benchmarks
 
+- [Front end](#front-end-milestone-5): the bundle budget and the dashboard's cold load
+  (milestone 5).
 - [API](#api-milestone-4): every §10 API target on the full database, the search rework and
   the database after it (milestone 4).
 - [Real data](#real-data-milestone-3): a full install of ClinicalTrials.gov and a real update
   (milestone 3), with the database size by table.
 - [Storage benchmark](#storage-benchmark-milestone-2): synthetic trials against the SQLite
   storage layer (milestone 2).
+
+## Front end (milestone 5)
+
+```bash
+cd web && npm run build && npm run budget          # bundle sizes from Vite's manifest
+npx playwright test cold-load                      # cold loads of the dashboard (tri-al serve)
+```
+
+`npm run budget` counts gzip (level 9) sizes from the build: **initial JS** is the entry
+chunk and every chunk it imports statically, which every page needs before it can draw;
+each page's own chunks load after it. `cold-load.spec.ts` starts `tri-al serve` with the
+built front end on `data/trials.db` and loads `/` five times in new browser contexts (empty
+cache), after one warm-up; "interactive" is when every chart from `/api/dashboard` has drawn,
+the map included, from the start of navigation. It also runs once with the CPU slowed 4×.
+
+2026-10-18, 607,349 trials, the M4 Pro Mac below, Google Chrome 155, one API worker.
+
+| What | Result | Target (§10) |
+|---|---|---|
+| Initial JS (entry + static imports), gzip | **158.1 KB** | < 200 KB |
+| CSS, gzip | 19.4 KB | |
+| Dashboard chunk (Recharts and the widgets), gzip | 118.9 KB | |
+| Map widget chunk (d3-geo, its own), gzip; world shapes (a separate JSON file) | 11.7 KB; 39.5 KB | |
+| Trials, trial, settings, ⌘K chunks, gzip | 31.3, 15.2, 15.8, 10.3 KB | |
+| Dashboard interactive, cold load (5 runs) | 446 ms median, **474 ms max** | < 1.5 s |
+| First contentful paint | 132 ms median | |
+| JS fetched by then, as sent (server gzip, level 5) | 319 KB in 38 requests | |
+| Dashboard interactive with the CPU slowed 4× (one run each time) | 1.09–1.41 s over three runs | |
+
+Kept out of the first load on purpose: each page (route-level chunks), Recharts (only the
+dashboard needs it), the map and its shapes, the ⌘K palette (fetched when the browser is
+idle), and the toaster (mounted when idle). Two changes during the milestone took the entry
+from 145 to 125 KB: toasts load lazily, and the header's theme control became a single
+button instead of a dropdown, so Radix's menu left the entry.
 
 ## API (milestone 4)
 

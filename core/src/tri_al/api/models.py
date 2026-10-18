@@ -33,6 +33,10 @@ class MetaOut(_Out):
     schedule: str
     plugins: list[str]
     search_candidates: int = Field(description="Matches a search ranks at most.")
+    labels: dict[str, dict[str, str]] = Field(
+        description="Display names of coded fields: status, phase, study_type, sponsor_class "
+        "and intervention_type. A code without one is shown as itself."
+    )
 
 
 class TrialSummaryOut(_Out):

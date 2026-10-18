@@ -6,6 +6,7 @@ from typing import Any
 
 import orjson
 from fastapi import HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 
 from tri_al.storage import Cursor, Sort
 
@@ -16,8 +17,12 @@ NO_STORE = "no-store"
 """Jobs, plugins and events change without the data version changing."""
 
 
-class JSONBytes(Response):
-    """A JSON response from orjson, or from bytes that are JSON already."""
+class JSONBytes(JSONResponse):
+    """A JSON response from orjson, or from bytes that are JSON already.
+
+    A ``JSONResponse`` subclass, so FastAPI puts each route's ``response_model`` in the
+    OpenAPI schema (for any other response class it writes ``string``).
+    """
 
     media_type = "application/json"
 

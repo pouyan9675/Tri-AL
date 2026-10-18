@@ -23,6 +23,8 @@ class ServerConfig(_Section):
     # checked against them, against DNS rebinding). Empty: the local names, plus `host` if
     # it is a specific address. "*" turns the check off.
     allowed_hosts: list[str] = Field(default_factory=list)
+    # The built front end (`npm run build` in web/). Default: web/dist in this checkout.
+    web_dir: Path | None = None
 
     @property
     def is_local(self) -> bool:

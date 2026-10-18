@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Tri-AL mirrors ClinicalTrials.gov into SQLite and lets you explore it in a local dashboard; the domain focus is Alzheimer's trials. The repository holds two versions:
 
-- **v2** (branch `v2`, in progress): a rewrite as a uv workspace in `core/` and `plugins/`, with FastAPI and a React front end still to come. **[docs/design.md](docs/design.md) is the source of truth:** decisions in §15, milestones in §14, speed targets in §10. Milestones 1 (skeleton), 2 (schema and storage), 3 (ClinicalTrials.gov plugin and pipeline) and 4 (jobs, stats and API) are built; 5 (the React front end) is next.
+- **v2** (branch `v2`, in progress): a rewrite as a uv workspace in `core/` and `plugins/`, with a FastAPI API and a React front end in `web/`. **[docs/design.md](docs/design.md) is the source of truth:** decisions in §15, milestones in §14, speed targets in §10. Milestones 1 (skeleton), 2 (schema and storage), 3 (ClinicalTrials.gov plugin and pipeline), 4 (jobs, stats and API) and 5 (front end) are built; 6 (install end to end and hardening) is next.
 - **v1** (`main`, and still at the repository root on `v2`): the Django 3.2 app described [below](#v1-django). Don't delete or move v1 files; v2 tooling ignores them.
 
 ## v2: setup and commands
@@ -26,18 +26,33 @@ uv run tri-al --help                      # the CLI; also `plugins list|enable|d
 uv run tri-al install                     # download ~2.8 GB, build data/trials.db (~9 GB, ~15 min)
 uv run tri-al install --from-file ctg-studies.json.zip   # or from a downloaded zip
 uv run tri-al update                      # fetch studies changed since the last update
-uv run tri-al serve                       # API on 127.0.0.1:8000 (docs at /api/docs) + job worker
+uv run tri-al serve                       # API + built front end on 127.0.0.1:8000 (docs at /api/docs) + job worker
 uv run tri-al worker                      # the job worker alone
 uv run python bench/api_bench.py            # §10 API targets on data/trials.db; results in bench/README.md
 uv run python bench/storage_bench.py        # storage benchmark; results in bench/README.md
 uv run python bench/db_report.py data/trials.db   # database size by table
 ```
 
-pytest runs with `filterwarnings = error` and `--import-mode=importlib`: an unclosed SQLite connection raises a `ResourceWarning` and fails the test, so close storages and `dispose()` engines (and `StatsEngine.close()`, which waits for an index being built). API tests use Starlette's `TestClient` (it needs `httpx2`, a dev dependency); it waits for whole responses, so event-stream tests run the app in a real uvicorn server (`running()` in `core/tests/test_api.py`). CI is `.github/workflows/v2.yml` (lint, format, mypy, pytest, a CLI smoke test).
+The front end is an npm project in `web/` (Node 22, `web/.node-version`); run these from `web/`:
+
+```bash
+npm ci                     # install
+npm run dev                # Vite on :5173 with hot reload; proxies /api to `tri-al serve` on :8000
+npm run build              # web/dist, which `tri-al serve` then serves on its own port
+npm run lint               # Biome (lint + format check); `npm run fix` applies fixes
+npm run typecheck          # tsc, strict
+npm test                   # Vitest + Testing Library (jsdom)
+npx vitest run src/lib/filters.test.ts   # one file
+npm run budget             # initial JS vs the 200 KB gzip budget (after a build)
+npm run api                # regenerate openapi.json and src/api/schema.gen.ts after an API change
+npm run test:e2e           # Playwright: smoke test + cold-load timing on data/trials.db (build first)
+```
+
+pytest runs with `filterwarnings = error` and `--import-mode=importlib`: an unclosed SQLite connection raises a `ResourceWarning` and fails the test, so close storages and `dispose()` engines (and `StatsEngine.close()`, which waits for an index being built). API tests use Starlette's `TestClient` (it needs `httpx2`, a dev dependency); it waits for whole responses, so event-stream tests run the app in a real uvicorn server (`running()` in `core/tests/test_api.py`). CI is `.github/workflows/v2.yml`: the `check` job (lint, format, mypy, pytest, a CLI smoke test) and the `web` job (Biome, tsc, the generated client is current, Vitest, build, bundle budget). The Playwright tests need the installed database, so they run locally only.
 
 ## v2 architecture
 
-**Layout.** `core/` is the `tri-al` package (`core/src/tri_al/`): `schema` (`TrialRecord`, `labels`), `filters.py` (`TrialFilter`), `storage`, `pipeline`, `jobs`, `stats`, `search.py`, `access`, `api`, `plugins`, `config`, `cli`, `doctor.py`, and `testing` (contract suites and `FakeSource`, which plugins reuse). `plugins/ctgov/` is the ClinicalTrials.gov source; `plugins/charts/` holds the default dashboard charts (specs only; the front end draws them); `plugins/sample/` is an example plugin. `bench/` holds benchmarks. The root `pyproject.toml` is a virtual workspace and holds the ruff, mypy and pytest config; ruff excludes `docs/` and the v1 paths.
+**Layout.** `core/` is the `tri-al` package (`core/src/tri_al/`): `schema` (`TrialRecord`, `labels`), `filters.py` (`TrialFilter`), `storage`, `pipeline`, `jobs`, `stats`, `search.py`, `access`, `api`, `plugins`, `config`, `cli`, `doctor.py`, and `testing` (contract suites and `FakeSource`, which plugins reuse). `plugins/ctgov/` is the ClinicalTrials.gov source; `plugins/charts/` holds the default dashboard charts (specs only; the front end draws them); `plugins/sample/` is an example plugin. `web/` is the front end (below). `bench/` holds benchmarks. The root `pyproject.toml` is a virtual workspace and holds the ruff, mypy and pytest config; ruff excludes `docs/` and the v1 paths.
 
 **Plugins** (`tri_al.plugins`). Each plugin is a package with an entry point in the `tri_al.plugins` group that points at a `Plugin` instance. Its `register(registry)` gets a per-plugin `Registry`. Implemented: `add_cli`, `add_sqlite_extension`, `add_migrations`, `add_source`, `on` (pipeline events), `add_chart`, `add_filter_field`, `add_search_provider`, `add_routes` (mounted at `/api/x/<plugin>/`), `add_job` and `set_access_policy`; `add_enricher` raises `NotImplementedError` until enrichers exist. Installed plugins are enabled by default. Enabled state and settings live in `tri-al.toml`, never in a database.
 
@@ -65,6 +80,16 @@ pytest runs with `filterwarnings = error` and `--import-mode=importlib`: an uncl
 **ctgov plugin** (`plugins/ctgov`): `CtgovSource` downloads `ctg-studies.json.zip` into `data/downloads/` (no Range support, so no resumed downloads) and reads it without extracting; updates page `/api/v2/studies` with `pageSize=1000`. `normalize.py` maps API v2 JSON to `TrialRecord`; `countries.py` maps all 226 API country names. Tests run offline against real study fixtures and recorded pages in `tests/fixtures/`.
 
 **Contract tests.** A backend passes `tri_al.testing.StorageContract` by subclassing it in a test module and overriding the `storage` fixture (see `core/tests/test_storage_sqlite.py`); a source passes `tri_al.testing.SourceContract` the same way (see `plugins/ctgov/tests/test_source.py`). The fixtures are in `tri_al.testing.fixtures`.
+
+**Front end** (`web/`, design §9): React 19, Vite 8, TypeScript (strict), Tailwind 4, shadcn/ui (Radix, "nova" preset; components in `src/components/ui/`, added with `npx shadcn add`), TanStack Query, Router (code-based routes in `src/router.tsx`, each page lazy) and Table (v8), Recharts through shadcn's `chart.tsx`, Biome.
+- **API types are generated, never written:** `npm run api` exports the core's schema (`python -m tri_al.api.openapi`, no plugins) to `openapi.json`, and openapi-typescript writes `src/api/schema.gen.ts`; `src/api/client.ts` is the openapi-fetch client and the type aliases. CI fails if they're stale. FastAPI only puts a route's `response_model` in the schema when its response class subclasses `JSONResponse`, which `JSONBytes` does.
+- **Data flow:** query options are in `src/api/queries.ts`. Data queries live under the `["data"]` key with `staleTime: Infinity`; `src/lib/live.ts` (one `EventSource` on `/api/events`) invalidates them all when `data_version` changes, merges `job` events into the cached job list, and refreshes the meta when a job finishes. The browser revalidates with the API's ETags, so refetches of unchanged data are 304s.
+- **Requests that change something** get the `X-Tri-AL: 1` header from client middleware.
+- **Filters in the URL** use the API's own query format (`?status=A&status=B&start=2020..2023`): custom `parseSearch`/`stringifySearch` in `src/lib/search-params.ts`, normalized by `parseFilter` in `src/lib/filters.ts`. Pages pass the filter straight to the API.
+- **Dashboard:** drawn from `/api/dashboard` through the widget registry (`src/widgets/registry.tsx`: `stat`, `bar`, `line`, `area`, `pie`, `table`, `map`); an unknown widget type gets a placeholder. The `map` widget (`src/widgets/map.tsx`) is its own chunk: d3-geo paths over world-atlas 110m shapes, fetched as a separate file. Labels for codes come from `/api/meta` (`labels`), not a front-end copy.
+- **Lazy on purpose:** each page, the ⌘K palette (`src/components/command-palette.tsx`, preloaded when idle; keys typed while it opens are buffered in `app-shell.tsx`), the toaster (`src/lib/notify.tsx`) and the map. `npm run budget` reads Vite's manifest.
+- **Serving:** `tri_al.api.web` serves `web/dist` (or `server.web_dir`) on the API's port: hashed `/assets` are immutable, `index.html` is `no-cache`, extensionless paths are app routes, missing files are 404s, `/api/...` is never the app.
+- **Tests:** Vitest in jsdom (`src/test/setup.ts` stubs ResizeObserver, canvas and friends; `src/test/api.ts` `mockApi` answers `fetch`); Playwright in `web/e2e/` starts `tri-al serve --port 8765 --no-job-worker` and drives the installed Google Chrome (`channel: "chrome"`), so there's no browser download.
 
 **`doctor`** (`tri_al/doctor.py`) checks the Python and SQLite versions (SQLite ≥ 3.45), FTS5, extension loading, config, plugins, plugin extensions, whether the server listens beyond this machine without an access plugin, and database state. When a fix is needed, it suggests `uv python install`.
 

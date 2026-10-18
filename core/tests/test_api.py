@@ -358,6 +358,41 @@ def test_the_openapi_schema_names_every_operation(client: TestClient) -> None:
     assert {"status", "conditions", "countries", "start", "q", "sort", "cursor", "limit"} <= params
 
 
+def test_the_openapi_schema_types_every_json_response(client: TestClient) -> None:
+    """web/ generates its client from these: a `string` would lose every response's type."""
+    schema = client.get("/api/openapi.json").json()
+    for path, operations in schema["paths"].items():
+        for method, operation in operations.items():
+            for code, response in operation["responses"].items():
+                content = response.get("content", {}).get("application/json")
+                if content is not None and path != "/api/events":
+                    assert "$ref" in content["schema"], (method, path, code, content)
+    meta = schema["paths"]["/api/meta"]["get"]["responses"]["200"]
+    assert meta["content"]["application/json"]["schema"]["$ref"].endswith("/MetaOut")
+
+
+def test_the_openapi_export_is_the_cores_schema() -> None:
+    from tri_al.api.openapi import schema
+
+    exported = schema()
+    assert exported["info"]["title"] == "Tri-AL"
+    assert not any(path.startswith("/api/x/") for path in exported["paths"])
+    assert "MetaOut" in exported["components"]["schemas"]
+
+
+def test_meta_sends_the_labels_of_coded_fields(client: TestClient) -> None:
+    meta = body(client.get("/api/meta"), m.MetaOut)
+    assert meta.labels["status"]["ACTIVE_NOT_RECRUITING"] == "Active, not recruiting"
+    assert meta.labels["phase"]["PHASE2_PHASE3"] == "Phase 2/3"
+    assert set(meta.labels) == {
+        "status",
+        "phase",
+        "study_type",
+        "sponsor_class",
+        "intervention_type",
+    }
+
+
 # --- browser protections and access -------------------------------------------------------
 
 

@@ -1,7 +1,8 @@
 """The FastAPI app (docs/design.md §5.9): one per API worker process.
 
 ``tri-al serve`` runs it with uvicorn (``create_app_from_env`` is the factory each worker
-calls), beside one job worker process. The OpenAPI schema is at ``/api/openapi.json``.
+calls), beside one job worker process. The OpenAPI schema is at ``/api/openapi.json``;
+every other path that isn't under ``/api`` is the built front end (``tri_al.api.web``).
 """
 
 import logging
@@ -25,6 +26,7 @@ from tri_al.api.events import EventHub, stream
 from tri_al.api.http import NO_STORE, JSONBytes
 from tri_al.api.routes import data, jobs, plugins
 from tri_al.api.state import ApiState
+from tri_al.api.web import add_web
 from tri_al.config import Config, config_path, load_config
 from tri_al.plugins import LoadedPlugins, load_plugins
 
@@ -114,6 +116,7 @@ def create_app(
 
     for name, router in loaded.contributions.routes.items():
         app.include_router(router, prefix=f"/api/x/{name}", tags=[f"plugin: {name}"])
+    add_web(app, config.server.web_dir)  # last: its catch-all route serves the app's pages
 
     app.add_middleware(GZipMiddleware, minimum_size=GZIP_MIN_BYTES, compresslevel=GZIP_LEVEL)
     app.add_middleware(ServerTiming)

@@ -1,6 +1,6 @@
 # Tri-AL v2 — System Design
 
-Status: **draft; decisions recorded in [§15](#15-decisions)** (2026-10-17, branch `v2`; milestones 1–4 built). Scope: the base platform only. AI features come later and plug into the extension points listed in [§12](#12-extension-points-reserved-for-ai).
+Status: **draft; decisions recorded in [§15](#15-decisions)** (2026-10-18, branch `v2`; milestones 1–5 built). Scope: the base platform only. AI features come later and plug into the extension points listed in [§12](#12-extension-points-reserved-for-ai).
 
 ## 1. Goals
 
@@ -362,20 +362,26 @@ Charts get a `ChartContext` rather than a bare connection so they can be counted
 
 ## 9. Front end
 
+`web/`, built in milestone 5.
+
 - **Stack:**
-  - React, Vite, TypeScript (strict), Tailwind, shadcn/ui
-  - TanStack Query (server data and caching), TanStack Router (type-safe, filters synced to the URL), TanStack Table
-  - Biome for lint and format
-- **Charts:** shadcn Charts (Recharts) for bar, line, area, pie and stat widgets. The `map` widget is a lazy-loaded chunk with its own map library, chosen in milestone 5.
-- **Pages:**
-  - Dashboard
-  - Trials: explorer table plus filter sidebar with facets
-  - Trial detail: overview, eligibility, outcomes, locations, changes
-  - Settings: update and jobs, plugins
-  - A global ⌘K command palette for search
-- **Widget registry:** maps a widget type to a component. The dashboard is drawn from `/api/dashboard`, and unknown widget types render a placeholder. Plugins add charts as specs, not as React code; the default charts are the backend `charts` plugin's (built in milestone 4), so the front end only renders them.
-- **Live updates:** an `EventSource` on `/api/events` refreshes queries and shows job progress.
-- **Serving:** in production, the built SPA is served by FastAPI on the same port. In development, the Vite dev server proxies `/api`.
+  - React 19, Vite 8, TypeScript (strict), Tailwind 4, shadcn/ui (Radix primitives, the "nova" preset with Geist)
+  - TanStack Query (server data and caching), TanStack Router (code-based, type-safe, filters synced to the URL), TanStack Table (v8; v9 came out in August with a new API)
+  - Biome for lint and format; Vitest and Testing Library; Playwright
+- **A generated client:** `npm run api` exports the API's OpenAPI schema (the core's routes, no plugins) to `web/openapi.json`, and openapi-typescript turns it into `src/api/schema.gen.ts`. openapi-fetch is the client (6 KB), so every request and response is typed from the schema and nothing is written by hand. CI fails when the generated files are stale.
+- **Pages** (each its own chunk, loaded on first visit):
+  - **Dashboard** (`/`): the charts from `/api/dashboard`. The page takes the same filter as the trial list (`/?conditions=Alzheimer+Disease`), and every chart is then filtered.
+  - **Trials** (`/trials`): a filter sidebar (a text box, every facet with counts, date and enrollment ranges; a sheet on phones), removable filter chips, sorting, and a table paged with the keyset cursor as it scrolls.
+  - **Trial detail** (`/trials/NCT…?tab=…`): a header with the key dates and facts, and tabs for overview, eligibility, outcomes, locations and changes.
+  - **Settings** (`/settings`): the Update button with live job progress, the job list, plugins (on/off, written to `tri-al.toml`), and the theme.
+  - **⌘K palette:** full-text search with snippets, names that jump to a filter, the pages and the theme. A broad search says it ranked only the newest matches (`capped`).
+- **Filters in the URL** use the API's own query format (`?status=RECRUITING&status=COMPLETED&start=2020..2023`), so a page's URL and its API requests carry the same filter and links can be shared.
+- **Widget registry:** maps a widget type to a component: `stat`, `bar`, `line`, `area` and `pie` use shadcn Charts (Recharts), `table` is a table, and `map` is a lazy chunk. Unknown types render a placeholder. Plugins add charts as specs, not as React code; the default charts are the backend `charts` plugin's, so the front end only renders them. Codes are shown with the labels `/api/meta` sends, so the front end keeps no copy of them.
+- **The map:** d3-geo (projection and paths only) drawing world-atlas's 110m country shapes as SVG, in a chunk of 12 KB gzip plus the shapes (40 KB, a separate cached file). It works offline, it uses the same theme colors and tooltips as the other charts, and it's maintained (d3-geo 3.1, world-atlas 2.0). Colors are a blue sequential ramp in decade classes (1+, 10+, 100+, …), since counts span five orders of magnitude; places too small for the 110m shapes (Hong Kong, Singapore, Malta, …) are dots; wide cards list the leading countries beside the map; a click opens the trial list for that country. Not chosen: react-simple-maps (unmaintained, no React 19), Leaflet and MapLibre (tile servers or 200 KB+), nivo's geo (several d3 bundles).
+- **Data and refreshes:** data queries are cached until the data version changes (`staleTime: Infinity`). One `EventSource` on `/api/events` invalidates them all when `data_version` changes; mounted pages refetch and keep showing the old data until the new arrives, and the page shows "Data updated just now". `job` events go straight into the cached job list, so progress needs no polling. The browser revalidates with the API's ETags, so refetching unchanged data costs a 304.
+- **Requests that change something** send `X-Tri-AL: 1` (§5.8).
+- **Serving:** in production `tri-al serve` serves the built SPA on the API's port (`tri_al.api.web`): hashed assets are cached for good, `index.html` is checked each time, other extensionless paths get `index.html`, and `/api/…` is never the app. In development the Vite dev server proxies `/api` to `tri-al serve`.
+- **Small first load:** the entry holds React, the router, TanStack Query and the shell. Each page, Recharts, the map, the ⌘K palette (fetched when the browser is idle) and the toaster load later (§10).
 
 ## 10. Performance
 
@@ -390,7 +396,7 @@ Targets on the full dataset, measured on the reference machine:
 | Full-text search | p95 < 150 ms | 83 ms (30 queries, cold; 103 ms max) |
 | Daily update (~1,500 changed) | < 2 min end to end (milestone 3: 2,606 trials rewritten in 10–17 s) |
 | Full install | < 18 min end to end, download included (milestone 3: 14m50s, of which the download took 1m43s) |
-| Front end | initial JS < 200 KB gzip; dashboard interactive < 1.5 s on a cold load |
+| Front end | initial JS < 200 KB gzip; dashboard interactive < 1.5 s on a cold load | Milestone 5: 158 KB; 474 ms max over 5 cold loads (1.1–1.4 s with the CPU slowed 4×) |
 
 How we get there:
 - **Little work per request:** precomputed stats, an in-memory trial index per API worker for filtered counts (§5.5), narrow hot tables, covering indexes, capped search ranking and keyset pagination.
@@ -406,7 +412,7 @@ How we get there:
 - **Python:** ruff for lint and format, mypy (strict on `core`), and pytest. API tests use httpx against the app.
 - **Contract tests:** every Source, Enricher, storage backend and SearchProvider must pass the suites in `tri_al.testing`.
 - **Fixtures:** a handful of real study JSON files (public data) cover edge cases: results, month-only dates, multiple phases, no locations.
-- **Web:** Vitest + Testing Library, plus a Playwright smoke test (install sample → dashboard → filter → detail).
+- **Web:** Vitest + Testing Library for components, and Playwright on the installed database: a smoke test (dashboard → filter → trial detail → ⌘K, plus settings and a live data-version change) and the cold-load timing. Playwright needs the full database, so it runs locally, not in CI.
 - **CI:** GitHub Actions (hosted runners for PRs; the self-hosted runner for nightly full benchmarks).
 
 ## 12. Extension points reserved for AI
@@ -474,6 +480,7 @@ Each milestone ends working, tested and measured.
 5. **Front end.**
    - Build: app shell, dashboard renderer (drawing the `charts` plugin's specs), trial explorer, detail page, ⌘K, settings page with the update button.
    - Done when: the Playwright smoke test passes and the bundle budget is met.
+   - Done 2026-10-18: `web/` (React, Vite, shadcn/ui, TanStack Query, Router and Table) with the dashboard, trial explorer, trial detail, ⌘K palette and settings, live updates over SSE, and `tri-al serve` serving it. The Playwright smoke test passes on 607,349 trials; initial JS is 158 KB gzip and the dashboard is interactive in 474 ms on a cold load (bench/README.md).
 6. **Install end to end and hardening.**
    - Build: the `uv tool install` + `install` experience, `backup`, `doctor`, a performance pass, docs. A Docker image waits until publishing.
    - Done when: a fresh machine goes from nothing to a working dashboard with one command.
@@ -503,3 +510,10 @@ Decided in milestone 4 (2026-10-17):
 13. **Filtered stats come from an in-memory index in each API worker, with numpy as a core dependency.** SQLite took 1–8 s for the facets of one broad filter (every completed trial, every trial in the US), which no SQL shape or index fixed: the work is visiting hundreds of thousands of link rows. The index (58 MB, built in 2.6 s per data version) answers the same in 8–40 ms. Not chosen: precomputing facets for single-value filters (over 1,000 queries per update, and still nothing for combinations); splitting queries across threads (slower: the merge holds the GIL); Python sets and bitmaps without numpy (too slow for high-cardinality facets).
 14. **The Host check covers every request,** not only changing ones, since DNS rebinding is also a way to read; `server.allowed_hosts` names other hosts.
 15. **The default charts are a backend plugin built in milestone 4** (design had them in milestone 5), so milestone 5 only renders specs from `/api/dashboard`.
+
+Decided in milestone 5 (2026-10-18):
+
+16. **The map is d3-geo with world-atlas shapes, drawn as SVG in its own chunk** (§9): 12 KB plus 40 KB of shapes, offline, themed like the other charts. Not chosen: react-simple-maps (unmaintained), Leaflet or MapLibre (tiles or 200 KB+), nivo.
+17. **"Initial JS" is the entry and its static imports**, the code every page needs before it draws. Recharts (119 KB gzip) loads with the dashboard, so the dashboard's whole cold load is 289 KB; the 1.5 s target covers that load.
+18. **The API's JSON responses are a `JSONResponse` subclass,** so FastAPI writes each route's `response_model` into the OpenAPI schema; with a plain `Response` it wrote `string` for every response, and a generated client would have had no types. `/api/meta` also sends the labels of coded fields, so the front end keeps no copy.
+19. **Playwright runs against the installed database, locally,** with the installed Google Chrome; CI runs the web lint, type check, unit tests, build and bundle budget. A CI job on a small fixture database could come with milestone 6's install work.

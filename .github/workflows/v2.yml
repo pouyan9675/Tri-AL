@@ -1,6 +1,6 @@
 name: v2 CI
 
-# Tri-AL v2 (uv workspace in core/ and plugins/). v1's Django CI is deploy.yml.
+# Tri-AL v2 (uv workspace in core/ and plugins/, front end in web/). v1's Django CI is deploy.yml.
 
 on:
   push:
@@ -40,3 +40,44 @@ jobs:
         run: |
           uv run tri-al plugins list
           uv run tri-al doctor
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: web/.node-version
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - uses: astral-sh/setup-uv@v10.3.0
+
+      - name: Install
+        run: |
+          npm ci
+          uv sync --locked
+
+      - name: Lint and format
+        run: npm run lint -- --reporter=github
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: API client matches the API
+        run: npm run api:check
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Bundle budget
+        run: npm run budget

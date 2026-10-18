@@ -31,7 +31,7 @@ from tri_al.api.params import sort_param, trial_filter
 from tri_al.api.state import ApiState
 from tri_al.filters import TrialFilter
 from tri_al.pipeline.runs import cursor_key
-from tri_al.schema import TrialRecord
+from tri_al.schema import TrialRecord, labels
 from tri_al.search import merge
 from tri_al.stats import UnknownChart
 from tri_al.storage import SEARCH_CANDIDATES, Sort, SQLiteReader
@@ -40,6 +40,15 @@ from tri_al.storage import tables as t
 router = APIRouter(prefix="/api", dependencies=[Depends(require(READ))])
 
 _WORD = re.compile(r"\w+")
+
+LABELS: dict[str, dict[str, str]] = {
+    "status": dict(labels.STATUS),
+    "phase": dict(labels.PHASE),
+    "study_type": dict(labels.STUDY_TYPE),
+    "sponsor_class": dict(labels.SPONSOR_CLASS),
+    "intervention_type": dict(labels.INTERVENTION_TYPE),
+}
+"""Sent with the meta, so the front end shows codes as ClinicalTrials.gov does, with no copy."""
 
 NOT_INSTALLED: dict[int | str, dict[str, Any]] = {
     503: {"model": ErrorOut, "description": "There's no data yet."}
@@ -89,6 +98,7 @@ def _meta(state: ApiState, reader: SQLiteReader | None, version: int) -> dict[st
         "schedule": state.config.update.schedule,
         "plugins": [plugin.name for plugin in state.plugins.plugins],
         "search_candidates": SEARCH_CANDIDATES,
+        "labels": LABELS,
     }
     if reader is None:
         return meta
