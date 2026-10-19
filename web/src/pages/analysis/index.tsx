@@ -3,8 +3,8 @@
  * each its own route under `/analysis`. All take the same filter. The landscape section is
  * drawn from chart specs (those whose `page` is "analysis"), so plugins add analyses to it
  * without front-end code; it starts with the research landscape in 3-D. Trial linking is
- * `linking.tsx`, Conditions and Interventions are `terms/` (one MeSH term in depth), and
- * Advanced search is still empty.
+ * `linking.tsx`, Advanced search is `search/` (trials by field), and Conditions and
+ * Interventions are `terms/` (one MeSH term in depth).
  */
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link, Outlet, useRouterState } from "@tanstack/react-router";
@@ -24,7 +24,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { activeCount, type TrialFilter, withoutFilter } from "@/lib/filters";
+import { activeCount, parseFilter, type TrialFilter, withoutFilter } from "@/lib/filters";
 import { formatNumber } from "@/lib/format";
 import { ROW_HEIGHT } from "@/pages/dashboard/widget-card";
 import { ANALYSIS_SECTIONS, analysisSection } from "./sections";
@@ -37,7 +37,8 @@ function useSection() {
 
 /** The frame every section shares: the header, the sections, the filter. */
 export function AnalysisPage() {
-  const filter = route.useSearch();
+  // The route's search holds the sections' own params too; the frame keeps only the filter.
+  const filter = parseFilter(route.useSearch());
   const navigate = route.useNavigate();
   const section = useSection();
   const meta = useQuery(metaQuery());
@@ -152,22 +153,6 @@ function NoAnalyses() {
           <Link to="/settings">Open Settings</Link>
         </Button>
       </EmptyContent>
-    </Empty>
-  );
-}
-
-/** A section with nothing in it yet. */
-export function EmptySection() {
-  const section = useSection();
-  return (
-    <Empty className="rounded-xl border border-dashed py-16" data-testid="analysis-empty">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <section.icon />
-        </EmptyMedia>
-        <EmptyTitle>Nothing here yet</EmptyTitle>
-        <EmptyDescription>This section is still being built.</EmptyDescription>
-      </EmptyHeader>
     </Empty>
   );
 }

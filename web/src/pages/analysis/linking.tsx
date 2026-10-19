@@ -17,7 +17,7 @@ import {
 } from "@/api/client";
 import { linkedTrialsQuery, metaQuery } from "@/api/queries";
 import { ErrorState } from "@/components/route-states";
-import { StatusBadge } from "@/components/status-badge";
+import { TrialFacts } from "@/components/trial-facts";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -30,7 +30,7 @@ import {
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { activeCount } from "@/lib/filters";
-import { formatDate, formatNumber } from "@/lib/format";
+import { formatNumber } from "@/lib/format";
 import { useLabels } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 
@@ -196,25 +196,6 @@ function Seed({ trial }: { trial: TrialSummary }) {
         {trial.title}
       </Link>
       <TrialFacts trial={trial} phase={trial.phase ? label("phase", trial.phase) : "No phase"} />
-    </div>
-  );
-}
-
-function TrialFacts({ trial, phase }: { trial: TrialSummary; phase?: string }) {
-  return (
-    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-      <span className="font-mono text-[0.7rem] text-foreground/70">{trial.source_id}</span>
-      <StatusBadge status={trial.status} className="h-5" />
-      {phase && <span>{phase}</span>}
-      {trial.start_date && <span>Started {formatDate(trial.start_date)}</span>}
-      {trial.enrollment !== null && (
-        <span className="tabular">{formatNumber(trial.enrollment)} enrolled</span>
-      )}
-      {trial.lead_sponsor && (
-        <span className="max-w-72 truncate" title={trial.lead_sponsor}>
-          {trial.lead_sponsor}
-        </span>
-      )}
     </div>
   );
 }

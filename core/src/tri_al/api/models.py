@@ -809,3 +809,94 @@ class TermSimilarOut(_Out):
     embedded: int
     same: list[SimilarTermOut]
     other: list[SimilarTermOut]
+
+
+# --- advanced search ----------------------------------------------------------------------
+
+TextFieldName = Literal[
+    "text",
+    "title",
+    "condition",
+    "intervention",
+    "summary",
+    "eligibility",
+    "inclusion",
+    "exclusion",
+    "outcome",
+    "primary_outcome",
+    "secondary_outcome",
+]
+
+
+class FieldReadOut(_Out):
+    field: TextFieldName
+    all: list[list[str]] = Field(
+        description="Groups that must all match, each by any of its terms, as typed: a word, "
+        '`"a phrase"`, `"words near"~5` or `prefix*`.'
+    )
+    none: list[str] = Field(description="Terms that mustn't match.")
+
+
+class SectionCheckOut(_Out):
+    candidates: int = Field(
+        description="Trials matching the rest, whose text was to be checked for inclusion, "
+        "exclusion, primary or secondary outcomes."
+    )
+    checked: int = Field(description="The newest of them, whose text was checked.")
+
+
+class FieldSnippetOut(_Out):
+    field: TextFieldName
+    parts: list[SnippetPartOut]
+
+
+class NearestSiteOut(_Out):
+    km: float
+    facility: str | None
+    city: str | None
+    state: str | None
+    country: str | None
+    sites: int = Field(description="The trial's sites within the distance.")
+
+
+class AdvancedHitOut(_Out):
+    trial: TrialSummaryOut
+    score: float | None = Field(
+        description="Relevance (higher is better), for the ranked matches when sorted by it."
+    )
+    snippets: list[FieldSnippetOut] = Field(
+        description="Where each field's words are, for fields with text to show."
+    )
+    nearest: NearestSiteOut | None = Field(description="The nearest site, with a place.")
+
+
+class AdvancedSearchOut(_Out):
+    data_version: int
+    total: int = Field(description="Trials that match.")
+    sort: str = Field(description="`relevance`, `distance` or a trial list sort.")
+    ranked: int | None = Field(
+        description="By relevance: matches ranked, the newest ones (at most `search_candidates` "
+        "in the meta); the rest follow, newest first."
+    )
+    sections: SectionCheckOut | None = Field(
+        description="With inclusion, exclusion, primary or secondary outcome fields."
+    )
+    read: list[FieldReadOut] = Field(description="How each text field was read.")
+    offset: int
+    next_offset: int | None = Field(description="Pass as `offset` for the next page.")
+    items: list[AdvancedHitOut]
+
+
+class PlaceOut(_Out):
+    city: str | None
+    state: str | None
+    country: str | None = Field(description="ISO 3166-1 alpha-2 code.")
+    country_name: str | None
+    lat: float
+    lon: float
+    sites: int = Field(description="Trial sites there.")
+
+
+class PlacesOut(_Out):
+    data_version: int
+    places: list[PlaceOut]

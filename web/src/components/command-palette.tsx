@@ -23,6 +23,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import type { NameHit, SearchHit, SearchResult } from "@/api/client";
 import { metaQuery, searchQuery } from "@/api/queries";
+import { Snippet } from "@/components/snippet";
 import { StatusBadge } from "@/components/status-badge";
 import {
   Command,
@@ -286,16 +287,6 @@ function countLine({ candidates, capped }: SearchResult, byId: number) {
   return parts.join(" · ");
 }
 
-/** Snippet parts with their offset in the snippet, which keys them. */
-function withOffsets(parts: SearchHit["snippet"]) {
-  let at = 0;
-  return parts.map((part) => {
-    const item = { ...part, at };
-    at += part.text.length;
-    return item;
-  });
-}
-
 /** How much of the hit's ID the query matched: all of it, its start, or none. */
 function matchedLength(hit: SearchHit, q: string) {
   if (hit.id_match === "exact") return hit.source_id.length;
@@ -304,7 +295,6 @@ function matchedLength(hit: SearchHit, q: string) {
   return hit.source_id.toUpperCase().startsWith(typed) ? typed.length : 0;
 }
 
-const MARK = "rounded-[3px] bg-brand/15 px-0.5 text-foreground dark:bg-brand/30";
 // No padding, so the ID still reads as one word where the match ends.
 const ID_MARK = "rounded-[2px] bg-brand/15 font-medium text-foreground dark:bg-brand/30";
 
@@ -317,15 +307,7 @@ function TrialItem({ hit, q, onSelect }: { hit: SearchHit; q: string; onSelect: 
         <div className="line-clamp-2 font-medium sm:line-clamp-1">{hit.title}</div>
         {hit.snippet.length > 0 && (
           <div className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-            {withOffsets(hit.snippet).map((part) =>
-              part.match ? (
-                <mark key={part.at} className={MARK}>
-                  {part.text}
-                </mark>
-              ) : (
-                <span key={part.at}>{part.text}</span>
-              ),
-            )}
+            <Snippet parts={hit.snippet} />
           </div>
         )}
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

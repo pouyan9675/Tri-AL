@@ -12,7 +12,7 @@ import { parseFilter } from "@/lib/filters";
 import { parseSearch, stringifySearch } from "@/lib/search-params";
 import { META, mockApi } from "@/test/api";
 import { renderWithProviders } from "@/test/render";
-import { AnalysisPage, EmptySection, LandscapeSection } from ".";
+import { AnalysisPage, LandscapeSection } from ".";
 import { ANALYSIS_SECTIONS, analysisSection } from "./sections";
 
 async function show(path: string) {
@@ -28,8 +28,13 @@ async function show(path: string) {
     validateSearch: parseFilter,
     component: AnalysisPage,
   });
+  // The other sections have tests of their own; here they're stand-ins.
   const empty = ["linking", "search", "conditions", "interventions"].map((name) =>
-    createRoute({ getParentRoute: () => analysis, path: name, component: EmptySection }),
+    createRoute({
+      getParentRoute: () => analysis,
+      path: name,
+      component: () => <p>The {name} section</p>,
+    }),
   );
   const routeTree = root.addChildren([
     analysis.addChildren([
@@ -73,7 +78,7 @@ describe("the analysis page", () => {
       "/analysis/conditions?status=RECRUITING",
     );
     await userEvent.click(within(nav).getByRole("link", { name: "Conditions" }));
-    await screen.findByText("Nothing here yet");
+    await screen.findByText("The conditions section");
     expect(router.state.location.href).toBe("/analysis/conditions?status=RECRUITING");
     expect(within(nav).getByRole("link", { name: "Conditions" })).toHaveAttribute(
       "aria-current",
@@ -83,6 +88,18 @@ describe("the analysis page", () => {
       "aria-current",
     );
     expect(await screen.findByText("1,234")).toBeInTheDocument();
+  });
+
+  it("carries only the filter, not a section's own params", async () => {
+    const { nav } = await show("/analysis/search?status=RECRUITING&exclusion=warfarin&term=D1");
+    expect(within(nav).getByRole("link", { name: "Conditions" })).toHaveAttribute(
+      "href",
+      "/analysis/conditions?status=RECRUITING",
+    );
+    expect(screen.getByRole("link", { name: /List these trials/ })).toHaveAttribute(
+      "href",
+      "/trials?status=RECRUITING",
+    );
   });
 
   it("stays in its section when a filter chip is removed", async () => {

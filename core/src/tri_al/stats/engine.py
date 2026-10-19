@@ -139,6 +139,8 @@ def _size(value: Any) -> int:
         return len(value) + 64
     if isinstance(value, np.ndarray):
         return int(value.nbytes) + 128
+    if isinstance(nbytes := getattr(value, "nbytes", None), int):
+        return nbytes + 1024
     return 1024
 
 

@@ -32,7 +32,7 @@ from tri_al.api.models import (
 from tri_al.api.routes.data import NOT_FOUND, NOT_INSTALLED, Filter, State
 from tri_al.api.state import ApiState
 from tri_al.filters import EVERY_TRIAL, TrialFilter
-from tri_al.stats import IndexUnavailable
+from tri_al.stats import IndexUnavailable, TrialIndex
 from tri_al.storage import SQLiteReader
 from tri_al.terms import (
     Scope,
@@ -78,7 +78,7 @@ def find_terms(
             return cached
 
         def run() -> bytes:
-            conn, index = reader.connection, _index(state, reader)
+            conn, index = reader.connection, trial_index(state, reader)
             totals: TermTotals = stats.cached(
                 reader, ("term-totals", kind), lambda: TermTotals.read(conn, index, kind)
             )
@@ -117,7 +117,8 @@ def _analysis(
         return data_json(body, etag)
 
 
-def _index(state: ApiState, reader: SQLiteReader) -> Any:
+def trial_index(state: ApiState, reader: SQLiteReader) -> TrialIndex:
+    """The trial index for the reader's data version; 503 if it isn't ready in time."""
     try:
         return state.stats().full_index(reader)
     except IndexUnavailable:
@@ -132,7 +133,7 @@ def _scope(
     state: ApiState, reader: SQLiteReader, kind: TermKind, code: str, filter: TrialFilter
 ) -> Scope:
     stats = state.stats()
-    index = _index(state, reader)
+    index = trial_index(state, reader)
     conn = reader.connection
     found = find_term(conn, kind, code.strip().upper())
     if found is None:

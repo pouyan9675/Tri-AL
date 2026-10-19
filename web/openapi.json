@@ -6649,6 +6649,889 @@
         }
       }
     },
+    "/api/search/advanced": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Advancedsearch",
+        "description": "Trials within the filter that the fields find, a page at a time.\n\nText fields search the full-text index, each in its own part of a trial; inclusion,\nexclusion, primary and secondary outcomes are then checked in the text of the newest\ncandidates (`sections` says how many). Each hit says where its words are (`snippets`)\nand, with a place, its nearest site.",
+        "operationId": "advancedSearch",
+        "parameters": [
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(relevance|distance|-?(last_update|start_date|first_posted|enrollment|id))$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`relevance` (with words to match) or `distance` (with `near`), the default in that order; or a trial list sort, `-last_update` without either.",
+              "title": "Sort"
+            },
+            "description": "`relevance` (with words to match) or `distance` (with `near`), the default in that order; or a trial list sort, `-last_update` without either."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Overall status codes: RECRUITING, ...",
+              "title": "Status"
+            },
+            "description": "Overall status codes: RECRUITING, ..."
+          },
+          {
+            "name": "phase",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "PHASE1, PHASE2_PHASE3, NA, ...",
+              "title": "Phase"
+            },
+            "description": "PHASE1, PHASE2_PHASE3, NA, ..."
+          },
+          {
+            "name": "study_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "INTERVENTIONAL, ...",
+              "title": "Study Type"
+            },
+            "description": "INTERVENTIONAL, ..."
+          },
+          {
+            "name": "conditions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Condition names",
+              "title": "Conditions"
+            },
+            "description": "Condition names"
+          },
+          {
+            "name": "mesh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "MeSH descriptor codes; narrower terms match too",
+              "title": "Mesh"
+            },
+            "description": "MeSH descriptor codes; narrower terms match too"
+          },
+          {
+            "name": "interventions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Intervention names",
+              "title": "Interventions"
+            },
+            "description": "Intervention names"
+          },
+          {
+            "name": "intervention_types",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "DRUG, DEVICE, ...",
+              "title": "Intervention Types"
+            },
+            "description": "DRUG, DEVICE, ..."
+          },
+          {
+            "name": "sponsors",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Lead or collaborator names",
+              "title": "Sponsors"
+            },
+            "description": "Lead or collaborator names"
+          },
+          {
+            "name": "sponsor_class",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The lead sponsor's class: INDUSTRY, NIH, ...",
+              "title": "Sponsor Class"
+            },
+            "description": "The lead sponsor's class: INDUSTRY, NIH, ..."
+          },
+          {
+            "name": "countries",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO 3166-1 alpha-2 codes",
+              "title": "Countries"
+            },
+            "description": "ISO 3166-1 alpha-2 codes"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Start"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "completion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Completion"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "first_posted",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "First Posted"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "last_update",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Last Update"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "enrollment",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `100..500`, `1000..`",
+              "title": "Enrollment"
+            },
+            "description": "`from..to`, either end open: `100..500`, `1000..`"
+          },
+          {
+            "name": "has_results",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Results"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Full-text: every word must match; or trial IDs, which find those",
+              "title": "Q"
+            },
+            "description": "Full-text: every word must match; or trial IDs, which find those"
+          },
+          {
+            "name": "text",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Anywhere. Words, all of which must match; `\"a phrase\"`; `\"words near\"~5` (within 5 words); `a OR b`; `prefix*`; `-word` to leave out.",
+              "title": "Text"
+            },
+            "description": "Anywhere. Words, all of which must match; `\"a phrase\"`; `\"words near\"~5` (within 5 words); `a OR b`; `prefix*`; `-word` to leave out."
+          },
+          {
+            "name": "title",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Words, all of which must match; `\"a phrase\"`; `\"words near\"~5` (within 5 words); `a OR b`; `prefix*`; `-word` to leave out.",
+              "title": "Title"
+            },
+            "description": "Words, all of which must match; `\"a phrase\"`; `\"words near\"~5` (within 5 words); `a OR b`; `prefix*`; `-word` to leave out."
+          },
+          {
+            "name": "condition",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "In condition names. Words, all of which must match; `\"a phrase\"`; `\"words near\"~5` (within 5 words); `a OR b`; `prefix*`; `-word` to leave out.",
+              "title": "Condition"
+            },
+            "description": "In condition names. Words, all of which must match; `\"a phrase\"`; `\"words near\"~5` (within 5 words); `a OR b`; `prefix*`; `-word` to leave out."
+          },
+          {
+            "name": "intervention",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "In intervention names and their other names.",
+              "title": "Intervention"
+            },
+            "description": "In intervention names and their other names."
+          },
+          {
+            "name": "summary",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "In the summary or description.",
+              "title": "Summary"
+            },
+            "description": "In the summary or description."
+          },
+          {
+            "name": "eligibility",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "In the eligibility criteria.",
+              "title": "Eligibility"
+            },
+            "description": "In the eligibility criteria."
+          },
+          {
+            "name": "inclusion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Under the inclusion criteria heading.",
+              "title": "Inclusion"
+            },
+            "description": "Under the inclusion criteria heading."
+          },
+          {
+            "name": "exclusion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Under the exclusion criteria heading.",
+              "title": "Exclusion"
+            },
+            "description": "Under the exclusion criteria heading."
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "In outcome measures.",
+              "title": "Outcome"
+            },
+            "description": "In outcome measures."
+          },
+          {
+            "name": "primary_outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "In primary outcome measures.",
+              "title": "Primary Outcome"
+            },
+            "description": "In primary outcome measures."
+          },
+          {
+            "name": "secondary_outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "In secondary outcome measures.",
+              "title": "Secondary Outcome"
+            },
+            "description": "In secondary outcome measures."
+          },
+          {
+            "name": "age",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Years: trials that take someone of this age (`70`) or of an age in the range (`60..80`, `..17`).",
+              "title": "Age"
+            },
+            "description": "Years: trials that take someone of this age (`70`) or of an age in the range (`60..80`, `..17`)."
+          },
+          {
+            "name": "sex",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "FEMALE",
+                    "MALE"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Trials that take this sex (or all, or don't say).",
+              "title": "Sex"
+            },
+            "description": "Trials that take this sex (or all, or don't say)."
+          },
+          {
+            "name": "healthy_volunteers",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Trials that take healthy volunteers, or don't.",
+              "title": "Healthy Volunteers"
+            },
+            "description": "Trials that take healthy volunteers, or don't."
+          },
+          {
+            "name": "allocation",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Allocation"
+            }
+          },
+          {
+            "name": "masking",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Masking"
+            }
+          },
+          {
+            "name": "intervention_model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Intervention Model"
+            }
+          },
+          {
+            "name": "primary_purpose",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Primary Purpose"
+            }
+          },
+          {
+            "name": "placebo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Trials with an intervention named placebo, or without.",
+              "title": "Placebo"
+            },
+            "description": "Trials with an intervention named placebo, or without."
+          },
+          {
+            "name": "near",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`latitude,longitude`: trials with a site within `within` km.",
+              "title": "Near"
+            },
+            "description": "`latitude,longitude`: trials with a site within `within` km."
+          },
+          {
+            "name": "within",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 20000,
+              "exclusiveMinimum": 0,
+              "description": "Kilometres from `near`.",
+              "default": 50,
+              "title": "Within"
+            },
+            "description": "Kilometres from `near`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdvancedSearchOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "There's no data yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/places": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Findplaces",
+        "description": "Places with trial sites, from the sites' own coordinates: cities starting with `q`,\nthen with a word starting with it, most sites first.",
+        "operationId": "findPlaces",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "The start of a city's name; after a comma, of its state or country.",
+              "title": "Q"
+            },
+            "description": "The start of a city's name; after a comma, of its state or country."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "default": 8,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlacesOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "There's no data yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/events": {
       "get": {
         "tags": [
@@ -6701,6 +7584,139 @@
   },
   "components": {
     "schemas": {
+      "AdvancedHitOut": {
+        "properties": {
+          "trial": {
+            "$ref": "#/components/schemas/TrialSummaryOut"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score",
+            "description": "Relevance (higher is better), for the ranked matches when sorted by it."
+          },
+          "snippets": {
+            "items": {
+              "$ref": "#/components/schemas/FieldSnippetOut"
+            },
+            "type": "array",
+            "title": "Snippets",
+            "description": "Where each field's words are, for fields with text to show."
+          },
+          "nearest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NearestSiteOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The nearest site, with a place."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "trial",
+          "score",
+          "snippets",
+          "nearest"
+        ],
+        "title": "AdvancedHitOut"
+      },
+      "AdvancedSearchOut": {
+        "properties": {
+          "data_version": {
+            "type": "integer",
+            "title": "Data Version"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Trials that match."
+          },
+          "sort": {
+            "type": "string",
+            "title": "Sort",
+            "description": "`relevance`, `distance` or a trial list sort."
+          },
+          "ranked": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranked",
+            "description": "By relevance: matches ranked, the newest ones (at most `search_candidates` in the meta); the rest follow, newest first."
+          },
+          "sections": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SectionCheckOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "With inclusion, exclusion, primary or secondary outcome fields."
+          },
+          "read": {
+            "items": {
+              "$ref": "#/components/schemas/FieldReadOut"
+            },
+            "type": "array",
+            "title": "Read",
+            "description": "How each text field was read."
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Offset",
+            "description": "Pass as `offset` for the next page."
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdvancedHitOut"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data_version",
+          "total",
+          "sort",
+          "ranked",
+          "sections",
+          "read",
+          "offset",
+          "next_offset",
+          "items"
+        ],
+        "title": "AdvancedSearchOut"
+      },
       "AiModelOut": {
         "properties": {
           "id": {
@@ -7783,6 +8799,89 @@
         ],
         "title": "FacetsOut"
       },
+      "FieldReadOut": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "text",
+              "title",
+              "condition",
+              "intervention",
+              "summary",
+              "eligibility",
+              "inclusion",
+              "exclusion",
+              "outcome",
+              "primary_outcome",
+              "secondary_outcome"
+            ],
+            "title": "Field"
+          },
+          "all": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "All",
+            "description": "Groups that must all match, each by any of its terms, as typed: a word, `\"a phrase\"`, `\"words near\"~5` or `prefix*`."
+          },
+          "none": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "None",
+            "description": "Terms that mustn't match."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "field",
+          "all",
+          "none"
+        ],
+        "title": "FieldReadOut"
+      },
+      "FieldSnippetOut": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "text",
+              "title",
+              "condition",
+              "intervention",
+              "summary",
+              "eligibility",
+              "inclusion",
+              "exclusion",
+              "outcome",
+              "primary_outcome",
+              "secondary_outcome"
+            ],
+            "title": "Field"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/components/schemas/SnippetPartOut"
+            },
+            "type": "array",
+            "title": "Parts"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "field",
+          "parts"
+        ],
+        "title": "FieldSnippetOut"
+      },
       "FunnelRowOut": {
         "properties": {
           "phase": {
@@ -8564,6 +9663,74 @@
         ],
         "title": "NameHitOut"
       },
+      "NearestSiteOut": {
+        "properties": {
+          "km": {
+            "type": "number",
+            "title": "Km"
+          },
+          "facility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Facility"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "sites": {
+            "type": "integer",
+            "title": "Sites",
+            "description": "The trial's sites within the distance."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "km",
+          "facility",
+          "city",
+          "state",
+          "country",
+          "sites"
+        ],
+        "title": "NearestSiteOut"
+      },
       "NetworkEdgeOut": {
         "properties": {
           "source": {
@@ -8800,6 +9967,102 @@
           "last_start"
         ],
         "title": "PipelineRowOut"
+      },
+      "PlaceOut": {
+        "properties": {
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country",
+            "description": "ISO 3166-1 alpha-2 code."
+          },
+          "country_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Name"
+          },
+          "lat": {
+            "type": "number",
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "number",
+            "title": "Lon"
+          },
+          "sites": {
+            "type": "integer",
+            "title": "Sites",
+            "description": "Trial sites there."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "city",
+          "state",
+          "country",
+          "country_name",
+          "lat",
+          "lon",
+          "sites"
+        ],
+        "title": "PlaceOut"
+      },
+      "PlacesOut": {
+        "properties": {
+          "data_version": {
+            "type": "integer",
+            "title": "Data Version"
+          },
+          "places": {
+            "items": {
+              "$ref": "#/components/schemas/PlaceOut"
+            },
+            "type": "array",
+            "title": "Places"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data_version",
+          "places"
+        ],
+        "title": "PlacesOut"
       },
       "PluginChangedOut": {
         "properties": {
@@ -9306,6 +10569,27 @@
           "names"
         ],
         "title": "SearchOut"
+      },
+      "SectionCheckOut": {
+        "properties": {
+          "candidates": {
+            "type": "integer",
+            "title": "Candidates",
+            "description": "Trials matching the rest, whose text was to be checked for inclusion, exclusion, primary or secondary outcomes."
+          },
+          "checked": {
+            "type": "integer",
+            "title": "Checked",
+            "description": "The newest of them, whose text was checked."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidates",
+          "checked"
+        ],
+        "title": "SectionCheckOut"
       },
       "SeriesOut": {
         "properties": {

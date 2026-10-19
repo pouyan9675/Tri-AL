@@ -624,6 +624,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/search/advanced": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Advancedsearch
+         * @description Trials within the filter that the fields find, a page at a time.
+         *
+         *     Text fields search the full-text index, each in its own part of a trial; inclusion,
+         *     exclusion, primary and secondary outcomes are then checked in the text of the newest
+         *     candidates (`sections` says how many). Each hit says where its words are (`snippets`)
+         *     and, with a place, its nearest site.
+         */
+        get: operations["advancedSearch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/places": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Findplaces
+         * @description Places with trial sites, from the sites' own coordinates: cities starting with `q`,
+         *     then with a word starting with it, most sites first.
+         */
+        get: operations["findPlaces"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events": {
         parameters: {
             query?: never;
@@ -648,6 +694,58 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AdvancedHitOut */
+        AdvancedHitOut: {
+            trial: components["schemas"]["TrialSummaryOut"];
+            /**
+             * Score
+             * @description Relevance (higher is better), for the ranked matches when sorted by it.
+             */
+            score: number | null;
+            /**
+             * Snippets
+             * @description Where each field's words are, for fields with text to show.
+             */
+            snippets: components["schemas"]["FieldSnippetOut"][];
+            /** @description The nearest site, with a place. */
+            nearest: components["schemas"]["NearestSiteOut"] | null;
+        };
+        /** AdvancedSearchOut */
+        AdvancedSearchOut: {
+            /** Data Version */
+            data_version: number;
+            /**
+             * Total
+             * @description Trials that match.
+             */
+            total: number;
+            /**
+             * Sort
+             * @description `relevance`, `distance` or a trial list sort.
+             */
+            sort: string;
+            /**
+             * Ranked
+             * @description By relevance: matches ranked, the newest ones (at most `search_candidates` in the meta); the rest follow, newest first.
+             */
+            ranked: number | null;
+            /** @description With inclusion, exclusion, primary or secondary outcome fields. */
+            sections: components["schemas"]["SectionCheckOut"] | null;
+            /**
+             * Read
+             * @description How each text field was read.
+             */
+            read: components["schemas"]["FieldReadOut"][];
+            /** Offset */
+            offset: number;
+            /**
+             * Next Offset
+             * @description Pass as `offset` for the next page.
+             */
+            next_offset: number | null;
+            /** Items */
+            items: components["schemas"]["AdvancedHitOut"][];
+        };
         /** AiModelOut */
         AiModelOut: {
             /** Id */
@@ -1048,6 +1146,34 @@ export interface components {
                 [key: string]: components["schemas"]["FacetValueOut"][];
             };
         };
+        /** FieldReadOut */
+        FieldReadOut: {
+            /**
+             * Field
+             * @enum {string}
+             */
+            field: "text" | "title" | "condition" | "intervention" | "summary" | "eligibility" | "inclusion" | "exclusion" | "outcome" | "primary_outcome" | "secondary_outcome";
+            /**
+             * All
+             * @description Groups that must all match, each by any of its terms, as typed: a word, `"a phrase"`, `"words near"~5` or `prefix*`.
+             */
+            all: string[][];
+            /**
+             * None
+             * @description Terms that mustn't match.
+             */
+            none: string[];
+        };
+        /** FieldSnippetOut */
+        FieldSnippetOut: {
+            /**
+             * Field
+             * @enum {string}
+             */
+            field: "text" | "title" | "condition" | "intervention" | "summary" | "eligibility" | "inclusion" | "exclusion" | "outcome" | "primary_outcome" | "secondary_outcome";
+            /** Parts */
+            parts: components["schemas"]["SnippetPartOut"][];
+        };
         /** FunnelRowOut */
         FunnelRowOut: {
             /** Phase */
@@ -1327,6 +1453,24 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** NearestSiteOut */
+        NearestSiteOut: {
+            /** Km */
+            km: number;
+            /** Facility */
+            facility: string | null;
+            /** City */
+            city: string | null;
+            /** State */
+            state: string | null;
+            /** Country */
+            country: string | null;
+            /**
+             * Sites
+             * @description The trial's sites within the distance.
+             */
+            sites: number;
+        };
         /** NetworkEdgeOut */
         NetworkEdgeOut: {
             /**
@@ -1414,6 +1558,36 @@ export interface components {
             highest: string | null;
             /** Last Start */
             last_start: string | null;
+        };
+        /** PlaceOut */
+        PlaceOut: {
+            /** City */
+            city: string | null;
+            /** State */
+            state: string | null;
+            /**
+             * Country
+             * @description ISO 3166-1 alpha-2 code.
+             */
+            country: string | null;
+            /** Country Name */
+            country_name: string | null;
+            /** Lat */
+            lat: number;
+            /** Lon */
+            lon: number;
+            /**
+             * Sites
+             * @description Trial sites there.
+             */
+            sites: number;
+        };
+        /** PlacesOut */
+        PlacesOut: {
+            /** Data Version */
+            data_version: number;
+            /** Places */
+            places: components["schemas"]["PlaceOut"][];
         };
         /** PluginChangedOut */
         PluginChangedOut: {
@@ -1609,6 +1783,19 @@ export interface components {
              * @description Conditions, interventions and sponsors.
              */
             names: components["schemas"]["NameHitOut"][];
+        };
+        /** SectionCheckOut */
+        SectionCheckOut: {
+            /**
+             * Candidates
+             * @description Trials matching the rest, whose text was to be checked for inclusion, exclusion, primary or secondary outcomes.
+             */
+            candidates: number;
+            /**
+             * Checked
+             * @description The newest of them, whose text was checked.
+             */
+            checked: number;
         };
         /** SeriesOut */
         SeriesOut: {
@@ -3995,6 +4182,162 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description There's no data yet. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    advancedSearch: {
+        parameters: {
+            query?: {
+                /** @description `relevance` (with words to match) or `distance` (with `near`), the default in that order; or a trial list sort, `-last_update` without either. */
+                sort?: string | null;
+                offset?: number;
+                limit?: number;
+                /** @description Overall status codes: RECRUITING, ... */
+                status?: string[] | null;
+                /** @description PHASE1, PHASE2_PHASE3, NA, ... */
+                phase?: string[] | null;
+                /** @description INTERVENTIONAL, ... */
+                study_type?: string[] | null;
+                /** @description Condition names */
+                conditions?: string[] | null;
+                /** @description MeSH descriptor codes; narrower terms match too */
+                mesh?: string[] | null;
+                /** @description Intervention names */
+                interventions?: string[] | null;
+                /** @description DRUG, DEVICE, ... */
+                intervention_types?: string[] | null;
+                /** @description Lead or collaborator names */
+                sponsors?: string[] | null;
+                /** @description The lead sponsor's class: INDUSTRY, NIH, ... */
+                sponsor_class?: string[] | null;
+                /** @description ISO 3166-1 alpha-2 codes */
+                countries?: string[] | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                start?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                completion?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                first_posted?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                last_update?: string | null;
+                /** @description `from..to`, either end open: `100..500`, `1000..` */
+                enrollment?: string | null;
+                has_results?: boolean | null;
+                /** @description Full-text: every word must match; or trial IDs, which find those */
+                q?: string | null;
+                /** @description Anywhere. Words, all of which must match; `"a phrase"`; `"words near"~5` (within 5 words); `a OR b`; `prefix*`; `-word` to leave out. */
+                text?: string | null;
+                /** @description Words, all of which must match; `"a phrase"`; `"words near"~5` (within 5 words); `a OR b`; `prefix*`; `-word` to leave out. */
+                title?: string | null;
+                /** @description In condition names. Words, all of which must match; `"a phrase"`; `"words near"~5` (within 5 words); `a OR b`; `prefix*`; `-word` to leave out. */
+                condition?: string | null;
+                /** @description In intervention names and their other names. */
+                intervention?: string | null;
+                /** @description In the summary or description. */
+                summary?: string | null;
+                /** @description In the eligibility criteria. */
+                eligibility?: string | null;
+                /** @description Under the inclusion criteria heading. */
+                inclusion?: string | null;
+                /** @description Under the exclusion criteria heading. */
+                exclusion?: string | null;
+                /** @description In outcome measures. */
+                outcome?: string | null;
+                /** @description In primary outcome measures. */
+                primary_outcome?: string | null;
+                /** @description In secondary outcome measures. */
+                secondary_outcome?: string | null;
+                /** @description Years: trials that take someone of this age (`70`) or of an age in the range (`60..80`, `..17`). */
+                age?: string | null;
+                /** @description Trials that take this sex (or all, or don't say). */
+                sex?: ("FEMALE" | "MALE") | null;
+                /** @description Trials that take healthy volunteers, or don't. */
+                healthy_volunteers?: boolean | null;
+                allocation?: string[] | null;
+                masking?: string[] | null;
+                intervention_model?: string[] | null;
+                primary_purpose?: string[] | null;
+                /** @description Trials with an intervention named placebo, or without. */
+                placebo?: boolean | null;
+                /** @description `latitude,longitude`: trials with a site within `within` km. */
+                near?: string | null;
+                /** @description Kilometres from `near`. */
+                within?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdvancedSearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description There's no data yet. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    findPlaces: {
+        parameters: {
+            query: {
+                /** @description The start of a city's name; after a comma, of its state or country. */
+                q: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlacesOut"];
                 };
             };
             /** @description Validation Error */

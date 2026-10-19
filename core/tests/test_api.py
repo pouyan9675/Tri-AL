@@ -397,6 +397,8 @@ def test_the_openapi_schema_names_every_operation(client: TestClient) -> None:
         "getTermProfile",
         "getTermThemes",
         "getTermSimilar",
+        "advancedSearch",
+        "findPlaces",
     }
     assert "TrialPageOut" in schema["components"]["schemas"]
     params = {p["name"] for p in schema["paths"]["/api/trials"]["get"]["parameters"]}

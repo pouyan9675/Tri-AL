@@ -32,12 +32,20 @@ from tri_al.storage.engine import (
     load_extension,
 )
 from tri_al.storage.migrations import Migration, MigrationError, migrate, run_script
-from tri_al.storage.sqlite import SEARCH_CANDIDATES, SQLiteReader, SQLiteStorage, StoredStats
+from tri_al.storage.sqlite import (
+    SEARCH_CANDIDATES,
+    SNIPPET_MARKS,
+    SQLiteReader,
+    SQLiteStorage,
+    StoredStats,
+    snippet_parts,
+)
 
 __all__ = [
     "MIN_SQLITE_VERSION",
     "NEWEST_FIRST",
     "SEARCH_CANDIDATES",
+    "SNIPPET_MARKS",
     "SORT_KEYS",
     "BulkLoader",
     "Cursor",
@@ -70,4 +78,5 @@ __all__ = [
     "migrate",
     "open_app_db",
     "run_script",
+    "snippet_parts",
 ]

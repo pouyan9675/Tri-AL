@@ -9,6 +9,7 @@ import {
   createRouter,
   lazyRouteComponent,
 } from "@tanstack/react-router";
+import { advancedSearchQuery } from "@/api/advanced";
 import {
   chartQuery,
   dashboardQuery,
@@ -20,6 +21,7 @@ import {
 import { termQuery } from "@/api/terms";
 import { AppShell } from "@/components/app-shell";
 import { NotFound, RouteError } from "@/components/route-states";
+import { hasQuery, parseAdvancedSearch } from "@/lib/advanced";
 import { parseFilter, parseTrialsSearch } from "@/lib/filters";
 import { parseSearch, stringifySearch } from "@/lib/search-params";
 import { parseLinkingSearch, parseTermSearch } from "@/pages/analysis/sections";
@@ -72,9 +74,6 @@ export const analysisLandscapeRoute = createRoute({
   component: lazyRouteComponent(() => import("@/pages/analysis"), "LandscapeSection"),
 });
 
-// Sections still to be built.
-const emptySection = lazyRouteComponent(() => import("@/pages/analysis"), "EmptySection");
-
 export const analysisLinkingRoute = createRoute({
   getParentRoute: () => analysisRoute,
   path: "linking",
@@ -87,11 +86,20 @@ export const analysisLinkingRoute = createRoute({
   component: lazyRouteComponent(() => import("@/pages/analysis/linking"), "LinkingSection"),
 });
 
+// Advanced search (`pages/analysis/search`): its fields sit beside the filter in the URL.
 export const analysisSearchRoute = createRoute({
   getParentRoute: () => analysisRoute,
   path: "search",
   staticData: { title: "Advanced search" },
-  component: emptySection,
+  validateSearch: parseAdvancedSearch,
+  loaderDeps: ({ search }) => search,
+  loader: ({ context: { queryClient }, deps }) => {
+    const search = parseAdvancedSearch(deps);
+    if (hasQuery(search)) {
+      void queryClient.prefetchInfiniteQuery(advancedSearchQuery(search, parseFilter(deps)));
+    }
+  },
+  component: lazyRouteComponent(() => import("@/pages/analysis/search"), "AdvancedSearchSection"),
 });
 
 // A MeSH term in depth (`pages/analysis/terms`); its first request starts with the chunk.

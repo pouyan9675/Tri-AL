@@ -62,6 +62,8 @@ CODED_COLUMNS: tuple[tuple[str, str], ...] = (
     ("primary_completion_date_type", "primary_completion_date_type"),
     ("allocation", "allocation"),
     ("masking", "masking"),
+    ("intervention_model", "intervention_model"),
+    ("primary_purpose", "primary_purpose"),
     ("sex", "sex"),
     ("healthy_volunteers", "healthy_volunteers"),
 )
@@ -465,6 +467,12 @@ class TrialIndex:
         ids = [int(i) for i in picked[:limit]]
         more = len(picked) > limit
         return ids, (self._cursor(sort.key, ids[-1]) if more and ids else None)
+
+    def ordered(self, mask: Mask, sort: Sort) -> Ids:
+        """Every trial ``mask`` holds, in ``sort``'s order: the order ``page`` pages in."""
+        order, _ = self._order(sort.key)
+        picked = order[mask[order]]
+        return picked[::-1] if sort.descending else picked
 
     def _order(self, key: str) -> tuple[Ids, npt.NDArray[np.int64]]:
         """Trial ids in ascending ``(value, id)`` order, missing values first, and their keys.

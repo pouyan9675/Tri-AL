@@ -483,11 +483,12 @@ class SQLiteReader:
             if trial_id in rows
         ]
 
-    def _snippet_text(self, ids: Sequence[int]) -> dict[int, list[str | None]]:
-        """The searchable text of each trial apart from its titles, in _Snippets.COLUMNS order."""
-        conn = self._conn
+    def names(self, ids: Sequence[int]) -> dict[int, dict[str, list[str]]]:
+        """Each trial's condition and intervention names and the interventions' other names,
+        under ``conditions``, ``interventions`` and ``other_names``: what the full-text index
+        reads besides the text."""
         joined: dict[int, dict[str, list[str]]] = {trial_id: {} for trial_id in ids}
-        for trial_id, kind, name in conn.execute(
+        for trial_id, kind, name in self._conn.execute(
             _sql(
                 "SELECT tc.trial_id, 'conditions', c.name FROM trial_conditions AS tc "
                 "JOIN conditions AS c ON c.id = tc.condition_id WHERE tc.trial_id IN "
@@ -502,7 +503,12 @@ class SQLiteReader:
             _ids(ids),
         ):
             joined[trial_id].setdefault(kind, []).append(name)
-        texts = _texts(conn, ids, self._decoder)
+        return joined
+
+    def _snippet_text(self, ids: Sequence[int]) -> dict[int, list[str | None]]:
+        """The searchable text of each trial apart from its titles, in _Snippets.COLUMNS order."""
+        joined = self.names(ids)
+        texts = _texts(self._conn, ids, self._decoder)
         result: dict[int, list[str | None]] = {}
         for trial_id in ids:
             text_ = texts.get(trial_id, docs.TrialText())
@@ -1490,6 +1496,8 @@ def id_matches(
 # --- snippets -----------------------------------------------------------------------------
 
 _OPEN, _CLOSE = "\x02", "\x03"
+SNIPPET_MARKS = (_OPEN, _CLOSE)
+"""What ``snippet()`` is asked to put around matches, for ``snippet_parts`` to split at."""
 _MARKS = re.compile(f"({_OPEN}|{_CLOSE})")
 _SPACES = re.compile(r"\s+")
 
@@ -1551,7 +1559,7 @@ class _Snippets:
                 [(trial_id, *columns) for trial_id, columns in texts.items()],
             )
             found = {
-                rowid: _parts(snippet)
+                rowid: snippet_parts(snippet)
                 for rowid, snippet in conn.execute(
                     "SELECT rowid, snippet(snip, -1, ?, ?, '…', ?) FROM snip WHERE snip MATCH ?",
                     (_OPEN, _CLOSE, self.TOKENS, match),
@@ -1571,7 +1579,8 @@ class _Snippets:
             self._conns.clear()
 
 
-def _parts(snippet: str) -> tuple[SnippetPart, ...]:
+def snippet_parts(snippet: str) -> tuple[SnippetPart, ...]:
+    """A snippet made with ``SNIPPET_MARKS`` as parts that matched and parts that didn't."""
     parts: list[SnippetPart] = []
     inside = False
     for piece in _MARKS.split(_SPACES.sub(" ", snippet)):

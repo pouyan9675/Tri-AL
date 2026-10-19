@@ -12,6 +12,7 @@ from sqlalchemy import Engine
 
 from tri_al import __version__
 from tri_al.access import AccessPolicy, AllowAll
+from tri_al.advanced import SiteCache, TextTable
 from tri_al.ai import AiService
 from tri_al.api.http import etag_for
 from tri_al.config import Config
@@ -41,6 +42,8 @@ class ApiState:
     use_index: bool = True
     build: str = ""
     term_vectors: TermVectorCache = field(default_factory=TermVectorCache)
+    sites: SiteCache = field(default_factory=SiteCache)
+    texts: TextTable = field(default_factory=TextTable)
     _storage: SQLiteStorage | None = None
     _stats: StatsEngine | None = None
     _lock: threading.Lock = field(default_factory=threading.Lock)
@@ -126,6 +129,7 @@ class ApiState:
                 self._storage.close()
                 self._storage = None
                 self._stats = None
+        self.texts.close()
         self.ai.close()
         self.app_db.dispose()
 
