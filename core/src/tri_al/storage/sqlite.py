@@ -26,9 +26,11 @@ from sqlalchemy import (
     bindparam,
     column,
     delete,
+    exists,
     func,
     insert,
     literal,
+    literal_column,
     or_,
     select,
     table,
@@ -102,6 +104,14 @@ SEARCH_CANDIDATES = 20_000
 Ranking costs about 2 µs a match, so a word in nearly every trial would take over a
 second to rank; ranking only the newest 20,000 keeps the worst case near 50 ms, and a
 search with fewer matches is ranked exactly.
+"""
+
+FEW_MATCHES = 100_000
+"""Matches a filtered search checks one at a time against the filter at most (design §6).
+
+Each costs about 1 µs, a trial looked up by id. A query with more matches lists the
+filter's trials once instead: that costs what the filter costs (up to about 300 ms for a
+broad one), then about a third as much a match.
 """
 
 NAME_CANDIDATES = 5_000
@@ -1440,11 +1450,12 @@ def rank_matches(
     if match is None or limit <= 0:
         return [], 0
     fts = table("trials_fts", column("rowid", Integer), column("rank", Float))
-    inner = select(fts.c.rowid, fts.c.rank).where(
-        _sql("trials_fts MATCH :fts_search").bindparams(fts_search=match)
-    )
+    matches = _sql("trials_fts MATCH :fts_search").bindparams(fts_search=match)
+    inner = select(fts.c.rowid, fts.c.rank).where(matches)
     if not filter.is_empty:
-        inner = inner.where(fts.c.rowid.in_(matching_ids(filter)))
+        newest = select(fts.c.rowid).where(matches).limit(FEW_MATCHES + 1).subquery()
+        few = conn.execute(select(func.count()).select_from(newest)).scalar_one() <= FEW_MATCHES
+        inner = inner.where(_in_filter(filter, each=few))
     ranked = inner.order_by(fts.c.rowid.desc()).limit(SEARCH_CANDIDATES).subquery()
     stmt = (
         select(ranked.c.rowid, ranked.c.rank, func.count().over())
@@ -1453,6 +1464,20 @@ def rank_matches(
     )
     rows = conn.execute(stmt).all()
     return [(rowid, -rank) for rowid, rank, _ in rows], rows[0][2] if rows else 0
+
+
+def _in_filter(filter: TrialFilter, *, each: bool) -> ColumnElement[bool]:
+    """``trials_fts.rowid`` is one of ``filter``'s trials, hidden from FTS5 by a unary plus.
+
+    FTS5 takes ``rowid IN (…)`` as a constraint and runs the whole query again for each id:
+    ranking "cancer" among recruiting trials took 131 s. ``each`` looks each match up in
+    ``trials``; otherwise the filter's trials are listed once and the matches checked
+    against the list.
+    """
+    rowid = literal_column("+trials_fts.rowid", Integer)
+    if each:
+        return exists().where(t.trials.c.id == rowid, *where(filter))
+    return rowid.in_(matching_ids(filter))
 
 
 def id_matches(

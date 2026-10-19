@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, event, text
 
 from tri_al.filters import TrialFilter
 from tri_al.schema import TrialRecord
@@ -121,6 +121,66 @@ def test_searches_rank_only_the_newest_candidates(
     assert result.capped
     assert sorted(hit.source_id for hit in result.hits) == ["NCT3", "NCT4"]
     assert not storage.search("memory 1", limit=10).capped
+
+
+@pytest.fixture
+def memory_trials(storage: SQLiteStorage) -> None:
+    storage.upsert_batch(
+        [
+            replace(minimal_trial(), source_id=f"NCT{i}", title=title, phase=phase)
+            for i, (title, phase) in enumerate(
+                [
+                    ("Memory study", "PHASE3"),
+                    ("Memory study", "PHASE3"),
+                    ("Memory study", "PHASE2"),
+                    ("Study of memory and sleep", "PHASE3"),
+                    ("Sleep study", "PHASE3"),
+                    ("Memory study", "PHASE2"),
+                    ("Memory study", "PHASE3"),
+                ]
+            )
+        ]
+    )
+
+
+@pytest.mark.usefixtures("memory_trials")
+def test_filtered_searches_rank_the_newest_matches_in_the_filter(
+    storage: SQLiteStorage, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(sqlite, "SEARCH_CANDIDATES", 3)
+    phase3 = TrialFilter(phase=("PHASE3",))
+
+    each = storage.search("memory", filter=phase3, limit=10)  # each match looked up
+    monkeypatch.setattr(sqlite, "FEW_MATCHES", 0)
+    listed = storage.search("memory", filter=phase3, limit=10)  # the filter's trials listed
+
+    assert listed == each
+    assert (each.candidates, each.capped) == (3, True)
+    assert [hit.source_id for hit in each.hits] == ["NCT6", "NCT1", "NCT3"]
+
+
+@pytest.mark.usefixtures("memory_trials")
+@pytest.mark.parametrize("few_matches", [sqlite.FEW_MATCHES, 0], ids=["each", "listed"])
+def test_filtered_searches_keep_the_filter_from_fts5(
+    storage: SQLiteStorage, monkeypatch: pytest.MonkeyPatch, few_matches: int
+) -> None:
+    """As a constraint (``rowid IN (…)``), FTS5 would run the query again for every id."""
+    monkeypatch.setattr(sqlite, "FEW_MATCHES", few_matches)
+    ranking: list[tuple[str, Any]] = []
+
+    @event.listens_for(storage.engine, "before_cursor_execute")
+    def record(*args: Any) -> None:
+        statement, parameters = args[2:4]
+        if "MATCH" in statement and "rank" in statement:
+            ranking.append((statement, parameters))
+
+    storage.search("memory", filter=TrialFilter(phase=("PHASE3",)))
+
+    [(statement, parameters)] = ranking
+    with storage.engine.connect() as conn:
+        plan = conn.exec_driver_sql(f"EXPLAIN QUERY PLAN {statement}", parameters).all()
+    [fts_index] = [row[-1] for row in plan if "trials_fts VIRTUAL TABLE" in row[-1]]
+    assert "=" not in fts_index.rpartition(":")[2]  # FTS5 marks a rowid constraint with =
 
 
 @pytest.mark.parametrize(
