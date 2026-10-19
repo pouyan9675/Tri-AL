@@ -98,6 +98,25 @@ export const changesQuery = (sourceId: string) =>
     staleTime: Number.POSITIVE_INFINITY,
   });
 
+/** Trials that share a trial's MeSH terms (`terms`; all of them if not given), by phase. */
+export const linkedTrialsQuery = (
+  sourceId: string,
+  terms: string[] | undefined,
+  filter: TrialFilter,
+) =>
+  queryOptions({
+    queryKey: [...DATA_KEY, "linked", sourceId, terms ?? "all", canonical(filter)],
+    queryFn: ({ signal }) =>
+      unwrap(
+        api.GET("/api/trials/{source_id}/linked", {
+          params: { path: { source_id: sourceId }, query: { ...filter, terms } },
+          signal,
+        }),
+      ),
+    staleTime: Number.POSITIVE_INFINITY,
+    placeholderData: keepPreviousData,
+  });
+
 export const searchQuery = (q: string, { limit = 8, names = 6 } = {}) =>
   queryOptions({
     queryKey: [...DATA_KEY, "search", q, limit, names],

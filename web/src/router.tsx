@@ -9,11 +9,19 @@ import {
   createRouter,
   lazyRouteComponent,
 } from "@tanstack/react-router";
-import { chartQuery, dashboardQuery, metaQuery, onPage, trialQuery } from "@/api/queries";
+import {
+  chartQuery,
+  dashboardQuery,
+  linkedTrialsQuery,
+  metaQuery,
+  onPage,
+  trialQuery,
+} from "@/api/queries";
 import { AppShell } from "@/components/app-shell";
 import { NotFound, RouteError } from "@/components/route-states";
 import { parseFilter, parseTrialsSearch } from "@/lib/filters";
 import { parseSearch, stringifySearch } from "@/lib/search-params";
+import { parseLinkingSearch } from "@/pages/analysis/sections";
 
 export type RouterContext = { queryClient: QueryClient };
 
@@ -39,11 +47,20 @@ export const dashboardRoute = createRoute({
   component: lazyRouteComponent(() => import("@/pages/dashboard"), "DashboardPage"),
 });
 
+// The analysis page frames its sections (`pages/analysis/sections.ts`), one route each; they
+// share its filter.
 export const analysisRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/analysis",
   staticData: { title: "Analysis" },
   validateSearch: parseFilter,
+  component: lazyRouteComponent(() => import("@/pages/analysis"), "AnalysisPage"),
+});
+
+export const analysisLandscapeRoute = createRoute({
+  getParentRoute: () => analysisRoute,
+  path: "/",
+  staticData: { title: "Landscape" },
   loaderDeps: ({ search }) => search,
   loader: async ({ context: { queryClient }, deps }) => {
     const dashboard = await queryClient.ensureQueryData(dashboardQuery()).catch(() => null);
@@ -51,7 +68,43 @@ export const analysisRoute = createRoute({
       void queryClient.prefetchQuery(chartQuery(chart.id, deps));
     }
   },
-  component: lazyRouteComponent(() => import("@/pages/analysis"), "AnalysisPage"),
+  component: lazyRouteComponent(() => import("@/pages/analysis"), "LandscapeSection"),
+});
+
+// Sections still to be built.
+const emptySection = lazyRouteComponent(() => import("@/pages/analysis"), "EmptySection");
+
+export const analysisLinkingRoute = createRoute({
+  getParentRoute: () => analysisRoute,
+  path: "linking",
+  staticData: { title: "Trial linking" },
+  validateSearch: parseLinkingSearch,
+  loaderDeps: ({ search }) => search,
+  loader: ({ context: { queryClient }, deps: { trial, terms, ...filter } }) => {
+    if (trial) void queryClient.prefetchQuery(linkedTrialsQuery(trial, terms, filter));
+  },
+  component: lazyRouteComponent(() => import("@/pages/analysis/linking"), "LinkingSection"),
+});
+
+export const analysisSearchRoute = createRoute({
+  getParentRoute: () => analysisRoute,
+  path: "search",
+  staticData: { title: "Advanced search" },
+  component: emptySection,
+});
+
+export const analysisConditionsRoute = createRoute({
+  getParentRoute: () => analysisRoute,
+  path: "conditions",
+  staticData: { title: "Conditions" },
+  component: emptySection,
+});
+
+export const analysisInterventionsRoute = createRoute({
+  getParentRoute: () => analysisRoute,
+  path: "interventions",
+  staticData: { title: "Interventions" },
+  component: emptySection,
 });
 
 export const trialsRoute = createRoute({
@@ -88,7 +141,13 @@ export const settingsRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   dashboardRoute,
-  analysisRoute,
+  analysisRoute.addChildren([
+    analysisLandscapeRoute,
+    analysisLinkingRoute,
+    analysisSearchRoute,
+    analysisConditionsRoute,
+    analysisInterventionsRoute,
+  ]),
   trialsRoute,
   trialRoute,
   settingsRoute,

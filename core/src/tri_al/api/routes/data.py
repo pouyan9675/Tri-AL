@@ -21,6 +21,7 @@ from tri_al.api.models import (
     DashboardOut,
     ErrorOut,
     FacetsOut,
+    LinkedTrialsOut,
     MetaOut,
     SearchOut,
     StatsOut,
@@ -30,6 +31,7 @@ from tri_al.api.models import (
 from tri_al.api.params import sort_param, trial_filter
 from tri_al.api.state import ApiState
 from tri_al.filters import TrialFilter
+from tri_al.linking import linked_trials
 from tri_al.pipeline.runs import cursor_key
 from tri_al.schema import TrialRecord, labels
 from tri_al.search import merge
@@ -245,6 +247,49 @@ def get_trial_changes(
             "source": found_source,
             "source_id": source_id,
             "changes": reader.changes(trial_id),
+        }
+        return data_json(body, etag)
+
+
+@router.get(
+    "/trials/{source_id}/linked",
+    response_model=LinkedTrialsOut,
+    responses=NOT_FOUND,
+    tags=["trials"],
+    name="getLinkedTrials",
+)
+def get_linked_trials(
+    request: Request,
+    state: State,
+    source_id: str,
+    filter: Filter,
+    terms: Annotated[
+        list[str] | None,
+        Query(description="The trial's MeSH codes to link by; all of them if not given"),
+    ] = None,
+    source: Annotated[
+        str | None, Query(description="The registry, if the id is in several")
+    ] = None,
+    limit: Annotated[int, Query(ge=1, le=500, description="Trials listed per phase")] = 100,
+) -> Response:
+    """Trials that share the trial's MeSH conditions and interventions, by phase.
+
+    A trial is linked when it's tagged with at least one of the chosen condition terms and
+    one of the chosen intervention terms; the filter narrows the linked trials.
+    """
+    with state.read() as reader:
+        version = reader.data_version()
+        etag = state.etag(version)
+        if (cached := not_modified(request, etag)) is not None:
+            return cached
+        _, trial_id = _find(reader, source_id, source)
+        links = linked_trials(reader, trial_id, terms=terms, filter=filter, limit=limit)
+        body = {
+            "data_version": version,
+            "trial": reader.summaries([trial_id])[0],
+            "terms": links.terms,
+            "total": links.total,
+            "phases": links.phases,
         }
         return data_json(body, etag)
 

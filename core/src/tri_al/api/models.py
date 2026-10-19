@@ -178,6 +178,33 @@ class ChangesOut(_Out):
     changes: list[ChangeOut]
 
 
+class LinkTermOut(_Out):
+    code: str
+    term: str
+    kind: Literal["condition", "intervention"]
+    selected: bool = Field(description="Whether trials are linked by it.")
+    trials: int = Field(description="Linked trials that share it.")
+
+
+class LinkedTrialOut(_Out):
+    trial: TrialSummaryOut
+    shared: list[str] = Field(description="The codes of the chosen terms it shares.")
+
+
+class PhaseGroupOut(_Out):
+    phase: str | None = Field(description="Null for trials without a phase.")
+    total: int
+    trials: list[LinkedTrialOut] = Field(description="The first `limit`, most terms shared first.")
+
+
+class LinkedTrialsOut(_Out):
+    data_version: int
+    trial: TrialSummaryOut
+    terms: list[LinkTermOut] = Field(description="The trial's own MeSH terms.")
+    total: int = Field(description="Linked trials.")
+    phases: list[PhaseGroupOut] = Field(description="In phase order; trials without one last.")
+
+
 class SnippetPartOut(_Out):
     text: str
     match: bool

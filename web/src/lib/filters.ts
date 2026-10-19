@@ -112,6 +112,12 @@ export function onlyFilter(search: TrialsSearch): TrialFilter {
   return parseFilter(filter);
 }
 
+/** Search params without the filter's: what else a page keeps in its URL. */
+export function withoutFilter(search: Record<string, unknown>): Record<string, unknown> {
+  const fields = new Set<string>([...LIST_FIELDS, ...RANGE_FIELDS, "has_results", "q"]);
+  return Object.fromEntries(Object.entries(search).filter(([key]) => !fields.has(key)));
+}
+
 export function activeCount(filter: TrialFilter): number {
   let count = 0;
   for (const field of LIST_FIELDS) count += filter[field]?.length ?? 0;

@@ -61,6 +61,22 @@
         "--no-job-worker"
       ],
       "port": 8000
+    },
+    {
+      "name": "web-dev-preview",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "TRI_AL_API=http://127.0.0.1:8766",
+        "npm",
+        "--prefix",
+        "web",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5174"
+      ],
+      "port": 5174
     }
   ]
 }

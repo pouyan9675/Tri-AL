@@ -17,6 +17,9 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
@@ -25,6 +28,7 @@ import { formatNumber } from "@/lib/format";
 import { isActive } from "@/lib/live";
 import { useLive } from "@/lib/live-context";
 import { cn } from "@/lib/utils";
+import { ANALYSIS_SECTIONS } from "@/pages/analysis/sections";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
@@ -84,6 +88,19 @@ export function AppSidebar({
                         <span>{item.label}</span>
                       </Link>
                     </SidebarMenuButton>
+                    {item.to === "/analysis" && (
+                      <SidebarMenuSub>
+                        {ANALYSIS_SECTIONS.map((section) => (
+                          <SidebarMenuSubItem key={section.to}>
+                            <SidebarMenuSubButton asChild isActive={pathname === section.to}>
+                              <Link to={section.to} onClick={() => setOpenMobile(false)}>
+                                <span>{section.label}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    )}
                   </SidebarMenuItem>
                 );
               })}

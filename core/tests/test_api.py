@@ -370,6 +370,7 @@ def test_the_openapi_schema_names_every_operation(client: TestClient) -> None:
         "listTrials",
         "getTrial",
         "getTrialChanges",
+        "getLinkedTrials",
         "search",
         "getFacets",
         "getDashboard",

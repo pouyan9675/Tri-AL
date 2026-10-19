@@ -84,6 +84,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/trials/{source_id}/linked": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Getlinkedtrials
+         * @description Trials that share the trial's MeSH conditions and interventions, by phase.
+         *
+         *     A trial is linked when it's tagged with at least one of the chosen condition terms and
+         *     one of the chosen intervention terms; the filter narrows the linked trials.
+         */
+        get: operations["getLinkedTrials"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/search": {
         parameters: {
             query?: never;
@@ -813,6 +836,58 @@ export interface components {
             /** Order */
             order: number;
         };
+        /** LinkTermOut */
+        LinkTermOut: {
+            /** Code */
+            code: string;
+            /** Term */
+            term: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "condition" | "intervention";
+            /**
+             * Selected
+             * @description Whether trials are linked by it.
+             */
+            selected: boolean;
+            /**
+             * Trials
+             * @description Linked trials that share it.
+             */
+            trials: number;
+        };
+        /** LinkedTrialOut */
+        LinkedTrialOut: {
+            trial: components["schemas"]["TrialSummaryOut"];
+            /**
+             * Shared
+             * @description The codes of the chosen terms it shares.
+             */
+            shared: string[];
+        };
+        /** LinkedTrialsOut */
+        LinkedTrialsOut: {
+            /** Data Version */
+            data_version: number;
+            trial: components["schemas"]["TrialSummaryOut"];
+            /**
+             * Terms
+             * @description The trial's own MeSH terms.
+             */
+            terms: components["schemas"]["LinkTermOut"][];
+            /**
+             * Total
+             * @description Linked trials.
+             */
+            total: number;
+            /**
+             * Phases
+             * @description In phase order; trials without one last.
+             */
+            phases: components["schemas"]["PhaseGroupOut"][];
+        };
         /** LocationOut */
         LocationOut: {
             /** Facility */
@@ -908,6 +983,21 @@ export interface components {
             description: string | null;
             /** Time Frame */
             time_frame: string | null;
+        };
+        /** PhaseGroupOut */
+        PhaseGroupOut: {
+            /**
+             * Phase
+             * @description Null for trials without a phase.
+             */
+            phase: string | null;
+            /** Total */
+            total: number;
+            /**
+             * Trials
+             * @description The first `limit`, most terms shared first.
+             */
+            trials: components["schemas"]["LinkedTrialOut"][];
         };
         /** PluginChangedOut */
         PluginChangedOut: {
@@ -1415,6 +1505,95 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChangesOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description There's no data yet. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    getLinkedTrials: {
+        parameters: {
+            query?: {
+                /** @description The trial's MeSH codes to link by; all of them if not given */
+                terms?: string[] | null;
+                /** @description The registry, if the id is in several */
+                source?: string | null;
+                /** @description Trials listed per phase */
+                limit?: number;
+                /** @description Overall status codes: RECRUITING, ... */
+                status?: string[] | null;
+                /** @description PHASE1, PHASE2_PHASE3, NA, ... */
+                phase?: string[] | null;
+                /** @description INTERVENTIONAL, ... */
+                study_type?: string[] | null;
+                /** @description Condition names */
+                conditions?: string[] | null;
+                /** @description MeSH descriptor codes; narrower terms match too */
+                mesh?: string[] | null;
+                /** @description Intervention names */
+                interventions?: string[] | null;
+                /** @description DRUG, DEVICE, ... */
+                intervention_types?: string[] | null;
+                /** @description Lead or collaborator names */
+                sponsors?: string[] | null;
+                /** @description The lead sponsor's class: INDUSTRY, NIH, ... */
+                sponsor_class?: string[] | null;
+                /** @description ISO 3166-1 alpha-2 codes */
+                countries?: string[] | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                start?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                completion?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                first_posted?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                last_update?: string | null;
+                /** @description `from..to`, either end open: `100..500`, `1000..` */
+                enrollment?: string | null;
+                has_results?: boolean | null;
+                /** @description Full-text: every word must match; or trial IDs, which find those */
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkedTrialsOut"];
                 };
             };
             /** @description Not Found */

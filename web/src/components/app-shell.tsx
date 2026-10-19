@@ -1,6 +1,6 @@
 import { Link, Outlet, useMatches } from "@tanstack/react-router";
 import { ChevronRight, SearchIcon } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { DataStatus } from "@/components/data-status";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -114,23 +114,31 @@ export function AppShell() {
 function Breadcrumbs() {
   const matches = useMatches();
   const leaf = matches[matches.length - 1];
-  const title = leaf?.staticData.title;
   const sourceId = (leaf?.params as { sourceId?: string } | undefined)?.sourceId;
+  // A trial's page goes under the trials; a section under its page (the analysis page's).
+  const trail = sourceId
+    ? [{ id: "trials", to: "/trials", title: "Trials" }]
+    : matches
+        .slice(0, -1)
+        .filter((match) => match.staticData.title)
+        .map((match) => ({ id: match.id, to: match.pathname, title: match.staticData.title }));
   return (
     <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm">
-      {sourceId ? (
-        <>
+      {trail.map((crumb) => (
+        <Fragment key={crumb.id}>
           <Link
-            to="/trials"
-            className="text-muted-foreground transition-colors hover:text-foreground"
+            to={crumb.to}
+            className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
           >
-            Trials
+            {crumb.title}
           </Link>
           <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/60" />
-          <span className="truncate font-mono text-[0.8rem] font-medium">{sourceId}</span>
-        </>
+        </Fragment>
+      ))}
+      {sourceId ? (
+        <span className="truncate font-mono text-[0.8rem] font-medium">{sourceId}</span>
       ) : (
-        <span className="truncate font-medium">{title}</span>
+        <span className="truncate font-medium">{leaf?.staticData.title}</span>
       )}
     </nav>
   );
