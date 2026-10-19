@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from tri_al.schema import Intervention, Location, MeshTerm, Outcome, Sponsor
+from tri_al.schema import Arm, Intervention, Location, MeshTerm, Outcome, Sponsor
 from tri_al.storage.countries import COUNTRIES, EXTRA_COUNTRIES
 from tri_al_ctgov.countries import CTGOV_COUNTRIES, country_code
 from tri_al_ctgov.normalize import age_days, hashable, normalize, parse_date, phase
@@ -34,12 +34,101 @@ def test_a_study_with_results_and_two_phases(load_study: StudyLoader) -> None:
     assert (record.enrollment, record.enrollment_type, record.arms_count) == (48, "ACTUAL", 3)
     assert record.healthy_volunteers is True
     assert record.interventions == [
-        Intervention("florbetapir (18F)", "DRUG", ("18F-AV-45", "Amyvid", "Florbetapir F 18"))
+        Intervention(
+            "florbetapir (18F)",
+            "DRUG",
+            ("18F-AV-45", "Amyvid", "Florbetapir F 18"),
+            "IV injection, 370 MBq(10mCi), single dose",
+        )
     ]
     assert record.sponsors == [
         Sponsor("Avid Radiopharmaceuticals", "lead", "INDUSTRY"),
         Sponsor("Eli Lilly and Company", "collaborator", "INDUSTRY"),
     ]
+
+
+def test_arms_get_their_interventions(load_study: StudyLoader) -> None:
+    record = normalize(load_study("NCT05026866"))
+
+    assert [(arm.label, arm.type, arm.interventions) for arm in record.arms] == [
+        ("Donanemab", "EXPERIMENTAL", ("Donanemab",)),
+        ("Placebo", "PLACEBO_COMPARATOR", ("Placebo",)),
+    ]
+    assert record.arms[0].description is not None
+    assert record.arms[0].description.startswith("Donanemab administered intravenously")
+    assert [i.description for i in record.interventions] == ["Administered intravenously"] * 2
+
+
+def test_an_arm_without_interventions(load_study: StudyLoader) -> None:
+    record = normalize(load_study("NCT06716476"))
+
+    assert record.arms[1] == Arm(
+        "No treatment with Vitamin D", "NO_INTERVENTION", "RA Patients without Vitamin D"
+    )
+
+
+def test_an_arm_names_an_intervention_by_type_and_name(load_study: StudyLoader) -> None:
+    raw = copy.deepcopy(load_study("NCT05026866"))
+    module = raw["protocolSection"]["armsInterventionsModule"]
+    for intervention in module["interventions"]:
+        intervention.pop("armGroupLabels", None)
+    record = normalize(raw)
+
+    # The arms list "Drug: Donanemab" and "Drug: Placebo".
+    assert [arm.interventions for arm in record.arms] == [("Donanemab",), ("Placebo",)]
+
+
+def test_interventional_design(load_study: StudyLoader) -> None:
+    record = normalize(load_study("NCT01245725"))
+
+    assert (record.allocation, record.intervention_model, record.masking) == (
+        "RANDOMIZED",
+        "PARALLEL",
+        "QUADRUPLE",
+    )
+    assert record.masked_roles == [
+        "PARTICIPANT",
+        "CARE_PROVIDER",
+        "INVESTIGATOR",
+        "OUTCOMES_ASSESSOR",
+    ]
+    assert (record.observational_model, record.time_perspective) == (None, None)
+
+
+def test_observational_design_and_cohorts(load_study: StudyLoader) -> None:
+    record = normalize(load_study("NCT07187596"))
+
+    assert record.study_type == "OBSERVATIONAL"
+    assert (record.observational_model, record.time_perspective) == ("OTHER", "OTHER")
+    assert (record.allocation, record.masking, record.masked_roles) == (None, None, [])
+    assert [(arm.label, arm.type) for arm in record.arms] == [("Mortality outcomes", None)]
+    assert record.keywords[:2] == ["Controlled blood pressure", "Mortality outcomes"]
+
+
+def test_the_timeline(load_study: StudyLoader) -> None:
+    record = normalize(load_study("NCT01662882"))
+
+    # Older studies may give a date without saying whether it's actual or estimated.
+    assert (
+        record.start_date_type,
+        record.primary_completion_date_type,
+        record.completion_date_type,
+    ) == (None, "ACTUAL", "ACTUAL")
+    assert record.results_first_posted == date(2013, 9, 19)
+    assert record.status_verified == date(2013, 7, 1)
+    assert (record.last_known_status, record.why_stopped) == (None, None)
+
+
+def test_why_a_trial_stopped(load_study: StudyLoader) -> None:
+    raw = copy.deepcopy(load_study("NCT01245725"))
+    status = raw["protocolSection"]["statusModule"]
+    status |= {"whyStopped": "  Sponsor decision ", "lastKnownStatus": "RECRUITING"}
+    status["statusVerifiedDate"] = "2011-03"
+    record = normalize(raw)
+
+    assert record.why_stopped == "Sponsor decision"
+    assert record.last_known_status == "RECRUITING"
+    assert record.status_verified == date(2011, 3, 1)
 
 
 def test_month_only_dates_become_the_first(load_study: StudyLoader) -> None:

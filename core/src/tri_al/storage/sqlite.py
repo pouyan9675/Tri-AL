@@ -5,9 +5,9 @@ import re
 import sqlite3
 import threading
 from collections import Counter
-from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 from types import TracebackType
@@ -39,6 +39,7 @@ from sqlalchemy.sql.elements import KeyedColumnElement
 
 from tri_al.filters import EVERY_TRIAL, TrialFilter
 from tri_al.schema import (
+    Arm,
     Intervention,
     Location,
     MeshTerm,
@@ -55,6 +56,7 @@ from tri_al.storage.base import (
     Cursor,
     NameHit,
     NameKind,
+    Refreshed,
     SearchHit,
     SearchResult,
     SnippetPart,
@@ -561,6 +563,62 @@ class SQLiteTransaction:
     def upsert_batch(self, records: Sequence[TrialRecord]) -> list[int]:
         return self._writer.upsert(records)
 
+    def refresh(
+        self,
+        trial_ids: Sequence[int],
+        derive: Callable[[TrialRecord], TrialRecord | None],
+    ) -> Refreshed:
+        result = Refreshed()
+        rewrite: list[tuple[int, TrialRecord]] = []
+        replace_: list[TrialRecord] = []
+        for trial_id in trial_ids:
+            stored = _read_trial(self._conn, trial_id, self._decoder)
+            derived = None if stored is None else derive(stored)
+            if stored is None or derived is None:
+                result.skipped.append(trial_id)
+                continue
+            if (derived.source, derived.source_id) != (stored.source, stored.source_id):
+                raise ValueError(
+                    f"derive made {derived.source}/{derived.source_id} of trial {trial_id}, "
+                    f"which is {stored.source}/{stored.source_id}"
+                )
+            record = without_repeats(derived)
+            if record.raw is None:
+                record.raw = stored.raw
+            if _comparable(record) == _comparable(stored):
+                result.unchanged.append(trial_id)
+            elif record.raw == stored.raw and _indexed(record) == _indexed(stored):
+                rewrite.append((trial_id, record))
+                result.rewritten.append(trial_id)
+            else:
+                replace_.append(record)
+                result.replaced.append(trial_id)
+        self._writer.rewrite(rewrite)
+        self._writer.upsert(replace_)
+        return result
+
+
+def _comparable(record: TrialRecord) -> TrialRecord:
+    """``record`` without what storage sets, to compare a stored record with a new one."""
+    return replace(record, id=None, ingested_at=None)
+
+
+def _indexed(record: TrialRecord) -> tuple[object, ...]:
+    """What a trial's links, full-text row and vector are made of; the rest is columns and text.
+
+    ``refresh`` rewrites a trial in place only when this hasn't changed. Embeddings read
+    the title, conditions, interventions and summary, which the full-text row covers too.
+    """
+    return (
+        _fts_row(record, 0),
+        record.conditions,
+        record.mesh_terms,
+        [(i.name, i.type, i.other_names) for i in record.interventions],
+        record.sponsors,
+        record.countries,
+        record.locations,
+    )
+
 
 class SQLiteBulkLoader:
     def __init__(self, conn: Connection) -> None:
@@ -760,6 +818,31 @@ class _Writer:
             conn.execute(_sql("INSERT INTO names_fts VALUES (:name, :kind, :ref)"), new_names)
         return ids
 
+    def rewrite(self, trials: Sequence[tuple[int, TrialRecord]]) -> None:
+        """Rewrite stored trials' columns and text, leaving the rest as it is.
+
+        Only for records whose links and indexed text are what's stored (``_indexed``), as
+        ``SQLiteTransaction.refresh`` checks: their full-text rows, raw documents, vectors
+        and ``ingested_at`` stay.
+        """
+        if not trials:
+            return
+        conn = self._conn
+        ids = [trial_id for trial_id, _ in trials]
+        conn.execute(
+            update(t.trials).where(t.trials.c.id == bindparam("b_id")),
+            [{"b_id": trial_id} | _trial_columns(record) for trial_id, record in trials],
+        )
+        conn.execute(delete(t.trial_text).where(_in(t.trial_text.c.trial_id, ids)))
+        conn.execute(
+            insert(t.trial_text),
+            self._texts.rows(
+                conn,
+                [(trial_id, _trial_text(record).pack()) for trial_id, record in trials],
+                "text",
+            ),
+        )
+
     def _check(self, records: Sequence[TrialRecord]) -> None:
         keys = Counter((record.source, record.source_id) for record in records)
         if repeated := sorted(key for key, count in keys.items() if count > 1):
@@ -820,30 +903,8 @@ class _Writer:
             "id": trial_id,
             "source": record.source,
             "source_id": record.source_id,
-            "title": record.title,
-            "official_title": record.official_title,
-            "status": record.status,
-            "phase": record.phase,
-            "study_type": record.study_type,
-            "primary_purpose": record.primary_purpose,
-            "start_date": record.start_date,
-            "primary_completion_date": record.primary_completion_date,
-            "completion_date": record.completion_date,
-            "first_posted": record.first_posted,
-            "last_update": record.last_update,
-            "enrollment": record.enrollment,
-            "enrollment_type": record.enrollment_type,
-            "arms_count": record.arms_count,
-            "has_results": record.has_results,
+            **_trial_columns(record),
             "lead_sponsor_id": None if lead is None else self._sponsors.ids[lead.name],
-            "lead_sponsor_class": None if lead is None else lead.sponsor_class,
-            "min_age_days": record.min_age_days,
-            "max_age_days": record.max_age_days,
-            "sex": record.sex,
-            "healthy_volunteers": record.healthy_volunteers,
-            "location_scope": record.location_scope,
-            "num_sites": record.num_sites,
-            "content_hash": record.content_hash,
             "ingested_at": now,
         }
 
@@ -927,6 +988,47 @@ class _Writer:
                 self._conn.execute(insert(table_), table_rows)
 
 
+def _trial_columns(record: TrialRecord) -> dict[str, Any]:
+    """The trial's ``trials`` columns but its identity, lead sponsor id and ``ingested_at``."""
+    lead = record.lead_sponsor
+    return {
+        "title": record.title,
+        "official_title": record.official_title,
+        "status": record.status,
+        "phase": record.phase,
+        "study_type": record.study_type,
+        "primary_purpose": record.primary_purpose,
+        "start_date": record.start_date,
+        "primary_completion_date": record.primary_completion_date,
+        "completion_date": record.completion_date,
+        "first_posted": record.first_posted,
+        "last_update": record.last_update,
+        "enrollment": record.enrollment,
+        "enrollment_type": record.enrollment_type,
+        "arms_count": record.arms_count,
+        "has_results": record.has_results,
+        "lead_sponsor_class": None if lead is None else lead.sponsor_class,
+        "min_age_days": record.min_age_days,
+        "max_age_days": record.max_age_days,
+        "sex": record.sex,
+        "healthy_volunteers": record.healthy_volunteers,
+        "location_scope": record.location_scope,
+        "num_sites": record.num_sites,
+        "content_hash": record.content_hash,
+        "allocation": record.allocation,
+        "intervention_model": record.intervention_model,
+        "observational_model": record.observational_model,
+        "time_perspective": record.time_perspective,
+        "masking": record.masking,
+        "start_date_type": record.start_date_type,
+        "primary_completion_date_type": record.primary_completion_date_type,
+        "completion_date_type": record.completion_date_type,
+        "results_first_posted": record.results_first_posted,
+        "status_verified": record.status_verified,
+        "last_known_status": record.last_known_status,
+    }
+
+
 def _trial_text(record: TrialRecord) -> docs.TrialText:
     return docs.TrialText(
         record.brief_summary,
@@ -936,6 +1038,11 @@ def _trial_text(record: TrialRecord) -> docs.TrialText:
             (outcome.kind, outcome.measure, outcome.description, outcome.time_frame)
             for outcome in record.outcomes
         ),
+        tuple(record.keywords),
+        tuple((arm.label, arm.type, arm.description, arm.interventions) for arm in record.arms),
+        tuple((i.name, i.description) for i in record.interventions if i.description is not None),
+        tuple(record.masked_roles),
+        record.why_stopped,
     )
 
 
@@ -1062,6 +1169,7 @@ def _read_trial(
             )
         ).one_or_none()
 
+    described = dict(text_.intervention_descriptions)
     aliases: dict[int, list[str]] = {}
     for intervention_id, alias in rows(
         select(t.intervention_aliases.c.intervention_id, t.intervention_aliases.c.alias),
@@ -1079,11 +1187,24 @@ def _read_trial(
         phase=trial.phase,
         study_type=trial.study_type,
         primary_purpose=trial.primary_purpose,
+        allocation=trial.allocation,
+        intervention_model=trial.intervention_model,
+        observational_model=trial.observational_model,
+        time_perspective=trial.time_perspective,
+        masking=trial.masking,
+        masked_roles=list(text_.masked_roles),
         start_date=trial.start_date,
         primary_completion_date=trial.primary_completion_date,
         completion_date=trial.completion_date,
         first_posted=trial.first_posted,
         last_update=trial.last_update,
+        start_date_type=trial.start_date_type,
+        primary_completion_date_type=trial.primary_completion_date_type,
+        completion_date_type=trial.completion_date_type,
+        results_first_posted=trial.results_first_posted,
+        status_verified=trial.status_verified,
+        last_known_status=trial.last_known_status,
+        why_stopped=text_.why_stopped,
         enrollment=trial.enrollment,
         enrollment_type=trial.enrollment_type,
         arms_count=trial.arms_count,
@@ -1105,6 +1226,7 @@ def _read_trial(
                 select(t.conditions.c.name).join(t.trial_conditions), t.trial_conditions
             )
         ],
+        keywords=list(text_.keywords),
         mesh_terms=[
             MeshTerm(row.code, row.term, row.kind, row.ancestor)
             for row in rows(
@@ -1118,13 +1240,18 @@ def _read_trial(
             )
         ],
         interventions=[
-            Intervention(row.name, row.type, tuple(aliases.get(row.id, ())))
+            Intervention(
+                row.name, row.type, tuple(aliases.get(row.id, ())), described.get(row.name)
+            )
             for row in rows(
                 select(
                     t.interventions.c.id, t.interventions.c.name, t.trial_interventions.c.type
                 ).join(t.trial_interventions),
                 t.trial_interventions,
             )
+        ],
+        arms=[
+            Arm(label, type_, description, names) for label, type_, description, names in text_.arms
         ],
         sponsors=[
             Sponsor(row.name, row.role, row.sponsor_class)

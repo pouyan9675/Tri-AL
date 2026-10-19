@@ -20,7 +20,12 @@ def storage(tmp_path: Path) -> Iterator[SQLiteStorage]:
         storage.upsert_batch(
             [
                 *sample_trials(),
-                replace(minimal_trial(), source_id="NCT5", last_update=date(2026, 9, 29)),
+                replace(
+                    minimal_trial(),
+                    source_id="NCT5",
+                    first_posted=date(2026, 7, 3),
+                    last_update=date(2026, 9, 29),
+                ),
             ]
         )
         yield storage
@@ -49,7 +54,7 @@ def test_registers_every_chart() -> None:
         "trials_by_phase",
         "trials_by_status",
         "top_conditions",
-        "recent_updates",
+        "new_and_updated",
     ]
     assert {chart.plugin for chart in contributions.charts.values()} == {"charts"}
 
@@ -107,16 +112,20 @@ def test_top_conditions_and_countries(storage: SQLiteStorage, index: bool) -> No
 
 
 @pytest.mark.parametrize("index", [False, True], ids=["sql", "index"])
-def test_recent_updates_cover_the_last_days_of_data(storage: SQLiteStorage, index: bool) -> None:
+def test_new_and_updated_cover_the_posting_days_of_the_last_days(
+    storage: SQLiteStorage, index: bool
+) -> None:
     with storage.read() as reader:
-        rows = run(reader, "recent_updates", TrialFilter(), index=index)
-        filtered = run(reader, "recent_updates", TrialFilter(status=("RECRUITING",)), index=index)
+        rows = run(reader, "new_and_updated", TrialFilter(), index=index)
+        filtered = run(reader, "new_and_updated", TrialFilter(status=("RECRUITING",)), index=index)
 
-    assert len(rows) == 30
-    assert rows[-1] == {"date": "2026-09-30", "value": 1}
-    assert rows[-2] == {"date": "2026-09-29", "value": 1}
-    assert rows[0]["date"] == "2026-09-01"
-    assert [row["value"] for row in filtered][-2:] == [0, 1]
+    # 90 days of data, 2026-07-03 to 2026-09-30, but only the days something was posted on.
+    assert rows == [
+        {"date": "2026-07-03", "new": 1, "updated": 0},
+        {"date": "2026-09-29", "new": 0, "updated": 1},
+        {"date": "2026-09-30", "new": 0, "updated": 1},
+    ]
+    assert [(row["new"], row["updated"]) for row in filtered] == [(0, 0), (0, 0), (0, 1)]
 
 
 @pytest.mark.parametrize("index", [False, True], ids=["sql", "index"])

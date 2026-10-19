@@ -22,8 +22,10 @@ from tri_al.pipeline import (
     content_hash,
     prepare,
 )
+from tri_al.schema import Arm, TrialRecord
 from tri_al.storage import SQLiteStorage, StorageError
 from tri_al.testing import FakeSource, fake_study
+from tri_al.testing.storage import source_ids
 
 STUDIES = (
     fake_study("F1", "Donepezil in mild AD", updated="2026-09-01", status="RECRUITING"),
@@ -529,3 +531,89 @@ def test_update_overlaps_the_cursor_by_a_day(installed: Pipeline) -> None:
     replace(installed, sources=[Recording()]).run_update()
 
     assert seen == [date(2026, 10, 14)]
+
+
+# --- renormalize ----------------------------------------------------------------------------
+
+
+class _ReadsMore(FakeSource):
+    """The fake source after it learned to read the design and arms of its studies."""
+
+    def normalize(self, raw: dict[str, Any]) -> TrialRecord:
+        return replace(
+            super().normalize(raw),
+            allocation="RANDOMIZED",
+            arms=[Arm("Treatment", "EXPERIMENTAL", f"{raw['title']} for 12 weeks")],
+        )
+
+
+class _Retitles(FakeSource):
+    def normalize(self, raw: dict[str, Any]) -> TrialRecord:
+        return replace(super().normalize(raw), title=f"{raw['title']} (renamed)")
+
+
+def test_renormalize_adds_new_fields_in_place(installed: Pipeline, tmp_path: Path) -> None:
+    version = installed.current_data_version()
+    before = query(installed, "SELECT id, ingested_at FROM trials ORDER BY id")
+    pipeline = replace(installed, sources=[_ReadsMore(studies=STUDIES)])
+    reports: list[Progress] = []
+
+    summary = pipeline.run_renormalize(reports.append)
+
+    assert (summary.trials, summary.rewritten, summary.unchanged, summary.replaced) == (3, 3, 0, 0)
+    assert summary.data_version == version + 1
+    assert reports[-1].stage == "stats"
+    with SQLiteStorage.open(pipeline.trials_db) as storage:
+        record = storage.find_trial("fake", "F3")
+        assert record is not None
+        assert record.allocation == "RANDOMIZED"
+        assert record.arms == [Arm("Treatment", "EXPERIMENTAL", "Lecanemab for 12 weeks")]
+        assert source_ids(storage.search("lecanemab").hits) == ["F3"]
+    assert query(pipeline, "SELECT id, ingested_at FROM trials ORDER BY id") == before
+    assert query(pipeline, "SELECT count(*) FROM trial_changes") == [(0,)]
+
+
+def test_renormalize_again_finds_nothing_to_do(installed: Pipeline) -> None:
+    pipeline = replace(installed, sources=[_ReadsMore(studies=STUDIES)])
+    pipeline.run_renormalize()
+    version = pipeline.current_data_version()
+
+    summary = pipeline.run_renormalize()
+
+    assert (summary.unchanged, summary.rewritten, summary.replaced) == (3, 0, 0)
+    assert summary.data_version == version
+    assert "stats" not in summary.stages
+
+
+def test_renormalize_replaces_trials_whose_searchable_text_changed(installed: Pipeline) -> None:
+    pipeline = replace(installed, sources=[_Retitles(studies=STUDIES)])
+
+    summary = pipeline.run_renormalize()
+
+    assert summary.replaced == 3
+    assert titles(pipeline)["F2"] == "Aducanumab (renamed)"
+    with SQLiteStorage.open(pipeline.trials_db) as storage:
+        assert source_ids(storage.search("renamed aducanumab").hits) == ["F2"]
+        record = storage.find_trial("fake", "F2")
+        assert record is not None
+        assert record.raw == STUDIES[1]
+
+
+def test_renormalize_skips_other_sources_and_counts_failures(installed: Pipeline) -> None:
+    class Breaks(FakeSource):
+        def normalize(self, raw: dict[str, Any]) -> TrialRecord:
+            if raw["id"] == "F2":
+                raise ValueError("F2: can't read it")
+            return super().normalize(raw)
+
+    summary = replace(installed, sources=[Breaks(studies=STUDIES)]).run_renormalize()
+    assert (summary.unchanged, summary.failed) == (2, 1)
+    assert summary.failures == ["fake/F2: ValueError: F2: can't read it"]
+
+    other = replace(installed, sources=[FakeSource(name="other")]).run_renormalize()
+    assert (other.trials, other.skipped, other.unchanged) == (3, 3, 0)
+
+
+def test_renormalize_needs_a_database(pipeline: Pipeline) -> None:
+    with pytest.raises(PipelineError, match="tri-al install"):
+        pipeline.run_renormalize()

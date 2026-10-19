@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, SearchIcon, Settings2, TableProperties } from "lucide-react";
+import { LayoutDashboard, Orbit, SearchIcon, Settings2, TableProperties } from "lucide-react";
 import { useMemo } from "react";
 import { metaQuery } from "@/api/queries";
 import { Logo } from "@/components/logo";
@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { to: "/analysis", label: "Analysis", icon: Orbit, exact: false },
   { to: "/trials", label: "Trials", icon: TableProperties, exact: false },
 ] as const;
 

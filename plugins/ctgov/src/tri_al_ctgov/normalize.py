@@ -12,6 +12,7 @@ from datetime import date
 from typing import Any
 
 from tri_al.schema import (
+    Arm,
     Intervention,
     Location,
     MeshKind,
@@ -63,6 +64,9 @@ def _normalize(nct_id: str, raw: Json, protocol: Json) -> TrialRecord:
     eligibility = _module(protocol, "eligibilityModule")
     description = _module(protocol, "descriptionModule")
     arms = _module(protocol, "armsInterventionsModule")
+    conditions = _module(protocol, "conditionsModule")
+    design_info = _module(design, "designInfo")
+    masking = _module(design_info, "maskingInfo")
     enrollment = _module(design, "enrollmentInfo")
     locations = [
         _location(location)
@@ -78,12 +82,25 @@ def _normalize(nct_id: str, raw: Json, protocol: Json) -> TrialRecord:
         status=_text(status.get("overallStatus")),
         phase=phase(design.get("phases")),
         study_type=_text(design.get("studyType")),
-        primary_purpose=_text(_module(design, "designInfo").get("primaryPurpose")),
+        primary_purpose=_text(design_info.get("primaryPurpose")),
+        allocation=_text(design_info.get("allocation")),
+        intervention_model=_text(design_info.get("interventionModel")),
+        observational_model=_text(design_info.get("observationalModel")),
+        time_perspective=_text(design_info.get("timePerspective")),
+        masking=_text(masking.get("masking")),
+        masked_roles=_texts(_list(masking, "whoMasked")),
         start_date=_date(status, "startDateStruct"),
         primary_completion_date=_date(status, "primaryCompletionDateStruct"),
         completion_date=_date(status, "completionDateStruct"),
         first_posted=_date(status, "studyFirstPostDateStruct"),
         last_update=_date(status, "lastUpdatePostDateStruct"),
+        start_date_type=_date_type(status, "startDateStruct"),
+        primary_completion_date_type=_date_type(status, "primaryCompletionDateStruct"),
+        completion_date_type=_date_type(status, "completionDateStruct"),
+        results_first_posted=_date(status, "resultsFirstPostDateStruct"),
+        status_verified=_optional_date(status.get("statusVerifiedDate")),
+        last_known_status=_text(status.get("lastKnownStatus")),
+        why_stopped=_text(status.get("whyStopped")),
         enrollment=_int(enrollment.get("count")),
         enrollment_type=_text(enrollment.get("type")),
         arms_count=len(arm_groups) if isinstance(arm_groups, list) else None,
@@ -96,9 +113,11 @@ def _normalize(nct_id: str, raw: Json, protocol: Json) -> TrialRecord:
         description=_text(description.get("detailedDescription")),
         eligibility_criteria=_text(eligibility.get("eligibilityCriteria")),
         outcomes=_outcomes(_module(protocol, "outcomesModule")),
-        conditions=_texts(_list(_module(protocol, "conditionsModule"), "conditions")),
+        conditions=_texts(_list(conditions, "conditions")),
+        keywords=_texts(_list(conditions, "keywords")),
         mesh_terms=_mesh_terms(_module(raw, "derivedSection")),
         interventions=_interventions(_list(arms, "interventions")),
+        arms=_arms(_list(arms, "armGroups"), _list(arms, "interventions")),
         sponsors=_sponsors(_module(protocol, "sponsorCollaboratorsModule")),
         countries=list(dict.fromkeys(loc.country_code for loc in locations if loc.country_code)),
         locations=locations,
@@ -192,10 +211,48 @@ def _mesh_terms(derived: Json) -> list[MeshTerm]:
 
 def _interventions(items: Iterable[Json]) -> list[Intervention]:
     return [
-        Intervention(name, _text(item.get("type")), tuple(_texts(item.get("otherNames") or [])))
+        Intervention(
+            name,
+            _text(item.get("type")),
+            tuple(_texts(_list(item, "otherNames"))),
+            _text(item.get("description")),
+        )
         for item in items
         if (name := _text(item.get("name")))
     ]
+
+
+def _arms(groups: Iterable[Json], interventions: Iterable[Json]) -> list[Arm]:
+    """Arm groups, each with the names of the interventions it gets.
+
+    An arm lists its interventions as ``"Drug: Placebo"`` (type, then name), and each
+    intervention lists the arms that get it by label; both are read, the arm's own list first.
+    """
+    names: set[str] = set()
+    by_label: dict[str, list[str]] = {}
+    for item in interventions:
+        if intervention := _text(item.get("name")):
+            names.add(intervention)
+            for arm_label in _texts(_list(item, "armGroupLabels")):
+                by_label.setdefault(arm_label, []).append(intervention)
+    arms = []
+    for group in groups:
+        if not (label := _text(group.get("label"))):
+            continue
+        given = []
+        for entry in _texts(_list(group, "interventionNames")):
+            name = entry if entry in names else entry.partition(":")[2].strip()
+            if name in names:
+                given.append(name)
+        arms.append(
+            Arm(
+                label,
+                _text(group.get("type")),
+                _text(group.get("description")),
+                tuple(dict.fromkeys([*given, *by_label.get(label, [])])),
+            )
+        )
+    return arms
 
 
 def _sponsors(module: Json) -> list[Sponsor]:
@@ -232,6 +289,16 @@ def _list(parent: Json, key: str) -> list[Any]:
 
 def _date(module: Json, key: str) -> date | None:
     text = _text(_module(module, key).get("date"))
+    return None if text is None else parse_date(text)
+
+
+def _date_type(module: Json, key: str) -> str | None:
+    struct = _module(module, key)
+    return _text(struct.get("type")) if _text(struct.get("date")) else None
+
+
+def _optional_date(value: object) -> date | None:
+    text = _text(value)
     return None if text is None else parse_date(text)
 
 

@@ -1,8 +1,8 @@
 """The storage contract (docs/design.md §5.2). Backends must pass ``tri_al.testing``."""
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, Literal, Protocol, Self
 
@@ -127,6 +127,16 @@ class TrialChange:
     new: Any
 
 
+@dataclass(kw_only=True)
+class Refreshed:
+    """What ``StorageTransaction.refresh`` did with each trial, by id."""
+
+    unchanged: list[int] = field(default_factory=list)  # nothing to write
+    rewritten: list[int] = field(default_factory=list)  # columns and text, in place
+    replaced: list[int] = field(default_factory=list)  # in full, so their vectors are gone
+    skipped: list[int] = field(default_factory=list)  # not stored, or nothing derived
+
+
 class StorageTransaction(Protocol):
     """Writes that commit together, or not at all."""
 
@@ -155,6 +165,24 @@ class StorageTransaction(Protocol):
         Returns the trials' ids in input order. An existing trial keeps its id, and
         everything about it is replaced, lists included. Raises ValueError, writing nothing,
         if the batch has two records for one trial or uses an unknown country code.
+        """
+        ...
+
+    def refresh(
+        self,
+        trial_ids: Sequence[int],
+        derive: Callable[[TrialRecord], TrialRecord | None],
+    ) -> Refreshed:
+        """Store what ``derive`` makes of each stored trial (read with its raw document).
+
+        For re-deriving trials from their raw documents after a source learned to read
+        more of them, without rewriting what didn't change. A trial whose record is the same
+        is left alone. One whose lists and indexed text (title, official title, conditions,
+        interventions and their other names, summary, description, eligibility, outcomes)
+        are the same gets its other fields rewritten in place, keeping its full-text row,
+        vector and ``ingested_at``. Any other is replaced as ``upsert_batch`` would, keeping
+        the stored raw document if the new record has none. ``derive`` returns None to skip
+        a trial; it must keep the trial's source and source id, or this raises ValueError.
         """
         ...
 

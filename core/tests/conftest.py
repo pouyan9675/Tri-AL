@@ -18,10 +18,15 @@ type Install = Callable[..., None]
 
 @pytest.fixture(autouse=True)
 def _isolated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Run each test in an empty directory, without the caller's TRI_AL_* variables."""
+    """Run each test in an empty directory, without the caller's TRI_AL_* variables.
+
+    Embeddings are off, so no test loads a real model; a test that wants them sets
+    ``TRI_AL_EMBEDDINGS__ENABLED`` and swaps in a fake engine.
+    """
     for var in list(os.environ):
         if var.startswith("TRI_AL_"):
             monkeypatch.delenv(var)
+    monkeypatch.setenv("TRI_AL_EMBEDDINGS__ENABLED", "false")
     monkeypatch.chdir(tmp_path)
 
 

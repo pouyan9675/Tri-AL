@@ -284,7 +284,7 @@ def test_facets(client: TestClient) -> None:
 def test_dashboard_and_chart_data(client: TestClient) -> None:
     dashboard = body(client.get("/api/dashboard"), m.DashboardOut)
     assert [chart.id for chart in dashboard.charts] == ["by_status"]
-    assert dashboard.charts[0].plugin == "fake"
+    assert (dashboard.charts[0].plugin, dashboard.charts[0].page) == ("fake", "dashboard")
     assert "conditions" in [facet.field for facet in dashboard.facets]
 
     plain = body(client.get("/api/stats/by_status"), m.StatsOut)
@@ -390,7 +390,16 @@ def test_meta_sends_the_labels_of_coded_fields(client: TestClient) -> None:
         "study_type",
         "sponsor_class",
         "intervention_type",
+        "primary_purpose",
+        "arm_type",
+        "allocation",
+        "intervention_model",
+        "observational_model",
+        "time_perspective",
+        "masking",
+        "masked_role",
     }
+    assert meta.labels["masking"]["QUADRUPLE"] == "Quadruple-blind"
 
 
 # --- browser protections and access -------------------------------------------------------

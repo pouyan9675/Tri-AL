@@ -22,7 +22,9 @@ const SPEC: ChartSpec = {
   section: "Research Intelligence",
   x: "label",
   y: "value",
+  series: [],
   layout: { width: 4, height: 2, order: 200 },
+  page: "dashboard",
   plugin: "insights",
   precomputed: true,
 };

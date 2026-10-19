@@ -9,7 +9,7 @@ import {
   createRouter,
   lazyRouteComponent,
 } from "@tanstack/react-router";
-import { chartQuery, dashboardQuery, metaQuery, trialQuery } from "@/api/queries";
+import { chartQuery, dashboardQuery, metaQuery, onPage, trialQuery } from "@/api/queries";
 import { AppShell } from "@/components/app-shell";
 import { NotFound, RouteError } from "@/components/route-states";
 import { parseFilter, parseTrialsSearch } from "@/lib/filters";
@@ -32,11 +32,26 @@ export const dashboardRoute = createRoute({
   loader: async ({ context: { queryClient }, deps }) => {
     void queryClient.prefetchQuery(metaQuery());
     const dashboard = await queryClient.ensureQueryData(dashboardQuery()).catch(() => null);
-    for (const chart of dashboard?.charts ?? []) {
+    for (const chart of onPage(dashboard?.charts, "dashboard")) {
       void queryClient.prefetchQuery(chartQuery(chart.id, deps));
     }
   },
   component: lazyRouteComponent(() => import("@/pages/dashboard"), "DashboardPage"),
+});
+
+export const analysisRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/analysis",
+  staticData: { title: "Analysis" },
+  validateSearch: parseFilter,
+  loaderDeps: ({ search }) => search,
+  loader: async ({ context: { queryClient }, deps }) => {
+    const dashboard = await queryClient.ensureQueryData(dashboardQuery()).catch(() => null);
+    for (const chart of onPage(dashboard?.charts, "analysis")) {
+      void queryClient.prefetchQuery(chartQuery(chart.id, deps));
+    }
+  },
+  component: lazyRouteComponent(() => import("@/pages/analysis"), "AnalysisPage"),
 });
 
 export const trialsRoute = createRoute({
@@ -71,7 +86,13 @@ export const settingsRoute = createRoute({
   component: lazyRouteComponent(() => import("@/pages/settings"), "SettingsPage"),
 });
 
-const routeTree = rootRoute.addChildren([dashboardRoute, trialsRoute, trialRoute, settingsRoute]);
+const routeTree = rootRoute.addChildren([
+  dashboardRoute,
+  analysisRoute,
+  trialsRoute,
+  trialRoute,
+  settingsRoute,
+]);
 
 export function makeRouter(queryClient: QueryClient) {
   return createRouter({

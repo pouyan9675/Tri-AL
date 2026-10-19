@@ -137,7 +137,8 @@ export interface paths {
         };
         /**
          * Getdashboard
-         * @description The dashboard's charts, in layout order, and the facets the explorer offers.
+         * @description Every chart, for the dashboard and the analysis page, in layout order, and the facets
+         *     the explorer offers.
          */
         get: operations["getDashboard"];
         put?: never;
@@ -313,6 +314,20 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ArmOut */
+        ArmOut: {
+            /** Label */
+            label: string;
+            /** Type */
+            type: string | null;
+            /** Description */
+            description: string | null;
+            /**
+             * Interventions
+             * @description Names of the interventions this arm gets.
+             */
+            interventions: string[];
+        };
         /** ChangeOut */
         ChangeOut: {
             /** Run Id */
@@ -347,18 +362,29 @@ export interface components {
              * Widget
              * @enum {string}
              */
-            widget: "bar" | "line" | "area" | "pie" | "stat" | "table" | "map" | "trends";
+            widget: "bar" | "line" | "area" | "pie" | "stat" | "table" | "map" | "trends" | "scatter" | "scatter3d";
             /** Description */
             description: string;
             /**
              * Section
-             * @description The dashboard section; empty for the first, untitled one.
+             * @description The page section; empty for the first, untitled one.
              */
             section: string;
+            /**
+             * Page
+             * @description Where the chart is shown: the dashboard or the analysis page.
+             * @enum {string}
+             */
+            page: "dashboard" | "analysis";
             /** X */
             x: string;
             /** Y */
             y: string;
+            /**
+             * Series
+             * @description Line and area charts with several series: each one's row key and name. Empty: one series, `y`.
+             */
+            series: components["schemas"]["SeriesOut"][];
             layout: components["schemas"]["LayoutOut"];
             /** Plugin */
             plugin: string;
@@ -427,6 +453,8 @@ export interface components {
             type: string | null;
             /** Other Names */
             other_names: string[];
+            /** Description */
+            description: string | null;
         };
         /** JobConflictOut */
         JobConflictOut: {
@@ -549,7 +577,7 @@ export interface components {
             search_candidates: number;
             /**
              * Labels
-             * @description Display names of coded fields: status, phase, study_type, sponsor_class and intervention_type. A code without one is shown as itself.
+             * @description Display names of coded fields: status, phase, study_type, sponsor_class, intervention_type, primary_purpose, arm_type, allocation, intervention_model, observational_model, time_perspective, masking and masked_role. A code without one is shown as itself.
              */
             labels: {
                 [key: string]: {
@@ -688,6 +716,13 @@ export interface components {
              */
             names: components["schemas"]["NameHitOut"][];
         };
+        /** SeriesOut */
+        SeriesOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+        };
         /** SnippetPartOut */
         SnippetPartOut: {
             /** Text */
@@ -739,6 +774,18 @@ export interface components {
             study_type: string | null;
             /** Primary Purpose */
             primary_purpose: string | null;
+            /** Allocation */
+            allocation: string | null;
+            /** Intervention Model */
+            intervention_model: string | null;
+            /** Observational Model */
+            observational_model: string | null;
+            /** Time Perspective */
+            time_perspective: string | null;
+            /** Masking */
+            masking: string | null;
+            /** Masked Roles */
+            masked_roles: string[];
             /** Start Date */
             start_date: string | null;
             /** Primary Completion Date */
@@ -749,6 +796,29 @@ export interface components {
             first_posted: string | null;
             /** Last Update */
             last_update: string | null;
+            /**
+             * Start Date Type
+             * @description ACTUAL or ESTIMATED; None if not given.
+             */
+            start_date_type: string | null;
+            /** Primary Completion Date Type */
+            primary_completion_date_type: string | null;
+            /** Completion Date Type */
+            completion_date_type: string | null;
+            /** Results First Posted */
+            results_first_posted: string | null;
+            /**
+             * Status Verified
+             * @description When the status was last confirmed.
+             */
+            status_verified: string | null;
+            /**
+             * Last Known Status
+             * @description The status before it became UNKNOWN.
+             */
+            last_known_status: string | null;
+            /** Why Stopped */
+            why_stopped: string | null;
             /** Enrollment */
             enrollment: number | null;
             /** Enrollment Type */
@@ -777,10 +847,14 @@ export interface components {
             outcomes: components["schemas"]["OutcomeOut"][];
             /** Conditions */
             conditions: string[];
+            /** Keywords */
+            keywords: string[];
             /** Mesh Terms */
             mesh_terms: components["schemas"]["MeshTermOut"][];
             /** Interventions */
             interventions: components["schemas"]["InterventionOut"][];
+            /** Arms */
+            arms: components["schemas"]["ArmOut"][];
             /** Sponsors */
             sponsors: components["schemas"]["SponsorOut"][];
             /** Countries */

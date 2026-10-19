@@ -34,7 +34,9 @@ async function coldLoad(
     if (types.get(event.requestId) === "Script") jsBytes += event.encodedDataLength;
   });
 
-  const charts = (await (await page.request.get("/api/dashboard")).json()).charts.length as number;
+  const charts = (
+    (await (await page.request.get("/api/dashboard")).json()).charts as { page: string }[]
+  ).filter((chart) => chart.page === "dashboard").length;
   await page.goto("/", { waitUntil: "commit" });
   const interactiveMs = await page.evaluate(
     (count) =>

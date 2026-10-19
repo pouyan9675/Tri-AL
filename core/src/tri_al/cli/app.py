@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 from tri_al import __version__
-from tri_al.cli import data, plugins, server
+from tri_al.cli import data, embeddings, plugins, server
 from tri_al.cli.doctor import doctor
 from tri_al.config import ConfigError, load_config
 from tri_al.plugins import PluginError, load_plugins
@@ -16,7 +16,18 @@ STUBS = {
     "backup": "Copy the databases while the app is running.",
     "bench": "Run the benchmark suite.",
 }
-CORE_COMMANDS = {*STUBS, "install", "update", "serve", "worker", "doctor", "plugins"}
+CORE_COMMANDS = {
+    *STUBS,
+    "install",
+    "update",
+    "embeddings",
+    "stats",
+    "renormalize",
+    "serve",
+    "worker",
+    "doctor",
+    "plugins",
+}
 
 
 def create_app() -> typer.Typer:
@@ -30,6 +41,9 @@ def create_app() -> typer.Typer:
     app.callback()(_root)
     app.command("install")(data.install)
     app.command("update")(data.update)
+    app.command("stats")(data.stats)
+    app.command("renormalize")(data.renormalize)
+    app.add_typer(embeddings.app, name="embeddings")
     app.command("serve")(server.serve)
     app.command("worker")(server.worker)
     for name, help_text in STUBS.items():

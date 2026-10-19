@@ -63,3 +63,56 @@ class RunSummary:
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(kw_only=True)
+class EmbeddingSummary:
+    """What ``run_embedding_backfill`` did."""
+
+    engine: str
+    model: str
+    trials: int = 0  # vectors written
+    skipped: int = 0  # trials that changed while being embedded; their update embedded them
+    data_version: int = 0
+    stages: dict[str, float] = field(default_factory=dict)  # seconds: model, embed, stats
+    stats_errors: list[str] = field(default_factory=list)
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(kw_only=True)
+class RenormalizeSummary:
+    """What ``run_renormalize`` did, in trials."""
+
+    trials: int = 0  # read
+    unchanged: int = 0
+    rewritten: int = 0  # columns and text, in place
+    replaced: int = 0  # written in full and embedded again
+    skipped: int = 0  # no raw document, or their source isn't enabled
+    failed: int = 0  # their document didn't normalize
+    failures: list[str] = field(default_factory=list)  # the first MAX_FAILURES problems
+    embedding_error: str | None = None
+    data_version: int = 0
+    stages: dict[str, float] = field(default_factory=dict)  # seconds: normalize, stats
+    stats_errors: list[str] = field(default_factory=list)
+
+    def add_failure(self, message: str) -> None:
+        self.failed += 1
+        if len(self.failures) < MAX_FAILURES:
+            self.failures.append(message)
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(kw_only=True)
+class StatsSummary:
+    """What ``run_stats`` did."""
+
+    data_version: int = 0
+    stages: dict[str, float] = field(default_factory=dict)  # seconds
+    stats_errors: list[str] = field(default_factory=list)
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)

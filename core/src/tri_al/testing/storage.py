@@ -18,7 +18,7 @@ from typing import Protocol
 import pytest
 
 from tri_al.filters import DateRange, IntRange, TrialFilter
-from tri_al.schema import Intervention, Location, MeshTerm, Outcome, Sponsor, TrialRecord
+from tri_al.schema import Arm, Intervention, Location, MeshTerm, Outcome, Sponsor, TrialRecord
 from tri_al.storage import Sort, Storage, StorageError, TrialSummary
 from tri_al.testing.fixtures import (
     completed_behavioral_trial,
@@ -572,6 +572,82 @@ class StorageContract:
         assert storage.count_trials() == 0
         assert storage.search("remternetug").hits == []
         assert storage.lookup_names("alzheimer") == []
+
+    # --- refreshing ------------------------------------------------------------------------
+
+    def test_refresh_leaves_unchanged_trials_alone(self, storage: Storage, ids: list[int]) -> None:
+        before = [storage.get_trial(trial_id) for trial_id in ids]
+
+        with storage.transaction() as tx:
+            result = tx.refresh(ids, lambda stored: replace(stored, id=None, ingested_at=None))
+
+        assert (result.unchanged, result.rewritten, result.replaced) == (ids, [], [])
+        assert [storage.get_trial(trial_id) for trial_id in ids] == before
+
+    def test_refresh_rewrites_new_details_in_place(self, storage: Storage) -> None:
+        old = replace(
+            phase3_trial(),
+            allocation=None,
+            masking=None,
+            masked_roles=[],
+            keywords=[],
+            arms=[],
+            interventions=[replace(i, description=None) for i in phase3_trial().interventions],
+        )
+        [trial_id] = storage.upsert_batch([old])
+        before = storage.get_trial(trial_id)
+        assert before is not None
+
+        with storage.transaction() as tx:
+            result = tx.refresh(
+                [trial_id], lambda stored: replace(phase3_trial(), status="COMPLETED")
+            )
+
+        assert result.rewritten == [trial_id]
+        after = storage.get_trial(trial_id)
+        assert after == replace(
+            phase3_trial(), status="COMPLETED", id=trial_id, ingested_at=before.ingested_at
+        )
+        assert source_ids(storage.search("remternetug").hits) == ["NCT90000001"]
+        assert storage.count_trials(TrialFilter(status=("COMPLETED",))) == 1
+
+    def test_refresh_replaces_trials_whose_indexed_text_changed(
+        self, storage: Storage, ids: list[int]
+    ) -> None:
+        changed = replace(
+            phase3_trial(),
+            title="Lecanemab in Early Alzheimer's Disease",
+            arms=[Arm("Lecanemab", "EXPERIMENTAL")],
+            raw=None,
+        )
+
+        with storage.transaction() as tx:
+            result = tx.refresh([ids[0]], lambda stored: changed)
+
+        assert result.replaced == [ids[0]]
+        stored = storage.get_trial(ids[0])
+        assert stored is not None
+        assert stored == as_stored(replace(changed, raw=phase3_trial().raw), stored)
+        assert source_ids(storage.search("lecanemab").hits) == ["NCT90000001"]
+
+    def test_refresh_skips_what_isnt_derived(self, storage: Storage, ids: list[int]) -> None:
+        with storage.transaction() as tx:
+            result = tx.refresh([ids[0], 999_999], lambda stored: None)
+
+        assert result.skipped == [ids[0], 999_999]
+        assert_round_trips(storage, [phase3_trial()], ids[:1])
+
+    def test_refresh_rejects_a_record_for_another_trial(
+        self, storage: Storage, ids: list[int]
+    ) -> None:
+        def refresh() -> None:
+            with storage.transaction() as tx:
+                tx.refresh(ids[:2], lambda stored: replace(minimal_trial(), title="Moved"))
+
+        with pytest.raises(ValueError, match="NCT90000003"):
+            refresh()
+
+        assert_round_trips(storage, [phase3_trial(), completed_behavioral_trial()], ids[:2])
 
     # --- bulk loads -------------------------------------------------------------------------
 

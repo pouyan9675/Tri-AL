@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ChartSpec } from "@/api/client";
 import { mockApi } from "@/test/api";
 import { renderWithProviders } from "@/test/render";
@@ -16,7 +16,9 @@ function spec(overrides: Partial<ChartSpec>): ChartSpec {
     section: "",
     x: "label",
     y: "value",
+    series: [],
     layout: { width: 2, height: 1, order: 0 },
+    page: "dashboard",
     plugin: "charts",
     precomputed: true,
     ...overrides,
@@ -28,6 +30,8 @@ function stats(chartId: string, rows: Record<string, unknown>[]) {
 }
 
 describe("the widget registry", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it("has a widget for every type the API declares", () => {
     expect(Object.keys(WIDGETS).sort()).toEqual([
       "area",
@@ -35,6 +39,8 @@ describe("the widget registry", () => {
       "line",
       "map",
       "pie",
+      "scatter",
+      "scatter3d",
       "stat",
       "table",
       "trends",
@@ -102,6 +108,38 @@ describe("the widget registry", () => {
     const table = screen.getByRole("table");
     expect(within(table).getByText("Phase 3")).toBeInTheDocument();
     expect(within(table).getByText("42,410")).toBeInTheDocument();
+  });
+
+  it("draws several series with a legend, and a column for each in the table", async () => {
+    // Recharts draws nothing at jsdom's size of zero.
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(
+      DOMRect.fromRect({ width: 800, height: 260 }),
+    );
+    mockApi({
+      "/api/stats/per_day": stats("per_day", [
+        { date: "2026-10-15", new: 210, updated: 1180 },
+        { date: "2026-10-16", new: 189, updated: 1593 },
+      ]),
+    });
+    const series = [
+      { key: "new", label: "New" },
+      { key: "updated", label: "Updated" },
+    ];
+    renderWithProviders(
+      <WidgetCard spec={spec({ id: "per_day", widget: "area", x: "date", series })} filter={{}} />,
+    );
+    const widget = await screen.findByTestId("widget");
+    await waitFor(() => expect(widget).toHaveAttribute("data-state", "ready"));
+    const legend = widget.querySelector(".recharts-legend-wrapper");
+    expect(legend).toHaveTextContent(/^NewUpdated$/);
+
+    await userEvent.click(screen.getByRole("button", { name: "Show as a table" }));
+    const table = screen.getByRole("table");
+    const headers = within(table)
+      .getAllByRole("columnheader")
+      .map((cell) => cell.textContent);
+    expect(headers).toEqual(["Date", "New", "Updated"]);
+    expect(within(table).getByText("1,593")).toBeInTheDocument();
   });
 
   it("says when a chart fails to load", async () => {

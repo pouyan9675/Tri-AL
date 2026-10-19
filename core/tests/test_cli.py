@@ -285,3 +285,64 @@ def test_install_reports_plugins_that_dont_load(install: Install, make_plugin: M
 
     assert result.exit_code == 1
     assert "written for plugin API 99" in result.stderr
+
+
+def test_embeddings_generate_runs_as_a_data_job(
+    install: Install, make_plugin: MakePlugin, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tri_al import embeddings
+    from tri_al.jobs import JobQueue
+    from tri_al.storage import open_app_db
+    from tri_al.testing import FakeEmbeddingEngine
+
+    install(source_plugin(make_plugin, FakeSource(studies=(fake_study("F1"), fake_study("F2")))))
+    run("install", "--workers", "0")
+    monkeypatch.setattr(embeddings, "create_engine", lambda *a, **k: FakeEmbeddingEngine())
+    monkeypatch.setenv("TRI_AL_EMBEDDINGS__ENABLED", "true")
+
+    result = run("embeddings", "generate")
+
+    assert result.exit_code == 0, result.output
+    assert "embed: 2 of 2 trials (100%)" in result.stdout
+    assert "Embedded 2 trials in" in result.stdout
+    engine = open_app_db(Path("data/app.db"))
+    try:
+        queue = JobQueue(engine)
+        [job] = queue.recent(types=["embeddings"])
+        assert job.status == "succeeded"
+        running = queue.start("update")
+        result = run("embeddings", "generate", "--force")
+        assert result.exit_code == 1
+        assert "already running" in result.stderr
+        queue.fail(running.id, "test")
+    finally:
+        engine.dispose()
+
+
+def test_embeddings_generate_when_off(install: Install, make_plugin: MakePlugin) -> None:
+    install(source_plugin(make_plugin, FakeSource(studies=(fake_study("F1"),))))
+
+    result = run("embeddings", "generate")
+
+    assert result.exit_code == 1
+    assert "embeddings are off in tri-al.toml" in result.stderr
+
+
+def test_stats_recomputes_as_a_data_job(install: Install, make_plugin: MakePlugin) -> None:
+    from tri_al.jobs import JobQueue
+    from tri_al.storage import open_app_db
+
+    install(source_plugin(make_plugin, FakeSource(studies=(fake_study("F1"),))))
+    run("install", "--workers", "0")
+
+    result = run("stats")
+
+    assert result.exit_code == 0, result.output
+    assert "Recomputed the stats of data/trials.db in" in result.stdout
+    assert "(data version 2)" in result.stdout
+    engine = open_app_db(Path("data/app.db"))
+    try:
+        [job] = JobQueue(engine).recent(types=["stats"])
+        assert job.status == "succeeded"
+    finally:
+        engine.dispose()

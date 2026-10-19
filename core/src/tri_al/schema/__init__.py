@@ -3,8 +3,9 @@
 Coded fields use ClinicalTrials.gov API v2's enum values, which is the vocabulary the core
 filters and charts on: ``status="RECRUITING"``, ``phase="PHASE2_PHASE3"``,
 ``study_type="INTERVENTIONAL"``, ``sex="ALL"``, ``enrollment_type="ESTIMATED"``,
-``Intervention.type="DRUG"``, ``Sponsor.sponsor_class="INDUSTRY"``. A source for another
-registry maps its own codes onto these.
+``Intervention.type="DRUG"``, ``Sponsor.sponsor_class="INDUSTRY"``, ``allocation="RANDOMIZED"``,
+``masking="DOUBLE"``, ``Arm.type="PLACEBO_COMPARATOR"``. A source for another registry maps
+its own codes onto these.
 """
 
 import math
@@ -69,6 +70,21 @@ class Intervention:
     name: str
     type: str | None = None
     other_names: tuple[str, ...] = ()
+    description: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Arm:
+    """A group of participants and what they're given: an arm, or an observational cohort.
+
+    ``interventions`` are the names of the trial's interventions this group gets, as in
+    ``Intervention.name``. Observational cohorts usually have no ``type``.
+    """
+
+    label: str
+    type: str | None = None  # EXPERIMENTAL, PLACEBO_COMPARATOR, ...
+    description: str | None = None
+    interventions: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,11 +129,29 @@ class TrialRecord:
     study_type: str | None = None
     primary_purpose: str | None = None
 
+    # How the trial is designed: interventional trials have an allocation, a model and
+    # masking (``masked_roles`` says who is masked); observational ones have a model and a
+    # time perspective.
+    allocation: str | None = None  # RANDOMIZED, NON_RANDOMIZED, NA
+    intervention_model: str | None = None  # PARALLEL, CROSSOVER, SINGLE_GROUP, ...
+    observational_model: str | None = None  # COHORT, CASE_CONTROL, ...
+    time_perspective: str | None = None  # PROSPECTIVE, RETROSPECTIVE, ...
+    masking: str | None = None  # NONE, SINGLE, DOUBLE, TRIPLE, QUADRUPLE
+    masked_roles: list[str] = field(default_factory=list)  # PARTICIPANT, INVESTIGATOR, ...
+
     start_date: date | None = None  # month-only dates become the 1st of the month
     primary_completion_date: date | None = None
     completion_date: date | None = None
     first_posted: date | None = None
     last_update: date | None = None
+    # Whether a milestone happened or is planned: ACTUAL or ESTIMATED; None if not given.
+    start_date_type: str | None = None
+    primary_completion_date_type: str | None = None
+    completion_date_type: str | None = None
+    results_first_posted: date | None = None
+    status_verified: date | None = None  # when the sponsor last confirmed the status
+    last_known_status: str | None = None  # before the status became UNKNOWN
+    why_stopped: str | None = None  # for a trial terminated, suspended or withdrawn
 
     enrollment: int | None = None
     enrollment_type: str | None = None
@@ -135,8 +169,10 @@ class TrialRecord:
     outcomes: list[Outcome] = field(default_factory=list)
 
     conditions: list[str] = field(default_factory=list)
+    keywords: list[str] = field(default_factory=list)  # the registry's free-text keywords
     mesh_terms: list[MeshTerm] = field(default_factory=list)
     interventions: list[Intervention] = field(default_factory=list)
+    arms: list[Arm] = field(default_factory=list)
     sponsors: list[Sponsor] = field(default_factory=list)
     countries: list[str] = field(default_factory=list)  # ISO 3166-1 alpha-2
     locations: list[Location] = field(default_factory=list)
@@ -197,6 +233,7 @@ def _unique[T](items: Iterable[T], key: Callable[[T], object]) -> list[T]:
 
 __all__ = [
     "DAYS_PER_UNIT",
+    "Arm",
     "Intervention",
     "Location",
     "LocationScope",

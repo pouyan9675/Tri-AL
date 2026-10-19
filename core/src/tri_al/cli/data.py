@@ -7,7 +7,7 @@ every few seconds.
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Protocol
 
 import typer
 
@@ -19,6 +19,7 @@ from tri_al.pipeline import (
     PipelineError,
     Progress,
     ProgressCallback,
+    RenormalizeSummary,
     RunSummary,
 )
 from tri_al.plugins import PluginError, load_plugins
@@ -81,6 +82,49 @@ def update(data_dir: DataDir = None) -> None:
         f"(data version {summary.data_version})."
     )
     _report(summary)
+
+
+def stats(data_dir: DataDir = None) -> None:
+    """Recompute the dashboard's stats and derived tables, such as the cluster map, now.
+
+    For after changing a plugin's settings: the data stays as it is, the data version goes
+    up and the dashboard fetches the new results.
+    """
+    pipeline = _pipeline(data_dir, workers=0)
+    started = time.monotonic()
+    summary = _as_job(pipeline, "stats", {}, pipeline.run_stats)
+    typer.echo(
+        f"\nRecomputed the stats of {pipeline.trials_db} in "
+        f"{duration(time.monotonic() - started)} (data version {summary.data_version})."
+    )
+    for error in summary.stats_errors:
+        typer.echo(f"stats: {error}", err=True)
+
+
+def renormalize(data_dir: DataDir = None) -> None:
+    """Read every stored trial again from its raw document, with today's source plugins.
+
+    For after a source plugin learns to read more of its documents, such as arms and
+    design: trials keep their ids, change log and vectors, and only what changed is
+    written. Stopping keeps the batches done; run it again to carry on.
+    """
+    pipeline = _pipeline(data_dir, workers=0)
+    started = time.monotonic()
+    summary: RenormalizeSummary = _as_job(pipeline, "renormalize", {}, pipeline.run_renormalize)
+    typer.echo(
+        f"\nRenormalized {summary.trials:,} trials in {duration(time.monotonic() - started)} "
+        f"(data version {summary.data_version}): {summary.rewritten:,} rewritten in place, "
+        f"{summary.replaced:,} replaced, {summary.unchanged:,} unchanged, "
+        f"{summary.skipped:,} skipped, {summary.failed:,} failed."
+    )
+    for failure in summary.failures[:5]:
+        typer.echo(f"  {failure}", err=True)
+    if summary.embedding_error:
+        typer.echo(
+            f"warning: embedding replaced trials failed: {summary.embedding_error}", err=True
+        )
+    for error in summary.stats_errors:
+        typer.echo(f"stats: {error}", err=True)
 
 
 class ProgressPrinter:
@@ -148,15 +192,20 @@ def _pipeline(data_dir: Path | None, workers: int | None) -> Pipeline:
     return Pipeline.from_plugins(config, plugins, data_dir=data_dir, workers=workers)
 
 
-def _as_job(
+class _Result(Protocol):
+    def as_dict(self) -> dict[str, Any]: ...
+
+
+def _as_job[R: _Result](
     pipeline: Pipeline,
     job_type: str,
     payload: dict[str, Any],
-    action: Callable[[ProgressCallback], RunSummary],
-) -> RunSummary:
+    action: Callable[[ProgressCallback], R],
+) -> R:
     """Run ``action`` as a job in ``app.db``, so the server shows it and waits for it.
 
-    Only one install or update runs at a time, whichever process starts it.
+    Only one data job (install, update or embedding backfill) runs at a time, whichever
+    process starts it.
     """
     pipeline.data_dir.mkdir(parents=True, exist_ok=True)
     try:

@@ -1,7 +1,7 @@
 # Benchmarks
 
 - [Front end](#front-end-milestone-5): the bundle budget and the dashboard's cold load
-  (milestone 5).
+  (milestone 5), and the research landscape redrawn on a canvas.
 - [API](#api-milestone-4): every §10 API target on the full database, the search rework and
   the database after it (milestone 4).
 - [Real data](#real-data-milestone-3): a full install of ClinicalTrials.gov and a real update
@@ -42,6 +42,27 @@ dashboard needs it), the map and its shapes, the ⌘K palette (fetched when the 
 idle), and the toaster (mounted when idle). Two changes during the milestone took the entry
 from 145 to 125 KB: toasts load lazily, and the header's theme control became a single
 button instead of a dropdown, so Radix's menu left the entry.
+
+### The research landscape on a canvas
+
+2026-10-18, the same machine and database, Google Chrome 155. Since milestone 5 the dashboard
+has gained Research Intelligence, with the 2-D map of the last 12 months' trials (3,000 of
+50,920 drawn). Drawn by Recharts as 3,000 SVG dots, the map took one long task of 181–190 ms
+on every cold load (837 ms with the CPU slowed 4×), which pushed interactive to 730 ms. Drawn
+on a canvas (`web/src/widgets/scatter-canvas.ts`, a few milliseconds), no long task is left
+and the dashboard is as fast as with no map at all, measured by answering the map's request
+with its "not laid out" state.
+
+| What | Recharts (SVG) | Canvas | No map |
+|---|---|---|---|
+| Dashboard interactive, cold load (5 runs) | 730 ms median, 741 ms max | 448–464 ms median, **465–498 ms max** over four runs | 456–492 ms |
+| Long tasks during the load | one of 181–190 ms | none | none |
+| With the CPU slowed 4× (one run each time) | 2.0 s | 1.24–1.55 s over four runs | 0.89 s |
+| First contentful paint | 120 ms median | 128–132 ms median | |
+| JS fetched by then, as sent | 342 KB in 47 requests | 342 KB in 47 requests | |
+
+The build then: initial JS 160.6 KB gzip, the dashboard chunk 136.5 KB. The 4× runs are
+single loads on a machine busy with other work (load average about 8), so they vary.
 
 ## API (milestone 4)
 

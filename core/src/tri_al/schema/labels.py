@@ -67,6 +67,76 @@ INTERVENTION_TYPE: Mapping[str, str] = {
     "OTHER": "Other",
 }
 
+PRIMARY_PURPOSE: Mapping[str, str] = {
+    "TREATMENT": "Treatment",
+    "PREVENTION": "Prevention",
+    "DIAGNOSTIC": "Diagnostic",
+    "SUPPORTIVE_CARE": "Supportive care",
+    "SCREENING": "Screening",
+    "HEALTH_SERVICES_RESEARCH": "Health services research",
+    "BASIC_SCIENCE": "Basic science",
+    "DEVICE_FEASIBILITY": "Device feasibility",
+    "ECT": "Educational/counseling/training",
+    "OTHER": "Other",
+}
+
+ARM_TYPE: Mapping[str, str] = {
+    "EXPERIMENTAL": "Experimental",
+    "ACTIVE_COMPARATOR": "Active comparator",
+    "PLACEBO_COMPARATOR": "Placebo comparator",
+    "SHAM_COMPARATOR": "Sham comparator",
+    "NO_INTERVENTION": "No intervention",
+    "OTHER": "Other",
+}
+
+ALLOCATION: Mapping[str, str] = {
+    "RANDOMIZED": "Randomized",
+    "NON_RANDOMIZED": "Non-randomized",
+    "NA": "Not applicable",
+}
+
+INTERVENTION_MODEL: Mapping[str, str] = {
+    "PARALLEL": "Parallel assignment",
+    "SINGLE_GROUP": "Single group assignment",
+    "CROSSOVER": "Crossover assignment",
+    "FACTORIAL": "Factorial assignment",
+    "SEQUENTIAL": "Sequential assignment",
+}
+
+OBSERVATIONAL_MODEL: Mapping[str, str] = {
+    "COHORT": "Cohort",
+    "CASE_CONTROL": "Case-control",
+    "CASE_ONLY": "Case-only",
+    "CASE_CROSSOVER": "Case-crossover",
+    "ECOLOGIC_OR_COMMUNITY": "Ecologic or community",
+    "FAMILY_BASED": "Family-based",
+    "DEFINED_POPULATION": "Defined population",
+    "NATURAL_HISTORY": "Natural history",
+    "OTHER": "Other",
+}
+
+TIME_PERSPECTIVE: Mapping[str, str] = {
+    "PROSPECTIVE": "Prospective",
+    "RETROSPECTIVE": "Retrospective",
+    "CROSS_SECTIONAL": "Cross-sectional",
+    "OTHER": "Other",
+}
+
+MASKING: Mapping[str, str] = {
+    "NONE": "Open label",
+    "SINGLE": "Single-blind",
+    "DOUBLE": "Double-blind",
+    "TRIPLE": "Triple-blind",
+    "QUADRUPLE": "Quadruple-blind",
+}
+
+MASKED_ROLE: Mapping[str, str] = {
+    "PARTICIPANT": "Participant",
+    "CARE_PROVIDER": "Care provider",
+    "INVESTIGATOR": "Investigator",
+    "OUTCOMES_ASSESSOR": "Outcomes assessor",
+}
+
 NOT_GIVEN = "Not given"
 """The label of a missing value, such as a trial with no phase."""
 

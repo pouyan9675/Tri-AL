@@ -1,9 +1,9 @@
 [project]
 name = "tri-al-insights"
 version = "0.1.0"
-description = "Research Intelligence for Tri-AL: emerging research trends on the dashboard."
+description = "Research Intelligence for Tri-AL: trends and semantic trial clusters."
 requires-python = ">=3.13"
-dependencies = ["tri-al"]
+dependencies = ["scikit-learn>=1.3", "tri-al", "umap-learn>=0.5.12"]
 
 [project.entry-points."tri_al.plugins"]
 insights = "tri_al_insights:plugin"

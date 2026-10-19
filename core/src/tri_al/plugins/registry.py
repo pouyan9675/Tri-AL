@@ -16,7 +16,7 @@ from tri_al.pipeline.events import EVENTS, Handler, Subscription
 from tri_al.pipeline.source import Source
 from tri_al.plugins.errors import PluginError
 from tri_al.search import SearchProvider
-from tri_al.stats.charts import Chart
+from tri_al.stats.charts import Chart, Derived
 from tri_al.storage import Migration, MigrationError, SqliteExtension
 from tri_al.storage.migrations import check_migrations
 
@@ -46,6 +46,8 @@ class Contributions:
     subscriptions: dict[str, list[Subscription]] = field(default_factory=dict)
     # by chart id, in plugin load order
     charts: dict[str, Chart] = field(default_factory=dict)
+    # by name, in plugin load order
+    derived: dict[str, Derived] = field(default_factory=dict)
     # by field name
     filter_fields: dict[str, FilterField] = field(default_factory=dict)
     # by provider name
@@ -149,6 +151,19 @@ class Registry:
         if existing is not None:
             raise PluginError(f"chart {chart.id!r} was already added by plugin {existing.plugin!r}")
         self._contributions.charts[chart.id] = dataclasses.replace(chart, plugin=self._plugin)
+
+    def add_derived(self, derived: Derived) -> None:
+        """Tables to rebuild before each precompute of the charts (``tri_al.stats.Derived``)."""
+        if not isinstance(derived, Derived):
+            raise PluginError(f"{type(derived).__name__} isn't a tri_al.stats.Derived")
+        existing = self._contributions.derived.get(derived.name)
+        if existing is not None:
+            raise PluginError(
+                f"derived tables {derived.name!r} were already added by plugin {existing.plugin!r}"
+            )
+        self._contributions.derived[derived.name] = dataclasses.replace(
+            derived, plugin=self._plugin
+        )
 
     def add_filter_field(self, filter_field: FilterField) -> None:
         """A filter field over the plugin's own tables, for the trial list, charts and facets.

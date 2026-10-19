@@ -47,6 +47,14 @@ LABELS: dict[str, dict[str, str]] = {
     "study_type": dict(labels.STUDY_TYPE),
     "sponsor_class": dict(labels.SPONSOR_CLASS),
     "intervention_type": dict(labels.INTERVENTION_TYPE),
+    "primary_purpose": dict(labels.PRIMARY_PURPOSE),
+    "arm_type": dict(labels.ARM_TYPE),
+    "allocation": dict(labels.ALLOCATION),
+    "intervention_model": dict(labels.INTERVENTION_MODEL),
+    "observational_model": dict(labels.OBSERVATIONAL_MODEL),
+    "time_perspective": dict(labels.TIME_PERSPECTIVE),
+    "masking": dict(labels.MASKING),
+    "masked_role": dict(labels.MASKED_ROLE),
 }
 """Sent with the meta, so the front end shows codes as ClinicalTrials.gov does, with no copy."""
 
@@ -343,7 +351,8 @@ def get_facets(
     name="getDashboard",
 )
 def get_dashboard(request: Request, state: State) -> Response:
-    """The dashboard's charts, in layout order, and the facets the explorer offers."""
+    """Every chart, for the dashboard and the analysis page, in layout order, and the facets
+    the explorer offers."""
     with state.read() as reader:
         version = reader.data_version()
         etag = state.etag(version)
@@ -358,8 +367,10 @@ def get_dashboard(request: Request, state: State) -> Response:
                     "widget": chart.widget,
                     "description": chart.description,
                     "section": chart.section,
+                    "page": chart.page,
                     "x": chart.x,
                     "y": chart.y,
+                    "series": chart.series,
                     "layout": chart.layout,
                     "plugin": chart.plugin,
                     "precomputed": chart.precompute,

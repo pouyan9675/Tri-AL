@@ -1,0 +1,66 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "tri-al",
+        "serve"
+      ],
+      "port": 8000
+    },
+    {
+      "name": "web-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "web",
+        "run",
+        "dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "slides",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8090",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "docs"
+      ],
+      "port": 8090
+    },
+    {
+      "name": "api-preview",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "tri-al",
+        "serve",
+        "--port",
+        "8766",
+        "--no-job-worker"
+      ],
+      "port": 8766
+    },
+    {
+      "name": "api-dev",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "tri-al",
+        "serve",
+        "--port",
+        "8000",
+        "--no-job-worker"
+      ],
+      "port": 8000
+    }
+  ]
+}

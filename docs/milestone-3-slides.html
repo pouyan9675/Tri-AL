@@ -1,0 +1,902 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Milestone 3 Overview</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    /* Storage layers, in a fixed order on every slide */
+    --raw: #2a78d6;        /* original documents */
+    --text: #eb6834;       /* plain text copies */
+    --search: #1baf7a;     /* search indexes */
+    --structured: #eda100; /* structured tables */
+    --book: #898781;       /* bookkeeping */
+    --time: #7d7b74;       /* the install timeline, a single series */
+    --good: #006300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #f0efec;
+      --ink-2: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --axis: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --raw: #3987e5;
+      --text: #d95926;
+      --search: #199e70;
+      --structured: #c98500;
+      --time: #8f8d86;
+      --good: #0ca30c;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --raw: #3987e5;
+    --text: #d95926;
+    --search: #199e70;
+    --structured: #c98500;
+    --time: #8f8d86;
+    --good: #0ca30c;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    overflow: hidden;
+  }
+
+  /* --- deck frame ------------------------------------------------------------------------ */
+  .stage {
+    position: absolute;
+    left: 50%;
+    top: calc(50% - 22px);
+    width: 1280px;
+    height: 720px;
+    transform: translate(-50%, -50%) scale(var(--scale, 1));
+    transform-origin: center;
+  }
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    padding: 52px 72px 40px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .slide.active { display: flex; }
+  .slide .num {
+    position: absolute;
+    right: 28px;
+    bottom: 18px;
+    font-size: 13px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    font-size: 14px;
+    color: var(--ink-2);
+  }
+  nav button {
+    font: inherit;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 34px;
+    height: 30px;
+    cursor: pointer;
+  }
+  nav button:hover { border-color: var(--axis); }
+  nav button:disabled { opacity: 0.35; cursor: default; }
+  nav .count { min-width: 60px; text-align: center; font-variant-numeric: tabular-nums; }
+  nav .hint { color: var(--muted); font-size: 13px; }
+
+  /* --- type ------------------------------------------------------------------------------ */
+  .kicker {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+  h1 { font-size: 58px; line-height: 1.05; margin: 0 0 18px; letter-spacing: -0.02em; font-weight: 700; }
+  h2 { font-size: 34px; line-height: 1.15; margin: 0 0 8px; letter-spacing: -0.01em; font-weight: 680; }
+  .lede { font-size: 18px; line-height: 1.45; color: var(--ink-2); margin: 0 0 24px; max-width: 1060px; }
+  p, li { font-size: 16px; line-height: 1.45; }
+  code, .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.9em; white-space: nowrap; }
+  .roomy .card h3 { font-size: 19px; }
+  .roomy .card p, .roomy .card li { font-size: 17px; line-height: 1.5; }
+  .roomy .step p { font-size: 15px; }
+  .muted { color: var(--muted); }
+  .ink2 { color: var(--ink-2); }
+  strong { font-weight: 650; }
+
+  /* --- pieces ---------------------------------------------------------------------------- */
+  .swatch {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    border-radius: 3px;
+    margin-right: 7px;
+    vertical-align: -1px;
+  }
+  .sw-raw { background: var(--raw); }
+  .sw-text { background: var(--text); }
+  .sw-search { background: var(--search); }
+  .sw-structured { background: var(--structured); }
+  .sw-book { background: var(--book); }
+
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: auto; }
+  .tile {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    background: var(--page);
+  }
+  .tile .value { font-size: 40px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+  .tile .label { font-size: 15px; color: var(--ink-2); margin-top: 6px; line-height: 1.35; }
+
+  .cards { display: grid; gap: 16px; }
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    background: var(--page);
+  }
+  .card h3 { font-size: 17px; margin: 0 0 6px; font-weight: 650; }
+  .card p { margin: 0; font-size: 15px; color: var(--ink-2); }
+  .card ul { margin: 6px 0 0; padding-left: 18px; }
+  .card li { font-size: 15px; color: var(--ink-2); margin: 2px 0; }
+
+  /* Steps in a lane */
+  .lane { display: flex; align-items: stretch; gap: 0; }
+  .lane-label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-size: 14px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-right: 14px;
+    text-align: center;
+  }
+  .step {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    background: var(--page);
+    min-width: 0;
+  }
+  .step h4 { margin: 0 0 4px; font-size: 16px; font-weight: 650; display: flex; justify-content: space-between; gap: 8px; }
+  .step h4 .t { font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .step p { margin: 0; font-size: 14px; line-height: 1.4; color: var(--ink-2); }
+  .arrow { align-self: center; color: var(--muted); font-size: 20px; padding: 0 6px; }
+
+  /* Bars */
+  .bar { display: flex; gap: 2px; height: 40px; }
+  .bar > div { height: 100%; }
+  .bar > div:first-child { border-radius: 4px 0 0 4px; }
+  .bar > div:last-child { border-radius: 0 4px 4px 0; }
+  .bar > div:hover { filter: brightness(1.08); }
+  .bar-labels { display: flex; gap: 2px; margin-top: 8px; }
+  .bar-labels > div { font-size: 14px; line-height: 1.3; color: var(--ink-2); overflow: hidden; }
+  .bar-labels b { display: block; color: var(--ink); font-weight: 650; }
+
+  .tip {
+    position: fixed;
+    pointer-events: none;
+    z-index: 10;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    line-height: 1.35;
+    max-width: 260px;
+    display: none;
+  }
+
+  /* SVG diagrams */
+  svg text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--ink); }
+  svg .t-title { font-size: 17px; font-weight: 650; }
+  svg .t-body { font-size: 14px; fill: var(--ink-2); }
+  svg .t-small { font-size: 12.5px; fill: var(--muted); }
+  svg .t-mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; }
+  svg .box { fill: var(--page); stroke: var(--axis); stroke-width: 1.2; }
+  svg .box-raw { fill: color-mix(in oklab, var(--raw) 11%, var(--surface)); stroke: var(--raw); stroke-width: 1.5; }
+  svg .box-text { fill: color-mix(in oklab, var(--text) 11%, var(--surface)); stroke: var(--text); stroke-width: 1.5; }
+  svg .box-search { fill: color-mix(in oklab, var(--search) 11%, var(--surface)); stroke: var(--search); stroke-width: 1.5; }
+  svg .box-structured { fill: color-mix(in oklab, var(--structured) 13%, var(--surface)); stroke: var(--structured); stroke-width: 1.5; }
+  svg .box-book { fill: var(--page); stroke: var(--book); stroke-width: 1.2; stroke-dasharray: 4 3; }
+  svg .box-core { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.5; }
+  svg .line { stroke: var(--axis); stroke-width: 1.5; fill: none; }
+  svg .flow { stroke: var(--muted); stroke-width: 2; fill: none; marker-end: url(#arrow); }
+  svg .flow-dash { stroke: var(--muted); stroke-width: 1.6; fill: none; stroke-dasharray: 5 4; marker-end: url(#arrow); }
+  svg .pill { fill: var(--surface); stroke: var(--axis); stroke-width: 1.2; }
+
+  /* JSON card */
+  .json {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.45;
+    background: var(--page);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 0;
+    white-space: pre;
+    overflow: hidden;
+    color: var(--ink-2);
+  }
+  .json .k { color: var(--ink); }
+  .json .dim { color: var(--muted); }
+  .json .hl { background: color-mix(in oklab, var(--text) 18%, transparent); border-radius: 3px; }
+  .json .drop { text-decoration: line-through; color: var(--muted); }
+
+  .lands { list-style: none; padding: 0; margin: 0; }
+  .lands li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--grid);
+    font-size: 15px;
+  }
+  .lands li span:last-child { color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .open { width: 100%; border-collapse: collapse; }
+  .open td { padding: 9px 10px; border-bottom: 1px solid var(--grid); font-size: 15px; vertical-align: top; line-height: 1.4; }
+  .open td:first-child { width: 34px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .open td:last-child { color: var(--ink-2); width: 230px; }
+  .tag {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 1px 8px;
+    color: var(--ink-2);
+    background: var(--page);
+  }
+
+  @media print {
+    body { overflow: visible; background: white; }
+    nav, .tip { display: none !important; }
+    .stage { position: static; transform: none; width: auto; height: auto; }
+    .slide { position: relative; display: flex !important; width: 1280px; height: 720px; page-break-after: always; break-after: page; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" style="fill: var(--muted)"/>
+    </marker>
+  </defs>
+</svg>
+
+<div class="stage" id="stage">
+
+<!-- 1 ------------------------------------------------------------------------------------- -->
+<section class="slide" data-title="Milestone 3">
+  <p class="kicker">Tri-AL v2 · Milestone 3</p>
+  <h1>ClinicalTrials.gov<br>into SQLite</h1>
+  <p class="lede">The ClinicalTrials.gov plugin and the data pipeline: where the data comes from, what
+    gets stored and why, how install and update work, and what's left for you to decide.</p>
+  <div class="tiles">
+    <div class="tile"><div class="value">607,349</div><div class="label">studies, ClinicalTrials.gov's 2026-10-16 release; none failed to load</div></div>
+    <div class="tile"><div class="value">14m50s</div><div class="label">full install, download included</div></div>
+    <div class="tile"><div class="value">9.1 GB</div><div class="label"><code>trials.db</code>, built from a 2.77 GB zip</div></div>
+    <div class="tile"><div class="value">3.7 s</div><div class="label">daily update: 2,606 studies checked</div></div>
+  </div>
+  <p class="muted" style="margin:18px 0 0;font-size:14px">Branch <code>v2</code> · built and measured 2026-10-17 · not committed yet</p>
+  <span class="num"></span>
+</section>
+
+<!-- 2 ------------------------------------------------------------------------------------- -->
+<section class="slide" data-title="The big picture">
+  <h2>The big picture</h2>
+  <p class="lede">Data flows one way: from ClinicalTrials.gov, through the plugin and the core pipeline,
+    into <code>trials.db</code>. Only the plugin knows ClinicalTrials.gov's JSON layout.</p>
+  <svg viewBox="0 0 1136 430" width="1136" height="430" role="img" aria-label="ClinicalTrials.gov feeds the ctgov plugin, which feeds the core pipeline, which writes trials.db">
+    <!-- ClinicalTrials.gov -->
+    <rect class="box" x="0" y="20" width="236" height="380" rx="12"/>
+    <text class="t-title" x="18" y="52">ClinicalTrials.gov</text>
+    <text class="t-small" x="18" y="72">public data, refreshed weekdays</text>
+    <rect class="pill" x="16" y="96" width="204" height="122" rx="10"/>
+    <text class="t-title" x="30" y="124" style="font-size:15px">Bulk download</text>
+    <text class="t-mono" x="30" y="148">ctg-studies.json.zip</text>
+    <text class="t-body" x="30" y="172">2.77 GB, one JSON file</text>
+    <text class="t-body" x="30" y="192">per study</text>
+    <rect class="pill" x="16" y="250" width="204" height="122" rx="10"/>
+    <text class="t-title" x="30" y="278" style="font-size:15px">API v2</text>
+    <text class="t-mono" x="30" y="302">/api/v2/studies</text>
+    <text class="t-body" x="30" y="326">pages of 1,000, filtered</text>
+    <text class="t-body" x="30" y="346">by last update date</text>
+
+    <!-- plugin -->
+    <rect class="box" x="300" y="20" width="250" height="380" rx="12"/>
+    <text class="t-title" x="318" y="52">ctgov plugin</text>
+    <text class="t-small" x="318" y="72">trial-al-ctgov · knows the JSON layout</text>
+    <rect class="pill" x="316" y="96" width="218" height="80" rx="10"/>
+    <text class="t-mono" x="330" y="122">fetch_all / fetch_changed</text>
+    <text class="t-body" x="330" y="146">download, page, retry politely;</text>
+    <text class="t-body" x="330" y="164">yield raw JSON per study</text>
+    <rect class="pill" x="316" y="192" width="218" height="80" rx="10"/>
+    <text class="t-mono" x="330" y="218">normalize</text>
+    <text class="t-body" x="330" y="242">raw JSON → TrialRecord</text>
+    <text class="t-body" x="330" y="260">(codes, dates, ages, countries)</text>
+    <rect class="pill" x="316" y="288" width="218" height="80" rx="10"/>
+    <text class="t-mono" x="330" y="314">hashable</text>
+    <text class="t-body" x="330" y="338">which part of a study counts</text>
+    <text class="t-body" x="330" y="356">as a change</text>
+
+    <!-- pipeline -->
+    <rect class="box-core" x="614" y="20" width="250" height="380" rx="12"/>
+    <text class="t-title" x="632" y="52">Core pipeline</text>
+    <text class="t-small" x="632" y="72">trial_al.pipeline · works for any registry</text>
+    <g>
+      <rect class="pill" x="632" y="94" width="214" height="40" rx="8"/><text class="t-body" x="648" y="119"><tspan style="fill:var(--ink)">parse</tspan>  JSON (orjson)</text>
+      <rect class="pill" x="632" y="148" width="214" height="40" rx="8"/><text class="t-body" x="648" y="173"><tspan style="fill:var(--ink)">hash</tspan>  BLAKE2b of hashable part</text>
+      <rect class="pill" x="632" y="202" width="214" height="40" rx="8"/><text class="t-body" x="648" y="227"><tspan style="fill:var(--ink)">normalize</tspan>  in 8 workers</text>
+      <rect class="pill" x="632" y="256" width="214" height="40" rx="8"/><text class="t-body" x="648" y="281"><tspan style="fill:var(--ink)">skip</tspan>  if the hash is unchanged</text>
+      <rect class="pill" x="632" y="310" width="214" height="40" rx="8"/><text class="t-body" x="648" y="335"><tspan style="fill:var(--ink)">write</tspan>  batches, one writer</text>
+      <path class="line" d="M739 134 V148 M739 188 V202 M739 242 V256 M739 296 V310"/>
+    </g>
+    <text class="t-small" x="632" y="378">checkpoints · change log · events</text>
+
+    <!-- storage -->
+    <path class="box-raw" d="M932 64 a102 14 0 0 1 204 0 v170 a102 14 0 0 1 -204 0 Z"/>
+    <path class="line" d="M932 64 a102 14 0 0 0 204 0" style="stroke:var(--raw)"/>
+    <text class="t-title" x="950" y="108">trials.db</text>
+    <text class="t-body" x="950" y="132">9.1 GB · source data</text>
+    <text class="t-body" x="950" y="156">trials, raw documents,</text>
+    <text class="t-body" x="950" y="176">text, search indexes,</text>
+    <text class="t-body" x="950" y="196">change log, runs</text>
+    <text class="t-small" x="950" y="222">written only by the pipeline</text>
+    <path class="box-book" d="M932 290 a102 14 0 0 1 204 0 v80 a102 14 0 0 1 -204 0 Z"/>
+    <path class="line" d="M932 290 a102 14 0 0 0 204 0" style="stroke:var(--book)"/>
+    <text class="t-title" x="950" y="330">app.db</text>
+    <text class="t-body" x="950" y="354">jobs (milestone 4)</text>
+
+    <!-- arrows -->
+    <path class="flow" d="M220 157 H312"/>
+    <text class="t-small" x="236" y="149">install</text>
+    <path class="flow" d="M220 311 C262 311 270 150 312 140"/>
+    <text class="t-small" x="234" y="300">update</text>
+    <path class="flow" d="M550 210 H626"/>
+    <text class="t-small" x="560" y="200">records</text>
+    <path class="flow" d="M864 210 H926"/>
+  </svg>
+  <span class="num"></span>
+</section>
+
+<!-- 3 ------------------------------------------------------------------------------------- -->
+<section class="slide" data-title="Install and update">
+  <h2>Two ways in: install and update</h2>
+  <p class="lede">Same stages, different fetch. An install builds a new database file and swaps it in;
+    an update changes the existing one in a single transaction.</p>
+  <div class="lane">
+    <div class="lane-label">Install</div>
+    <div class="step"><h4>Download <span class="t">1m43s</span></h4><p>2.77 GB zip into <code>data/downloads/</code>, size and SHA-256 recorded</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>Load <span class="t">6m13s</span></h4><p>read the zip file by file; 8 workers parse, hash, normalize; one writer, batches of 5,000</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>Index <span class="t">4m11s</span></h4><p>build secondary indexes and full-text search after the load</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>Check <span class="t">2m43s</span></h4><p>SQLite <code>quick_check</code> and full-text integrity checks</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>Swap <span class="t">0s</span></h4><p>rename <code>trials.db.new</code> over <code>trials.db</code></p></div>
+  </div>
+  <div style="margin:14px 0 0 30px">
+    <div class="bar" style="height:22px" aria-label="Install time by stage">
+      <div style="flex:103;background:var(--time)" data-tip="<b>Download</b><br>1m43s · 12% of the install"></div>
+      <div style="flex:373;background:var(--time)" data-tip="<b>Load</b><br>6m13s · 42% of the install<br>about 1,630 trials/s; the single writer is the bottleneck"></div>
+      <div style="flex:251;background:var(--time)" data-tip="<b>Index</b><br>4m11s · 28% of the install"></div>
+      <div style="flex:163;background:var(--time)" data-tip="<b>Check</b><br>2m43s · 18% of the install<br>quick_check 71s, full-text check 84s"></div>
+    </div>
+    <div class="bar-labels">
+      <div style="flex:103">Download</div><div style="flex:373">Load</div><div style="flex:251">Index</div><div style="flex:163">Check</div>
+    </div>
+    <p class="muted" style="margin:6px 0 0;font-size:14px">A failed install never touches the working database, and every stage is checkpointed: run it again and it carries on.</p>
+  </div>
+
+  <div class="lane" style="margin-top:28px">
+    <div class="lane-label">Update</div>
+    <div class="step"><h4>Fetch <span class="t">3.7s</span></h4><p>API pages of studies updated since the cursor − 1 day (3 pages today)</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>Hash check</h4><p>skip studies whose hash matches what's stored (today: 2,606 of 2,606)</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>One transaction</h4><p>changed trials, change log, cursor and <code>data_version</code>, all or nothing</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>Commit, then events</h4><p>readers switch to the new data at once; plugins are told what changed</p></div>
+  </div>
+  <p class="muted" style="margin:10px 0 0 30px;font-size:14px">A busy day (2,606 trials rewritten in one transaction) takes 10–17 s; the target is under 2 minutes.</p>
+  <span class="num"></span>
+</section>
+
+<!-- 4 ------------------------------------------------------------------------------------- -->
+<section class="slide" data-title="One study's journey">
+  <h2>What happens to one study</h2>
+  <p class="lede">NCT05026866 (donanemab, TRAILBLAZER-ALZ 3): one 49 KB JSON file becomes about 255 rows
+    across ten tables, plus its original, compressed.</p>
+  <div style="display:grid;grid-template-columns:410px 1fr 320px;gap:20px;align-items:start">
+<pre class="json"><span class="dim">{</span> <span class="k">"protocolSection"</span>: {
+    <span class="k">"identificationModule"</span>: {
+      "nctId": "NCT05026866", <span class="dim">…</span> },
+    <span class="k">"statusModule"</span>: {
+      "overallStatus": "ACTIVE_NOT_RECRUITING",
+      "primaryCompletionDateStruct":
+        { "date": <span class="hl">"2027-11"</span> }, <span class="dim">…</span> },
+    <span class="k">"designModule"</span>: {
+      "phases": <span class="hl">["PHASE3"]</span>,
+      "enrollmentInfo": { "count": 2996 } },
+    <span class="k">"eligibilityModule"</span>: {
+      "minimumAge": <span class="hl">"55 Years"</span>, <span class="dim">…</span> },
+    <span class="k">"contactsLocationsModule"</span>: { "locations": [
+      { "city": "Birmingham",
+        "country": <span class="hl">"United States"</span>, <span class="dim">…</span> },
+      <span class="dim">… 216 sites</span> ] },
+    <span class="k">"outcomesModule"</span>: { <span class="dim">… 18 outcomes</span> }, <span class="dim">…</span> },
+  <span class="k">"derivedSection"</span>: {
+    "miscInfoModule":
+      { <span class="drop">"versionHolder": "2026-10-16"</span> },
+    "conditionBrowseModule": { <span class="dim">… MeSH</span> } },
+  <span class="k">"hasResults"</span>: false <span class="dim">}</span></pre>
+    <div class="cards" style="gap:12px">
+      <div class="card"><h3>1 · Parse and hash</h3><p>BLAKE2b of the study without <code>versionHolder</code> (struck through), keys sorted. If it equals the stored hash, stop here: nothing changed.</p></div>
+      <div class="card"><h3>2 · Normalize (plugin)</h3>
+        <ul>
+          <li><code>"2027-11"</code> → 2027-11-01 (month-only → 1st)</li>
+          <li><code>["PHASE2","PHASE3"]</code> → <code>PHASE2_PHASE3</code></li>
+          <li><code>"55 Years"</code> → 20,088 days</li>
+          <li><code>"United States"</code> → <code>US</code> (226 names mapped)</li>
+        </ul></div>
+      <div class="card"><h3>3 · Write (storage)</h3><p>One <code>TrialRecord</code> fans out into rows, and the original JSON is kept beside it.</p></div>
+    </div>
+    <ul class="lands">
+      <li><span><span class="swatch sw-structured"></span><code>trials</code></span><span>1 row</span></li>
+      <li><span><span class="swatch sw-structured"></span><code>locations</code></span><span>216</span></li>
+      <li><span><span class="swatch sw-structured"></span><code>trial_mesh</code></span><span>10</span></li>
+      <li><span><span class="swatch sw-structured"></span><code>trial_countries</code></span><span>3</span></li>
+      <li><span><span class="swatch sw-structured"></span><code>trial_interventions</code> + aliases</span><span>2 + 1</span></li>
+      <li><span><span class="swatch sw-structured"></span><code>trial_conditions</code>, <code>trial_sponsors</code></span><span>1 + 1</span></li>
+      <li><span><span class="swatch sw-text"></span><code>trial_outcomes</code></span><span>18</span></li>
+      <li><span><span class="swatch sw-text"></span><code>trial_text</code></span><span>1</span></li>
+      <li><span><span class="swatch sw-search"></span><code>trials_fts</code></span><span>1 entry</span></li>
+      <li><span><span class="swatch sw-raw"></span><code>trial_docs</code></span><span>49 KB → 10.4 KB</span></li>
+    </ul>
+  </div>
+  <span class="num"></span>
+</section>
+
+<!-- 5 ------------------------------------------------------------------------------------- -->
+<section class="slide" data-title="What trials.db holds">
+  <h2>What <code>trials.db</code> holds</h2>
+  <p class="lede">Everything ClinicalTrials.gov publishes is kept once, compressed. Most of the 9.1 GB is
+    copies built for speed: plain text for search, the search indexes, and structured tables.</p>
+  <div class="bar" style="height:48px" aria-label="trials.db by storage layer">
+    <div class="seg" style="flex:2528;background:var(--raw)" data-tip="<b>Original documents</b><br>2.53 GB · 27.8%<br>content 2.05 GB + SQLite page overhead"></div>
+    <div class="seg" style="flex:3788;background:var(--text)" data-tip="<b>Plain text copies</b><br>3.79 GB · 41.6%<br>trial_text 2.52 GB + trial_outcomes 1.26 GB"></div>
+    <div class="seg" style="flex:1534;background:var(--search)" data-tip="<b>Search indexes</b><br>1.53 GB · 16.9%<br>trials_fts 1.41 GB + names_fts 0.12 GB"></div>
+    <div class="seg" style="flex:1246;background:var(--structured)" data-tip="<b>Structured tables</b><br>1.25 GB · 13.7%<br>trials, links, locations, MeSH"></div>
+  </div>
+  <div class="bar-labels">
+    <div style="flex:2528"><b>2.53 GB · 28%</b>Original documents</div>
+    <div style="flex:3788"><b>3.79 GB · 42%</b>Plain text copies</div>
+    <div style="flex:1534"><b>1.53 GB · 17%</b>Search indexes</div>
+    <div style="flex:1246"><b>1.25 GB · 14%</b>Structured</div>
+  </div>
+  <div class="cards" style="grid-template-columns:repeat(4,1fr);margin-top:22px">
+    <div class="card"><h3><span class="swatch sw-raw"></span>Original documents</h3>
+      <p>Every study's full JSON, byte for byte, compressed to 19% with zstd. The only place results, arms, design details, contacts and references live.</p>
+      <p class="muted" style="margin-top:8px;font-size:13px"><code>trial_docs</code> · as plain JSON it would be about 9.8 GB</p></div>
+    <div class="card"><h3><span class="swatch sw-text"></span>Plain text copies</h3>
+      <p>Summaries, descriptions, eligibility criteria and outcomes, uncompressed. The search index reads them (next slides).</p>
+      <p class="muted" style="margin-top:8px;font-size:13px"><code>trial_text</code>, <code>trial_outcomes</code> · 3.1 GB of text</p></div>
+    <div class="card"><h3><span class="swatch sw-search"></span>Search indexes</h3>
+      <p>Word positions for full-text search over titles, text, conditions and interventions; plus fuzzy name lookup.</p>
+      <p class="muted" style="margin-top:8px;font-size:13px"><code>trials_fts</code>, <code>names_fts</code></p></div>
+    <div class="card"><h3><span class="swatch sw-structured"></span>Structured tables</h3>
+      <p>One narrow row per trial plus links to conditions, MeSH, interventions, sponsors, countries and sites, for filters and charts.</p>
+      <p class="muted" style="margin-top:8px;font-size:13px"><code>trials</code> and 12 more tables</p></div>
+  </div>
+  <p class="muted" style="margin:16px 0 0;font-size:14px">Sizes include each table's indexes and SQLite page overhead. The 2.77 GB zip stays in <code>data/downloads/</code> for rebuilds and can be deleted.</p>
+  <span class="num"></span>
+</section>
+
+<!-- 6 ------------------------------------------------------------------------------------- -->
+<section class="slide" data-title="The tables">
+  <h2>The tables</h2>
+  <p class="lede">Everything hangs off <code>trials</code> by <code>trial_id</code>. Names (conditions, sponsors…) are
+    stored once and linked; per-trial details sit on the link.</p>
+  <svg viewBox="0 0 1136 500" width="1136" height="500" role="img" aria-label="Schema of trials.db">
+    <!-- connectors -->
+    <g class="line">
+      <path d="M300 46 C390 46 390 170 460 170"/>
+      <path d="M300 122 C390 122 390 190 460 190"/>
+      <path d="M300 198 C390 198 390 210 460 210"/>
+      <path d="M300 274 C390 274 390 230 460 230"/>
+      <path d="M300 350 C390 350 390 250 460 250"/>
+      <path d="M300 426 C390 426 390 270 460 270"/>
+      <path d="M836 46 C746 46 746 170 676 170"/>
+      <path d="M836 122 C746 122 746 190 676 190"/>
+      <path d="M836 212 C746 212 746 230 676 230"/>
+      <path d="M836 304 C746 304 746 250 676 250"/>
+      <path d="M568 340 V392"/>
+    </g>
+    <!-- trials -->
+    <rect class="box-structured" x="460" y="120" width="216" height="220" rx="12"/>
+    <text class="t-title" x="478" y="150">trials</text>
+    <text class="t-small" x="478" y="170">607,349 rows · narrow</text>
+    <text class="t-body" x="478" y="198">NCT id, titles</text>
+    <text class="t-body" x="478" y="218">status, phase, type</text>
+    <text class="t-body" x="478" y="238">start/completion dates</text>
+    <text class="t-body" x="478" y="258">enrollment, ages, sex</text>
+    <text class="t-body" x="478" y="278">lead sponsor, scope, sites</text>
+    <text class="t-body" x="478" y="298">content_hash</text>
+
+    <!-- left: structured links -->
+    <g>
+      <rect class="box-structured" x="0" y="16" width="300" height="60" rx="10"/>
+      <text class="t-body" x="16" y="41"><tspan style="fill:var(--ink)">trial_conditions</tspan> → conditions</text>
+      <text class="t-small" x="16" y="62">1.09M links · 134k names</text>
+      <rect class="box-structured" x="0" y="92" width="300" height="60" rx="10"/>
+      <text class="t-body" x="16" y="117"><tspan style="fill:var(--ink)">trial_mesh</tspan> → mesh_terms</text>
+      <text class="t-small" x="16" y="138">6.97M links · condition/intervention, ancestor flag</text>
+      <rect class="box-structured" x="0" y="168" width="300" height="60" rx="10"/>
+      <text class="t-body" x="16" y="193"><tspan style="fill:var(--ink)">trial_interventions</tspan> → interventions</text>
+      <text class="t-small" x="16" y="214">1.01M links, with type · 482k other names</text>
+      <rect class="box-structured" x="0" y="244" width="300" height="60" rx="10"/>
+      <text class="t-body" x="16" y="269"><tspan style="fill:var(--ink)">trial_sponsors</tspan> → sponsors</text>
+      <text class="t-small" x="16" y="290">968k links · lead/collaborator, class</text>
+      <rect class="box-structured" x="0" y="320" width="300" height="60" rx="10"/>
+      <text class="t-body" x="16" y="345"><tspan style="fill:var(--ink)">trial_countries</tspan> → countries</text>
+      <text class="t-small" x="16" y="366">786k links · 253 codes (ISO + 4 extra)</text>
+      <rect class="box-structured" x="0" y="396" width="300" height="60" rx="10"/>
+      <text class="t-body" x="16" y="421"><tspan style="fill:var(--ink)">locations</tspan></text>
+      <text class="t-small" x="16" y="442">3.55M sites · facility, city, country, lat/lon</text>
+    </g>
+
+    <!-- right: text, original, search -->
+    <g>
+      <rect class="box-text" x="836" y="16" width="300" height="60" rx="10"/>
+      <text class="t-body" x="852" y="41"><tspan style="fill:var(--ink)">trial_text</tspan></text>
+      <text class="t-small" x="852" y="62">summary, description, eligibility</text>
+      <rect class="box-text" x="836" y="92" width="300" height="60" rx="10"/>
+      <text class="t-body" x="852" y="117"><tspan style="fill:var(--ink)">trial_outcomes</tspan></text>
+      <text class="t-small" x="852" y="138">3.80M outcome rows · measure, time frame</text>
+      <rect class="box-search" x="836" y="176" width="300" height="72" rx="10"/>
+      <text class="t-body" x="852" y="201"><tspan style="fill:var(--ink)">trials_fts</tspan> · <tspan style="fill:var(--ink)">names_fts</tspan></text>
+      <text class="t-small" x="852" y="222">full-text index, reads the text above</text>
+      <text class="t-small" x="852" y="238">fuzzy lookup of names</text>
+      <path class="flow-dash" d="M1100 176 V158"/>
+      <text class="t-small" x="1060" y="171">reads</text>
+      <rect class="box-raw" x="836" y="268" width="300" height="72" rx="10"/>
+      <text class="t-body" x="852" y="293"><tspan style="fill:var(--ink)">trial_docs</tspan> → doc_dicts</text>
+      <text class="t-small" x="852" y="314">original JSON, zstd-compressed</text>
+      <text class="t-small" x="852" y="330">with one shared, trained dictionary</text>
+    </g>
+
+    <!-- bookkeeping -->
+    <g>
+      <rect class="box-book" x="360" y="392" width="416" height="96" rx="12"/>
+      <text class="t-title" x="378" y="420" style="font-size:15px">Bookkeeping</text>
+      <text class="t-body" x="378" y="444"><tspan style="fill:var(--ink)">runs</tspan> install/update runs, stage checkpoints</text>
+      <text class="t-body" x="378" y="464"><tspan style="fill:var(--ink)">trial_changes</tspan> change log · <tspan style="fill:var(--ink)">meta</tspan> data_version, cursor</text>
+      <text class="t-body" x="378" y="484"><tspan style="fill:var(--ink)">stats</tspan> precomputed charts (milestone 4)</text>
+    </g>
+  </svg>
+  <span class="num"></span>
+</section>
+
+<!-- 7 ------------------------------------------------------------------------------------- -->
+<section class="slide" data-title="Why text is stored twice">
+  <h2>Why the text is stored twice, and how to stop</h2>
+  <p class="lede">Today's full-text index stores only word positions and reads the text back through SQL
+    whenever it needs it. SQL can't unpack compressed documents, so the text has to be plain.</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px">
+    <div class="card" style="padding:18px 20px">
+      <h3>Today: the index reads its text <span class="tag">external content</span></h3>
+      <svg viewBox="0 0 500 150" width="100%" height="150" aria-hidden="true">
+        <rect class="box-search" x="0" y="50" width="130" height="50" rx="8"/>
+        <text class="t-body" x="16" y="80"><tspan style="fill:var(--ink)">trials_fts</tspan></text>
+        <path class="flow" d="M216 75 H136"/>
+        <text class="t-small" x="150" y="66">reads</text>
+        <rect class="box" x="218" y="50" width="104" height="50" rx="8"/>
+        <text class="t-body" x="232" y="80">SQL view</text>
+        <rect class="box-text" x="370" y="14" width="130" height="50" rx="8"/>
+        <text class="t-body" x="384" y="44">plain text</text>
+        <rect class="box-raw" x="370" y="86" width="130" height="50" rx="8"/>
+        <text class="t-body" x="384" y="116">compressed doc</text>
+        <path class="flow" d="M370 39 L330 62"/>
+        <path class="line" d="M370 111 L326 90" style="stroke-dasharray:4 4"/>
+        <text class="t-small" x="200" y="128">✕ SQL can't unpack it</text>
+      </svg>
+      <p style="margin:6px 0 4px">It reads the text to:</p>
+      <ul>
+        <li>remove a trial's old words when an update changes it</li>
+        <li>rebuild the whole index after the install's bulk load</li>
+        <li>make snippets and highlights, and run its integrity check</li>
+      </ul>
+    </div>
+    <div class="card" style="padding:18px 20px">
+      <h3>Your idea, for milestone 4 <span class="tag">contentless</span></h3>
+      <svg viewBox="0 0 500 150" width="100%" height="150" aria-hidden="true">
+        <rect class="box" x="0" y="50" width="104" height="50" rx="8"/>
+        <text class="t-body" x="16" y="80">query</text>
+        <path class="flow" d="M104 75 H146"/>
+        <rect class="box-search" x="150" y="50" width="130" height="50" rx="8"/>
+        <text class="t-body" x="164" y="80"><tspan style="fill:var(--ink)">trials_fts</tspan></text>
+        <path class="flow" d="M280 75 H322"/>
+        <text class="t-small" x="278" y="40">top 100 ids</text>
+        <rect class="box-raw" x="326" y="50" width="174" height="50" rx="8"/>
+        <text class="t-body" x="340" y="80">unpack those docs</text>
+        <text class="t-small" x="150" y="130">→ snippets; unpacking 100 documents takes about 2 ms</text>
+      </svg>
+      <ul style="margin-top:6px">
+        <li>the pipeline hands the index the text as it writes each trial</li>
+        <li>matching, phrases and ranking work from the index alone</li>
+        <li>SQLite 3.43+ can update and delete without the old text</li>
+        <li>no plain copies: about 5.3–6.4 GB instead of 9.1</li>
+      </ul>
+    </div>
+  </div>
+  <div style="margin-top:20px">
+    <div style="display:flex;gap:18px;font-size:13px;color:var(--ink-2);margin-bottom:8px">
+      <span><span class="swatch sw-raw"></span>Original documents</span>
+      <span><span class="swatch sw-text"></span>Text (plain, or compressed)</span>
+      <span><span class="swatch sw-search"></span>Search indexes</span>
+      <span><span class="swatch sw-structured"></span>Structured tables</span>
+    </div>
+    <div id="compare"></div>
+  </div>
+  <span class="num"></span>
+</section>
+
+<!-- 8 ------------------------------------------------------------------------------------- -->
+<section class="slide roomy" data-title="How an update knows what changed">
+  <h2>How an update knows what changed</h2>
+  <p class="lede">Each trial stores a fingerprint of its study. An update fingerprints what it fetched and
+    writes only the studies whose fingerprint differs.</p>
+  <div class="lane" style="margin-bottom:22px">
+    <div class="step"><h4>Study from the API</h4><p>or from the bulk zip: the same JSON, so the same fingerprint</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>Drop <code>versionHolder</code></h4><p>the release date, new in all 607k studies every day</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>Sort keys, BLAKE2b</h4><p>16-byte <code>content_hash</code></p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>Same as stored?</h4><p><b>Yes:</b> skip. <b>No:</b> write it and log what changed.</p></div>
+  </div>
+  <div class="cards" style="grid-template-columns:repeat(3,1fr)">
+    <div class="card"><h3>Why drop the release date</h3><p>Hashing it would make every study the update fetches look changed, every day: thousands of pointless rewrites and false "updated" events. The plugin decides what to leave out (<code>hashable</code>).</p></div>
+    <div class="card"><h3>The cursor and the overlap</h3><p><code>meta</code> keeps the latest update date seen (2026-10-16). The next update asks from one day earlier, because dates have no time of day. The fingerprint makes the overlap free: today all 2,606 refetched studies were skipped.</p></div>
+    <div class="card"><h3>The change log</h3><p>For changed trials, <code>trial_changes</code> records old and new values of tracked fields: status, phase, dates, enrollment, lead sponsor, conditions, interventions, countries, sites… It replaces v1's history tables; a field's first value is the "old" of its first change.</p></div>
+  </div>
+  <span class="num"></span>
+</section>
+
+<!-- 9 ------------------------------------------------------------------------------------- -->
+<section class="slide roomy" data-title="Safety">
+  <h2>What keeps the data safe</h2>
+  <p class="lede">Readers never see half-written data, a failure leaves things as they were, and a re-run
+    picks up where the last one stopped.</p>
+  <div class="cards" style="grid-template-columns:1fr 1fr;gap:18px">
+    <div class="card"><h3>Updates are all or nothing</h3><p>One <code>BEGIN IMMEDIATE</code> transaction holds the trials, change log, cursor and data version. Readers see the old data until it commits. A failure writes nothing and marks the run failed.</p></div>
+    <div class="card"><h3>Installs build beside the old database</h3><p>The new data goes into <code>trials.db.new</code>, gets checked, then is renamed over <code>trials.db</code>. Install refuses to replace an existing database without <code>--force</code>, or one another process has open.</p></div>
+    <div class="card"><h3>Interrupted? Run it again</h3><p>Each install stage is checkpointed in <code>runs</code>. A re-run skips finished stages and trials already loaded with the same fingerprint, and reuses a finished download. (The server doesn't support resuming a half-finished download.)</p></div>
+    <div class="card"><h3>One bad study doesn't stop 600k</h3><p>A study that fails to parse or normalize is skipped and counted, with the first 100 messages in the run summary (0 of 607,349 failed). Plugin event handlers run after commit; one that crashes is logged and doesn't stop the run.</p></div>
+  </div>
+  <span class="num"></span>
+</section>
+
+<!-- 10 ------------------------------------------------------------------------------------ -->
+<section class="slide roomy" data-title="Boundaries">
+  <h2>Who owns what</h2>
+  <p class="lede">The core knows trials, storage and the pipeline; the plugin knows ClinicalTrials.gov.
+    They meet at a small interface that any future registry can implement.</p>
+  <div style="display:grid;grid-template-columns:1fr 330px 1fr;gap:18px;align-items:stretch">
+    <div class="card"><h3>Core (<code>trial-al</code>)</h3>
+      <ul>
+        <li><code>TrialRecord</code>: the shape every source produces</li>
+        <li>Storage: SQLite tables, migrations, compression, search</li>
+        <li>Pipeline: install, update, fingerprints, checkpoints, change log, events</li>
+        <li>CLI: <code>install</code>, <code>update</code>, <code>doctor</code>, <code>plugins</code></li>
+      </ul></div>
+    <div class="card" style="background:var(--surface);border-color:var(--axis)"><h3>The interface: <code>Source</code></h3>
+      <ul>
+        <li><code>fetch_all(ctx)</code> → raw JSON</li>
+        <li><code>fetch_changed(since, ctx)</code></li>
+        <li><code>normalize(raw)</code> → <code>TrialRecord</code></li>
+        <li><code>hashable(raw)</code></li>
+      </ul>
+      <p style="margin-top:8px">Checked by the <code>SourceContract</code> test suite.</p></div>
+    <div class="card"><h3>ctgov plugin (<code>trial-al-ctgov</code>)</h3>
+      <ul>
+        <li>Download the zip; page the API; back off on 429 and 5xx</li>
+        <li>Read the zip without extracting it</li>
+        <li>Normalize: phases, dates, ages, 226 countries, MeSH, sponsors, outcomes, sites</li>
+        <li>Leave <code>versionHolder</code> out of the fingerprint</li>
+      </ul></div>
+  </div>
+  <div class="card" style="margin-top:18px"><h3>What milestone 4 plugs into</h3>
+    <p><code>Pipeline.run_install(progress)</code> and <code>run_update(progress)</code> become background jobs · the <code>enrich</code> and <code>stats</code> stages are in place but empty · plugins subscribe to <code>update.started</code>, <code>trials.changed</code>, <code>update.finished</code>, <code>install.finished</code>.</p></div>
+  <span class="num"></span>
+</section>
+
+<!-- 11 ------------------------------------------------------------------------------------ -->
+<section class="slide" data-title="Open items">
+  <h2>What's open, and what's yours to decide</h2>
+  <p class="lede">Nothing here blocks committing milestone 3; each has a home in a later milestone.</p>
+  <table class="open">
+    <tr><td>1</td><td><strong>Text stored twice.</strong> Contentless search index plus unpacking the top hits. Raw documents only (≈ 5.3 GB, reading a trial's text needs the source plugin) or a compressed text column too (≈ 6.4 GB, storage stays independent of the plugin).</td><td><span class="tag">your call</span> · milestone 4</td></tr>
+    <tr><td>2</td><td><strong>Searching very common words</strong> would take about 1.8 s at full size (target 150 ms), whatever the index type.</td><td>milestone 4</td></tr>
+    <tr><td>3</td><td><strong>Rebuilding</strong> with <code>--force</code> starts the change log over, and replacing a database a running server has open isn't handled yet.</td><td>milestone 4 · <code>rebuild</code></td></tr>
+    <tr><td>4</td><td><strong>Install speed.</strong> The single writer is the bottleneck (1,630 trials/s); the check stage takes 2m43s.</td><td>milestone 6</td></tr>
+    <tr><td>5</td><td><strong>Removed studies</strong> stay in the database; the weekly reconcile job isn't built.</td><td>later</td></tr>
+    <tr><td>6</td><td><strong>Puerto Rico</strong> counts as its own country, so a US + Puerto Rico trial is "both US and non-US".</td><td><span class="tag">your call</span></td></tr>
+    <tr><td>7</td><td><strong>Real changes on live data</strong> haven't been written yet: it's the weekend. Run <code>trial-al update</code> after Monday's release.</td><td>Monday</td></tr>
+  </table>
+  <span class="num"></span>
+</section>
+
+</div>
+
+<nav>
+  <button id="prev" aria-label="Previous slide">‹</button>
+  <span class="count" id="count"></span>
+  <button id="next" aria-label="Next slide">›</button>
+  <span class="hint">← → or space</span>
+</nav>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+(() => {
+  const slides = [...document.querySelectorAll(".slide")];
+  const stage = document.getElementById("stage");
+  const count = document.getElementById("count");
+  const prev = document.getElementById("prev");
+  const next = document.getElementById("next");
+  slides.forEach((slide, i) => { slide.querySelector(".num").textContent = `${i + 1} / ${slides.length}`; });
+
+  let current = 0;
+  try {
+    const saved = Number(new URLSearchParams(location.hash.slice(1)).get("slide"));
+    if (saved >= 1 && saved <= slides.length) current = saved - 1;
+  } catch (_) {}
+
+  function show(i) {
+    current = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach((slide, j) => slide.classList.toggle("active", j === current));
+    count.textContent = `${current + 1} / ${slides.length}`;
+    prev.disabled = current === 0;
+    next.disabled = current === slides.length - 1;
+    try { history.replaceState(null, "", `#slide=${current + 1}`); } catch (_) {}
+    hideTip();
+  }
+  function fit() {
+    const scale = Math.min(window.innerWidth / 1300, (window.innerHeight - 52) / 735);
+    stage.style.setProperty("--scale", String(Math.max(scale, 0.2)));
+  }
+  prev.addEventListener("click", () => show(current - 1));
+  next.addEventListener("click", () => show(current + 1));
+  document.addEventListener("keydown", (e) => {
+    if (["ArrowRight", "PageDown", " ", "Enter"].includes(e.key)) { e.preventDefault(); show(current + 1); }
+    else if (["ArrowLeft", "PageUp", "Backspace"].includes(e.key)) { e.preventDefault(); show(current - 1); }
+    else if (e.key === "Home") show(0);
+    else if (e.key === "End") show(slides.length - 1);
+  });
+  let touchX = null;
+  document.addEventListener("touchstart", (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+  document.addEventListener("touchend", (e) => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    if (Math.abs(dx) > 50) show(current + (dx < 0 ? 1 : -1));
+    touchX = null;
+  });
+  window.addEventListener("resize", fit);
+
+  // Comparison of database layouts (slide 7): GB per storage layer.
+  const layers = [
+    ["raw", "Original documents"],
+    ["text", "Text"],
+    ["search", "Search indexes"],
+    ["structured", "Structured tables"],
+  ];
+  const layouts = [
+    ["Today", [2.53, 3.79, 1.53, 1.25], "plain text copies"],
+    ["+ compressed text", [2.53, 1.1, 1.53, 1.25], "estimate: text compressed, contentless index"],
+    ["Raw documents only", [2.53, 0, 1.53, 1.25], "estimate: no text copies, contentless index"],
+  ];
+  const max = 9.1;
+  const compare = document.getElementById("compare");
+  for (const [name, sizes, note] of layouts) {
+    const total = sizes.reduce((a, b) => a + b, 0);
+    const row = document.createElement("div");
+    row.style.cssText = "display:grid;grid-template-columns:170px 1fr 230px;align-items:center;gap:14px;margin:7px 0";
+    const label = document.createElement("div");
+    label.style.cssText = "font-size:14px;font-weight:600";
+    label.textContent = name;
+    const track = document.createElement("div");
+    const bar = document.createElement("div");
+    bar.className = "bar";
+    bar.style.cssText = `height:22px;width:${(total / max) * 100}%`;
+    sizes.forEach((size, i) => {
+      if (!size) return;
+      const seg = document.createElement("div");
+      seg.style.cssText = `flex:${size};background:var(--${layers[i][0]})`;
+      seg.dataset.tip = `<b>${name}: ${layers[i][1]}</b><br>${size.toFixed(2)} GB`;
+      bar.appendChild(seg);
+    });
+    track.appendChild(bar);
+    const value = document.createElement("div");
+    value.style.cssText = "font-size:14px;color:var(--ink-2)";
+    value.innerHTML = `<b style="color:var(--ink)">${total.toFixed(1)} GB</b> · ${note}`;
+    row.append(label, track, value);
+    compare.appendChild(row);
+  }
+
+  // Tooltips for every element with data-tip.
+  const tip = document.getElementById("tip");
+  function hideTip() { tip.style.display = "none"; }
+  document.addEventListener("mousemove", (e) => {
+    const target = e.target.closest("[data-tip]");
+    if (!target) { hideTip(); return; }
+    tip.innerHTML = target.dataset.tip;
+    tip.style.display = "block";
+    const x = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 8);
+    const y = Math.min(e.clientY + 16, window.innerHeight - tip.offsetHeight - 8);
+    tip.style.left = `${x}px`;
+    tip.style.top = `${y}px`;
+  });
+  document.addEventListener("mouseleave", hideTip);
+
+  fit();
+  show(current);
+})();
+</script>
+</body>
+</html>

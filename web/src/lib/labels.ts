@@ -12,6 +12,14 @@ export type LabelField =
   | "sponsor_class"
   | "intervention_type"
   | "intervention_types"
+  | "primary_purpose"
+  | "arm_type"
+  | "allocation"
+  | "intervention_model"
+  | "observational_model"
+  | "time_perspective"
+  | "masking"
+  | "masked_role"
   | "countries";
 
 const META_KEYS: Record<string, string> = { intervention_types: "intervention_type" };

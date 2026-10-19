@@ -15,13 +15,18 @@ import type { WidgetProps } from "./common";
 const HIDDEN = new Set(["key"]);
 
 export function TableWidget({ spec, rows, height }: WidgetProps) {
-  const columns = useMemo(() => {
+  const { columns, numbers, names } = useMemo(() => {
+    const numbers = spec.series.length > 0 ? spec.series.map((one) => one.key) : [spec.y];
     const keys = new Set<string>();
     for (const row of rows) for (const key of Object.keys(row)) keys.add(key);
     keys.delete(spec.x);
-    keys.delete(spec.y);
-    return [spec.x, ...[...keys].filter((key) => !HIDDEN.has(key)), spec.y];
-  }, [rows, spec.x, spec.y]);
+    for (const key of numbers) keys.delete(key);
+    return {
+      columns: [spec.x, ...[...keys].filter((key) => !HIDDEN.has(key)), ...numbers],
+      numbers: new Set(numbers),
+      names: new Map(spec.series.map((one) => [one.key, one.label])),
+    };
+  }, [rows, spec.x, spec.y, spec.series]);
 
   return (
     <div className="overflow-auto rounded-lg border" style={{ maxHeight: Math.max(height, 240) }}>
@@ -29,8 +34,8 @@ export function TableWidget({ spec, rows, height }: WidgetProps) {
         <TableHeader className="sticky top-0 bg-card">
           <TableRow>
             {columns.map((column) => (
-              <TableHead key={column} className={cn(column === spec.y && "text-right")}>
-                {humanize(column)}
+              <TableHead key={column} className={cn(numbers.has(column) && "text-right")}>
+                {names.get(column) ?? humanize(column)}
               </TableHead>
             ))}
           </TableRow>

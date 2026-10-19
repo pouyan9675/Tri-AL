@@ -34,8 +34,10 @@ class MetaOut(_Out):
     plugins: list[str]
     search_candidates: int = Field(description="Matches a search ranks at most.")
     labels: dict[str, dict[str, str]] = Field(
-        description="Display names of coded fields: status, phase, study_type, sponsor_class "
-        "and intervention_type. A code without one is shown as itself."
+        description="Display names of coded fields: status, phase, study_type, sponsor_class, "
+        "intervention_type, primary_purpose, arm_type, allocation, intervention_model, "
+        "observational_model, time_perspective, masking and masked_role. A code without one "
+        "is shown as itself."
     )
 
 
@@ -82,6 +84,14 @@ class InterventionOut(_Out):
     name: str
     type: str | None
     other_names: list[str]
+    description: str | None
+
+
+class ArmOut(_Out):
+    label: str
+    type: str | None
+    description: str | None
+    interventions: list[str] = Field(description="Names of the interventions this arm gets.")
 
 
 class SponsorOut(_Out):
@@ -111,11 +121,24 @@ class TrialDetailOut(_Out):
     phase: str | None
     study_type: str | None
     primary_purpose: str | None
+    allocation: str | None
+    intervention_model: str | None
+    observational_model: str | None
+    time_perspective: str | None
+    masking: str | None
+    masked_roles: list[str]
     start_date: date | None
     primary_completion_date: date | None
     completion_date: date | None
     first_posted: date | None
     last_update: date | None
+    start_date_type: str | None = Field(description="ACTUAL or ESTIMATED; None if not given.")
+    primary_completion_date_type: str | None
+    completion_date_type: str | None
+    results_first_posted: date | None
+    status_verified: date | None = Field(description="When the status was last confirmed.")
+    last_known_status: str | None = Field(description="The status before it became UNKNOWN.")
+    why_stopped: str | None
     enrollment: int | None
     enrollment_type: str | None
     arms_count: int | None
@@ -130,8 +153,10 @@ class TrialDetailOut(_Out):
     eligibility_criteria: str | None
     outcomes: list[OutcomeOut]
     conditions: list[str]
+    keywords: list[str]
     mesh_terms: list[MeshTermOut]
     interventions: list[InterventionOut]
+    arms: list[ArmOut]
     sponsors: list[SponsorOut]
     countries: list[str]
     locations: list[LocationOut]
@@ -202,14 +227,28 @@ class LayoutOut(_Out):
     order: int
 
 
+class SeriesOut(_Out):
+    key: str
+    label: str
+
+
 class ChartSpecOut(_Out):
     id: str
     title: str
-    widget: Literal["bar", "line", "area", "pie", "stat", "table", "map", "trends"]
+    widget: Literal[
+        "bar", "line", "area", "pie", "stat", "table", "map", "trends", "scatter", "scatter3d"
+    ]
     description: str
-    section: str = Field(description="The dashboard section; empty for the first, untitled one.")
+    section: str = Field(description="The page section; empty for the first, untitled one.")
+    page: Literal["dashboard", "analysis"] = Field(
+        description="Where the chart is shown: the dashboard or the analysis page."
+    )
     x: str
     y: str
+    series: list[SeriesOut] = Field(
+        description="Line and area charts with several series: each one's row key and name. "
+        "Empty: one series, `y`."
+    )
     layout: LayoutOut
     plugin: str
     precomputed: bool

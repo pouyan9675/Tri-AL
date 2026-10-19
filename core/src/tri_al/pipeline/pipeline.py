@@ -15,8 +15,11 @@ is how they report, and a progress callback may raise to stop a run.
 from __future__ import annotations
 
 import itertools
+import logging
 import os
+import queue
 import sqlite3
+import threading
 import time
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
@@ -28,6 +31,8 @@ from typing import TYPE_CHECKING, Any, Literal, Self
 from sqlalchemy import Connection, func, insert, select, update
 from sqlalchemy.exc import DatabaseError
 
+from tri_al import embeddings
+from tri_al.embeddings import EmbeddingEngine
 from tri_al.pipeline import changes as change_log
 from tri_al.pipeline.events import (
     Event,
@@ -38,7 +43,7 @@ from tri_al.pipeline.events import (
     UpdateStarted,
     fire,
 )
-from tri_al.pipeline.prepare import default_workers, prepared
+from tri_al.pipeline.prepare import default_workers, prepare, prepared
 from tri_al.pipeline.runs import (
     DATA_VERSION,
     Run,
@@ -59,15 +64,22 @@ from tri_al.pipeline.source import (
     Source,
     ignore_progress,
 )
-from tri_al.pipeline.summary import RunSummary, SourceCounts
+from tri_al.pipeline.summary import (
+    EmbeddingSummary,
+    RenormalizeSummary,
+    RunSummary,
+    SourceCounts,
+    StatsSummary,
+)
 from tri_al.schema import TrialRecord
-from tri_al.stats import CORE_FACETS, Chart, Facet, precompute
+from tri_al.stats import CORE_FACETS, Chart, Derived, Facet, precompute
 from tri_al.storage import (
     BulkLoader,
     Migration,
     SqliteExtension,
     SQLiteStorage,
     StorageError,
+    docs,
     open_app_db,
 )
 from tri_al.storage import tables as t
@@ -88,6 +100,12 @@ class PipelineError(Exception):
     """The pipeline can't run as asked, such as an update before any install."""
 
 
+log = logging.getLogger(__name__)
+
+EMBED_BATCH = 2_048
+"""Trials an embedding backfill encodes and writes at a time."""
+
+
 @dataclass(frozen=True, kw_only=True)
 class Pipeline:
     """Install and update for the trials in ``data_dir``, from ``sources``."""
@@ -99,10 +117,12 @@ class Pipeline:
     app_migrations: Mapping[str, Sequence[Migration]] = field(default_factory=dict)
     subscriptions: Mapping[str, Sequence[Subscription]] = field(default_factory=dict)
     charts: Sequence[Chart] = ()  # precomputed with every install and update
+    derived: Sequence[Derived] = ()  # rebuilt just before the charts
     facets: Sequence[Facet] = CORE_FACETS
     workers: int = field(default_factory=default_workers)  # 0: normalize in this process
     batch_size: int = BATCH_SIZE
     check_full_text: bool = True  # an install checks its full-text indexes before the swap
+    embedder: EmbeddingEngine | None = None
 
     @classmethod
     def from_plugins(
@@ -115,6 +135,16 @@ class Pipeline:
     ) -> Self:
         """A pipeline for the enabled plugins' sources, migrations, extensions and handlers."""
         contributions = plugins.contributions
+        embedder = None
+        if config.embeddings.enabled:
+            embedder = embeddings.create_engine(
+                config.embeddings.engine,
+                config.embeddings.model,
+                max_tokens=config.embeddings.max_tokens,
+                batch_size=config.embeddings.batch_size,
+                device=config.embeddings.device,
+                float16=config.embeddings.float16,
+            )
         return cls(
             data_dir=config.data.dir if data_dir is None else data_dir,
             sources=list(contributions.sources.values()),
@@ -125,7 +155,9 @@ class Pipeline:
                 event: list(subs) for event, subs in contributions.subscriptions.items()
             },
             charts=list(contributions.charts.values()),
+            derived=list(contributions.derived.values()),
             workers=default_workers() if workers is None else workers,
+            embedder=embedder,
         )
 
     @property
@@ -250,17 +282,207 @@ class Pipeline:
         with self._open(self.trials_db) as storage:
             return _Update(self, storage, progress).run()
 
+    def run_embedding_backfill(
+        self,
+        progress: ProgressCallback = ignore_progress,
+        *,
+        force: bool = False,
+        batch_size: int = EMBED_BATCH,
+    ) -> EmbeddingSummary:
+        """Embed every trial without a vector from the configured model (all with ``force``).
+
+        Newest trials first, so the recent window that charts use fills first. A thread
+        reads the next batch's text while the model encodes this one, and each batch is
+        written in its own short transaction, never holding the write lock while the model
+        runs; a trial an update changed in the meantime is left to that update. Stopping
+        loses at most a batch: the next run carries on. When vectors were written, the data
+        version goes up and the stats are recomputed, since charts read the vectors.
+        """
+        engine = self.embedder
+        if engine is None:
+            raise PipelineError("embeddings are off in tri-al.toml ([embeddings] enabled)")
+        if not self.trials_db.exists():
+            raise PipelineError(
+                f"there's no database at {self.trials_db} yet; run `tri-al install` first"
+            )
+        if batch_size < 1:
+            raise ValueError("batch_size must be at least 1")
+        summary = EmbeddingSummary(engine=engine.name, model=engine.model)
+        with self._open(self.trials_db) as storage:
+            started = time.monotonic()
+            progress(Progress("model", message=engine.model))
+            dimensions = engine.encode(["warm up"]).shape[1]  # loads the model
+            with storage.transaction() as tx:
+                model = embeddings.model_for(tx.connection, engine, dimensions)
+            with storage.engine.connect() as conn:
+                ids = embeddings.stale_trials(conn, model, force=force)
+            summary.stages["model"] = round(time.monotonic() - started, 3)
+
+            started = time.monotonic()
+            total = len(ids)
+            progress(Progress("embed", 0, total, "trials"))
+            done = 0
+            batches = [list(b) for b in itertools.batched(ids, batch_size, strict=False)]
+            with _Prefetch(storage, batches) as texts:
+                for batch in texts:
+                    vectors = engine.encode([text.text for text in batch])
+                    with storage.transaction() as tx:
+                        current = {
+                            text.trial_id for text in embeddings.unchanged(tx.connection, batch)
+                        }
+                        keep = [i for i, text in enumerate(batch) if text.trial_id in current]
+                        embeddings.store(
+                            tx.connection, model, [batch[i].trial_id for i in keep], vectors[keep]
+                        )
+                    summary.trials += len(keep)
+                    summary.skipped += len(batch) - len(keep)
+                    done += len(batch)
+                    progress(Progress("embed", done, total, "trials"))
+            summary.stages["embed"] = round(time.monotonic() - started, 3)
+
+            if summary.trials:
+                started = time.monotonic()
+                progress(Progress("stats"))
+                summary.stats_errors = self._new_stats(storage)
+                summary.stages["stats"] = round(time.monotonic() - started, 3)
+            with storage.engine.connect() as conn:
+                summary.data_version = data_version(conn)
+        return summary
+
+    def run_renormalize(self, progress: ProgressCallback = ignore_progress) -> RenormalizeSummary:
+        """Normalize every stored trial again from its raw document, with today's sources.
+
+        For when a source plugin learns to read more of its documents, such as arms and
+        design, so trials stored before get the new fields without a new install. Each
+        batch is its own short transaction (``StorageTransaction.refresh``): a trial whose
+        record comes out the same is left alone; one whose lists and searchable text are
+        the same gets its other fields and text rewritten in place, keeping its full-text
+        row and vector; any other is written in full and embedded again. The change log
+        gets nothing, since the registry didn't change the trials. Stopping keeps the
+        batches done; running again carries on, past them quickly. When anything was
+        written, the data version goes up and the stats are recomputed.
+        """
+        self._check_sources()
+        if not self.trials_db.exists():
+            raise PipelineError(
+                f"there's no database at {self.trials_db} yet; run `tri-al install` first"
+            )
+        sources = {source.name: source for source in self.sources}
+        summary = RenormalizeSummary()
+        with self._open(self.trials_db) as storage:
+            started = time.monotonic()
+            with storage.engine.connect() as conn:
+                ids = conn.execute(select(t.trials.c.id).order_by(t.trials.c.id)).scalars().all()
+            total = len(ids)
+            progress(Progress("normalize", 0, total, "trials"))
+            derived: dict[int, TrialRecord] = {}
+
+            def derive(stored: TrialRecord) -> TrialRecord | None:
+                source = sources.get(stored.source)
+                if source is None or stored.raw is None or stored.id is None:
+                    summary.skipped += 1
+                    return None
+                prepared_ = prepare(source, stored.raw)
+                record = prepared_.record
+                if record is None or record.source_id != stored.source_id:
+                    found = None if record is None else f"a record for {record.source_id}"
+                    summary.add_failure(
+                        f"{stored.source}/{stored.source_id}: {prepared_.error or found}"
+                    )
+                    return None
+                derived[stored.id] = record
+                return record
+
+            for batch in itertools.batched(ids, self.batch_size, strict=False):
+                derived.clear()
+                with storage.transaction() as tx:
+                    result = tx.refresh(batch, derive)
+                    replaced = [(trial_id, derived[trial_id]) for trial_id in result.replaced]
+                    if error := self.enrich(tx.connection, replaced):
+                        summary.embedding_error = error
+                summary.trials += len(batch)
+                summary.unchanged += len(result.unchanged)
+                summary.rewritten += len(result.rewritten)
+                summary.replaced += len(result.replaced)
+                progress(Progress("normalize", summary.trials, total, "trials"))
+            summary.stages["normalize"] = round(time.monotonic() - started, 3)
+
+            if summary.rewritten or summary.replaced:
+                started = time.monotonic()
+                progress(Progress("stats"))
+                summary.stats_errors = self._new_stats(storage)
+                summary.stages["stats"] = round(time.monotonic() - started, 3)
+            with storage.engine.connect() as conn:
+                summary.data_version = data_version(conn)
+        return summary
+
+    def run_stats(self, progress: ProgressCallback = ignore_progress) -> StatsSummary:
+        """Rebuild the derived tables and precomputed stats now, under a new data version.
+
+        For when what they're made from changed but the data didn't: a plugin's settings,
+        such as the cluster map's, or a chart's code. The data version goes up, so API
+        caches and browsers fetch the new results.
+        """
+        if not self.trials_db.exists():
+            raise PipelineError(
+                f"there's no database at {self.trials_db} yet; run `tri-al install` first"
+            )
+        summary = StatsSummary()
+        with self._open(self.trials_db) as storage:
+            started = time.monotonic()
+            progress(Progress("stats"))
+            summary.stats_errors = self._new_stats(storage)
+            summary.stages["stats"] = round(time.monotonic() - started, 3)
+            with storage.engine.connect() as conn:
+                summary.data_version = data_version(conn)
+        return summary
+
+    def _new_stats(self, storage: SQLiteStorage) -> list[str]:
+        """Bump the data version and recompute the stats for it, in one transaction."""
+        with storage.transaction() as tx:
+            version = data_version(tx.connection) + 1
+            set_meta(tx.connection, DATA_VERSION, str(version))
+            return self.compute_stats(tx.connection, version)
+
     # --- enrich and stats ----------------------------------------------------------------------
 
-    def enrich(self, conn: Connection, trial_ids: Sequence[int] | None) -> None:
-        """Run enrichers over ``trial_ids`` (None: every trial). Enrichers come later."""
+    def enrich(
+        self, conn: Connection, trials: Sequence[tuple[int, TrialRecord]] | None
+    ) -> str | None:
+        """Embed new and changed trials, in the update's transaction; an error, or None.
+
+        Installs pass ``None``: ``tri-al embeddings generate`` embeds them afterwards. The
+        trial writer has already removed the old vectors of changed trials. A model that
+        fails doesn't stop the update: its trials stay without vectors until the next
+        backfill, and the error goes in the run summary.
+        """
+        if not trials or self.embedder is None:
+            return None
+        try:
+            texts = [embeddings.trial_embedding_text(record) for _, record in trials]
+            vectors = self.embedder.encode(texts)
+            model = embeddings.model_for(conn, self.embedder, vectors.shape[1])
+        except Exception as exc:
+            log.warning("embedding %d trials failed: %s", len(trials), exc, exc_info=True)
+            return f"{type(exc).__name__}: {exc}"
+        embeddings.store(conn, model, [trial_id for trial_id, _ in trials], vectors)
+        return None
 
     def compute_stats(self, conn: Connection, data_version: int) -> list[str]:
         """Store the precomputed charts and facets for ``data_version``; return errors.
 
         Runs in the caller's transaction, so readers get the new stats with the new data.
+        Derived tables are rebuilt first, since charts may read them.
         """
-        return precompute(conn, self.charts, self.facets, data_version)
+        errors: list[str] = []
+        for derived in self.derived:
+            try:
+                with conn.begin_nested():
+                    derived.build(conn, data_version)
+            except Exception as exc:
+                log.exception("stats: derived tables %s failed", derived.name)
+                errors.append(f"{derived.name}: {exc!r}")
+        return errors + precompute(conn, self.charts, self.facets, data_version)
 
     def stats_are_current(self, conn: Connection, data_version: int) -> bool:
         """Whether ``stats`` holds every precomputed chart and facet for ``data_version``."""
@@ -347,10 +569,10 @@ class _Install:
         def stats(conn: Connection) -> None:
             self.summary.stats_errors = self.pipeline.compute_stats(conn, version)
 
-        stages: dict[str, Callable[[Connection], None]] = {
-            "enrich": lambda conn: self.pipeline.enrich(conn, None),
-            "stats": stats,
-        }
+        def enrich(conn: Connection) -> None:
+            self.pipeline.enrich(conn, None)  # every trial is new: the backfill embeds them
+
+        stages: dict[str, Callable[[Connection], None]] = {"enrich": enrich, "stats": stats}
         for stage, action in stages.items():
             if stage not in done:
                 # The stage's writes and its checkpoint commit together.
@@ -507,6 +729,7 @@ class _Update:
     def _write(self, fetched: Sequence[_Fetched]) -> tuple[list[int], list[int]]:
         new_ids: list[int] = []
         updated_ids: list[int] = []
+        changed_records: list[tuple[int, TrialRecord]] = []
         total = sum(len(f.changed) for f in fetched)
         stages = self.summary.stages
         started = time.monotonic()
@@ -524,6 +747,7 @@ class _Update:
                 for chunk in itertools.batched(f.changed, self.pipeline.batch_size, strict=False):
                     ids = tx.upsert_batch(chunk)
                     for record, trial_id in zip(chunk, ids, strict=True):
+                        changed_records.append((trial_id, record))
                         before = old.get(record.source_id)
                         if before is None:
                             new_ids.append(trial_id)
@@ -546,7 +770,13 @@ class _Update:
 
             changed_ids = new_ids + updated_ids
             with self._timed("enrich"):
-                self.pipeline.enrich(conn, changed_ids)
+                error = self.pipeline.enrich(conn, changed_records)
+            if error is not None:
+                self.summary.notes["embeddings"] = {
+                    "error": error,
+                    "trials": len(changed_records),
+                    "fix": "run `tri-al embeddings generate`",
+                }
 
             version = data_version(conn)
             if changed_ids:
@@ -600,3 +830,57 @@ def _latest_update(conn: Connection, source: str) -> date | None:
 def _remove_database(path: Path) -> None:
     for name in (str(path), f"{path}-wal", f"{path}-shm"):
         Path(name).unlink(missing_ok=True)
+
+
+class _Prefetch:
+    """Reads each batch's embedding text in a thread, one batch ahead of the caller.
+
+    Iterating yields the batches' ``TrialText`` lists in order; leaving the ``with`` block
+    (finished, or because the caller raised) stops the thread.
+    """
+
+    def __init__(self, storage: SQLiteStorage, batches: Sequence[Sequence[int]], ahead: int = 2):
+        self._storage = storage
+        self._batches = batches
+        self._queue: queue.Queue[list[embeddings.TrialText] | BaseException | None] = queue.Queue(
+            ahead
+        )
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._read, name="embedding-texts", daemon=True)
+
+    def __enter__(self) -> Iterator[list[embeddings.TrialText]]:
+        self._thread.start()
+        return self._iterate()
+
+    def __exit__(self, *exc: object) -> None:
+        self._stop.set()
+        with suppress(queue.Empty):
+            while True:  # make room, so a blocked put returns and sees the stop
+                self._queue.get_nowait()
+        self._thread.join()
+
+    def _iterate(self) -> Iterator[list[embeddings.TrialText]]:
+        while (item := self._queue.get()) is not None:
+            if isinstance(item, BaseException):
+                raise item
+            yield item
+
+    def _put(self, item: list[embeddings.TrialText] | BaseException | None) -> bool:
+        while not self._stop.is_set():
+            with suppress(queue.Full):
+                self._queue.put(item, timeout=0.1)
+                return True
+        return False
+
+    def _read(self) -> None:
+        decoder = docs.Decoder()  # decoders aren't shared between threads
+        try:
+            for batch in self._batches:
+                with self._storage.engine.connect() as conn:
+                    texts = embeddings.load_texts(conn, batch, decoder)
+                if not self._put(texts):
+                    return
+        except BaseException as exc:
+            self._put(exc)
+            return
+        self._put(None)

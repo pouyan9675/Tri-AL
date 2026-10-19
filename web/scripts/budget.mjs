@@ -39,6 +39,8 @@ const initialBytes = total(initial);
 const PAGES = {
   dashboard: ["src/pages/dashboard/index.tsx"],
   "  + map widget": ["src/widgets/map.tsx", "src/pages/dashboard/index.tsx"],
+  analysis: ["src/pages/analysis/index.tsx"],
+  "  + 3D widget": ["src/widgets/scatter3d.tsx", "src/pages/analysis/index.tsx"],
   trials: ["src/pages/trials/index.tsx"],
   trial: ["src/pages/trial/index.tsx"],
   settings: ["src/pages/settings/index.tsx"],

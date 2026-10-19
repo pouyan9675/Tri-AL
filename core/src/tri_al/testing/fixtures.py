@@ -10,7 +10,7 @@ import json
 from datetime import date
 from typing import Any
 
-from tri_al.schema import Intervention, Location, MeshTerm, Outcome, Sponsor, TrialRecord
+from tri_al.schema import Arm, Intervention, Location, MeshTerm, Outcome, Sponsor, TrialRecord
 
 
 def raw_json(data: dict[str, Any]) -> bytes:
@@ -44,11 +44,19 @@ def phase3_trial() -> TrialRecord:
         phase="PHASE3",
         study_type="INTERVENTIONAL",
         primary_purpose="TREATMENT",
+        allocation="RANDOMIZED",
+        intervention_model="PARALLEL",
+        masking="DOUBLE",
+        masked_roles=["PARTICIPANT", "INVESTIGATOR"],
         start_date=date(2024, 3, 1),
         primary_completion_date=date(2027, 6, 30),
         completion_date=date(2028, 1, 15),
         first_posted=date(2024, 2, 20),
         last_update=date(2026, 9, 30),
+        start_date_type="ACTUAL",
+        primary_completion_date_type="ESTIMATED",
+        completion_date_type="ESTIMATED",
+        status_verified=date(2026, 9, 1),
         enrollment=1800,
         enrollment_type="ESTIMATED",
         arms_count=2,
@@ -80,6 +88,7 @@ def phase3_trial() -> TrialRecord:
             Outcome("other", "Plasma p-tau217 concentration"),
         ],
         conditions=["Alzheimer Disease", "Mild Cognitive Impairment"],
+        keywords=["amyloid", "anti-amyloid antibody", "Köln cohort"],
         mesh_terms=[
             MeshTerm("D000544", "Alzheimer Disease", "condition"),
             MeshTerm("D060825", "Cognitive Dysfunction", "condition"),
@@ -87,8 +96,20 @@ def phase3_trial() -> TrialRecord:
             MeshTerm("D000911", "Antibodies, Monoclonal", "intervention", ancestor=True),
         ],
         interventions=[
-            Intervention("Remternetug", "DRUG", ("TAL-0451", "LY-TEST-1")),
+            Intervention(
+                "Remternetug", "DRUG", ("TAL-0451", "LY-TEST-1"), "1,400 mg IV every 4 weeks"
+            ),
             Intervention("Placebo", "DRUG"),
+        ],
+        arms=[
+            Arm(
+                "Remternetug",
+                "EXPERIMENTAL",
+                "Participants receive remternetug by IV infusion every 4 weeks.",
+                ("Remternetug",),
+            ),
+            Arm("Placebo", "PLACEBO_COMPARATOR", None, ("Placebo",)),
+            Arm("Natural history", None),
         ],
         sponsors=[
             Sponsor("Tri-AL Test Pharma", "lead", "INDUSTRY"),

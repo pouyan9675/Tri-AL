@@ -27,8 +27,8 @@ def fake_study(
 
     ``snapshot`` stands for a field that changes with every data release but not with the
     study (like ClinicalTrials.gov's ``versionHolder``), so ``FakeSource.hashable`` leaves it
-    out. Other ``fields``: ``status``, ``enrollment``, ``conditions``, ``countries``, and
-    ``broken=True`` to make normalizing fail.
+    out. Other ``fields``: ``status``, ``enrollment``, ``conditions``, ``countries``,
+    ``first_posted`` (``YYYY-MM-DD``), and ``broken=True`` to make normalizing fail.
     """
     study = {"id": source_id, "title": title or f"Study {source_id}", "updated": updated}
     return orjson.dumps(study | {"snapshot": snapshot} | fields)
@@ -63,6 +63,7 @@ class FakeSource:
             status=raw.get("status"),
             enrollment=raw.get("enrollment"),
             last_update=date.fromisoformat(raw["updated"]),
+            first_posted=date.fromisoformat(raw["first_posted"]) if "first_posted" in raw else None,
             conditions=list(raw.get("conditions", [])),
             countries=list(raw.get("countries", [])),
         )

@@ -9,7 +9,7 @@
  */
 import { infiniteQueryOptions, keepPreviousData, queryOptions } from "@tanstack/react-query";
 import { canonical, type TrialFilter } from "@/lib/filters";
-import { api, type SortKey, unwrap } from "./client";
+import { api, type ChartSpec, type SortKey, unwrap } from "./client";
 
 export const DATA_KEY = ["data"] as const;
 export const JOBS_KEY = ["jobs"] as const;
@@ -28,6 +28,11 @@ export const dashboardQuery = () =>
     queryFn: ({ signal }) => unwrap(api.GET("/api/dashboard", { signal })),
     staleTime: Number.POSITIVE_INFINITY,
   });
+
+/** The charts a page shows (the dashboard or the analysis page), in layout order. */
+export function onPage(charts: ChartSpec[] | undefined, page: ChartSpec["page"]): ChartSpec[] {
+  return (charts ?? []).filter((chart) => chart.page === page);
+}
 
 export const chartQuery = (chartId: string, filter: TrialFilter) =>
   queryOptions({

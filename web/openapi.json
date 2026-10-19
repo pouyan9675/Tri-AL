@@ -1429,7 +1429,7 @@
           "stats"
         ],
         "summary": "Getdashboard",
-        "description": "The dashboard's charts, in layout order, and the facets the explorer offers.",
+        "description": "Every chart, for the dashboard and the analysis page, in layout order, and the facets\nthe explorer offers.",
         "operationId": "getDashboard",
         "responses": {
           "200": {
@@ -2172,6 +2172,53 @@
   },
   "components": {
     "schemas": {
+      "ArmOut": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "interventions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Interventions",
+            "description": "Names of the interventions this arm gets."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "label",
+          "type",
+          "description",
+          "interventions"
+        ],
+        "title": "ArmOut"
+      },
       "ChangeOut": {
         "properties": {
           "run_id": {
@@ -2264,7 +2311,9 @@
               "stat",
               "table",
               "map",
-              "trends"
+              "trends",
+              "scatter",
+              "scatter3d"
             ],
             "title": "Widget"
           },
@@ -2275,7 +2324,16 @@
           "section": {
             "type": "string",
             "title": "Section",
-            "description": "The dashboard section; empty for the first, untitled one."
+            "description": "The page section; empty for the first, untitled one."
+          },
+          "page": {
+            "type": "string",
+            "enum": [
+              "dashboard",
+              "analysis"
+            ],
+            "title": "Page",
+            "description": "Where the chart is shown: the dashboard or the analysis page."
           },
           "x": {
             "type": "string",
@@ -2284,6 +2342,14 @@
           "y": {
             "type": "string",
             "title": "Y"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesOut"
+            },
+            "type": "array",
+            "title": "Series",
+            "description": "Line and area charts with several series: each one's row key and name. Empty: one series, `y`."
           },
           "layout": {
             "$ref": "#/components/schemas/LayoutOut"
@@ -2305,8 +2371,10 @@
           "widget",
           "description",
           "section",
+          "page",
           "x",
           "y",
+          "series",
           "layout",
           "plugin",
           "precomputed"
@@ -2480,6 +2548,17 @@
             },
             "type": "array",
             "title": "Other Names"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
           }
         },
         "additionalProperties": false,
@@ -2487,7 +2566,8 @@
         "required": [
           "name",
           "type",
-          "other_names"
+          "other_names",
+          "description"
         ],
         "title": "InterventionOut"
       },
@@ -2905,7 +2985,7 @@
             },
             "type": "object",
             "title": "Labels",
-            "description": "Display names of coded fields: status, phase, study_type, sponsor_class and intervention_type. A code without one is shown as itself."
+            "description": "Display names of coded fields: status, phase, study_type, sponsor_class, intervention_type, primary_purpose, arm_type, allocation, intervention_model, observational_model, time_perspective, masking and masked_role. A code without one is shown as itself."
           }
         },
         "additionalProperties": false,
@@ -3292,6 +3372,25 @@
         ],
         "title": "SearchOut"
       },
+      "SeriesOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "SeriesOut"
+      },
       "SnippetPartOut": {
         "properties": {
           "text": {
@@ -3452,6 +3551,68 @@
             ],
             "title": "Primary Purpose"
           },
+          "allocation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocation"
+          },
+          "intervention_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intervention Model"
+          },
+          "observational_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observational Model"
+          },
+          "time_perspective": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Perspective"
+          },
+          "masking": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Masking"
+          },
+          "masked_roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Masked Roles"
+          },
           "start_date": {
             "anyOf": [
               {
@@ -3511,6 +3672,88 @@
               }
             ],
             "title": "Last Update"
+          },
+          "start_date_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date Type",
+            "description": "ACTUAL or ESTIMATED; None if not given."
+          },
+          "primary_completion_date_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Completion Date Type"
+          },
+          "completion_date_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Date Type"
+          },
+          "results_first_posted": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Results First Posted"
+          },
+          "status_verified": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Verified",
+            "description": "When the status was last confirmed."
+          },
+          "last_known_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Known Status",
+            "description": "The status before it became UNKNOWN."
+          },
+          "why_stopped": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why Stopped"
           },
           "enrollment": {
             "anyOf": [
@@ -3651,6 +3894,13 @@
             "type": "array",
             "title": "Conditions"
           },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keywords"
+          },
           "mesh_terms": {
             "items": {
               "$ref": "#/components/schemas/MeshTermOut"
@@ -3664,6 +3914,13 @@
             },
             "type": "array",
             "title": "Interventions"
+          },
+          "arms": {
+            "items": {
+              "$ref": "#/components/schemas/ArmOut"
+            },
+            "type": "array",
+            "title": "Arms"
           },
           "sponsors": {
             "items": {
@@ -3712,11 +3969,24 @@
           "phase",
           "study_type",
           "primary_purpose",
+          "allocation",
+          "intervention_model",
+          "observational_model",
+          "time_perspective",
+          "masking",
+          "masked_roles",
           "start_date",
           "primary_completion_date",
           "completion_date",
           "first_posted",
           "last_update",
+          "start_date_type",
+          "primary_completion_date_type",
+          "completion_date_type",
+          "results_first_posted",
+          "status_verified",
+          "last_known_status",
+          "why_stopped",
           "enrollment",
           "enrollment_type",
           "arms_count",
@@ -3731,8 +4001,10 @@
           "eligibility_criteria",
           "outcomes",
           "conditions",
+          "keywords",
           "mesh_terms",
           "interventions",
+          "arms",
           "sponsors",
           "countries",
           "locations",

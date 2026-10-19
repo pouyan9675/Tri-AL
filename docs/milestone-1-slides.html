@@ -1,0 +1,1022 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Milestone 1 Overview</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    /* The three milestone 1 subsystems, in a fixed order on every slide */
+    --plugins: #1baf7a;
+    --config: #eda100;
+    --cli: #2a78d6;
+    --warn: #eb6834;      /* problems and errors */
+    --later: #898781;     /* built in later milestones, or still to come */
+    --term-bg: #1a1a19;
+    --term-ink: #e8e7e3;
+    --term-dim: #8f8d86;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #f0efec;
+      --ink-2: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --axis: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --plugins: #199e70;
+      --config: #c98500;
+      --cli: #3987e5;
+      --warn: #d95926;
+      --term-bg: #0d0d0d;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --plugins: #199e70;
+    --config: #c98500;
+    --cli: #3987e5;
+    --warn: #d95926;
+    --term-bg: #0d0d0d;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    overflow: hidden;
+  }
+
+  /* --- deck frame ------------------------------------------------------------------------ */
+  .stage {
+    position: absolute;
+    left: 50%;
+    top: calc(50% - 22px);
+    width: 1280px;
+    height: 720px;
+    transform: translate(-50%, -50%) scale(var(--scale, 1));
+    transform-origin: center;
+  }
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    padding: 52px 72px 40px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .slide.active { display: flex; }
+  .slide .num {
+    position: absolute;
+    right: 28px;
+    bottom: 18px;
+    font-size: 13px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    font-size: 14px;
+    color: var(--ink-2);
+  }
+  nav button {
+    font: inherit;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 34px;
+    height: 30px;
+    cursor: pointer;
+  }
+  nav button:hover { border-color: var(--axis); }
+  nav button:disabled { opacity: 0.35; cursor: default; }
+  nav .count { min-width: 60px; text-align: center; font-variant-numeric: tabular-nums; }
+  nav .hint { color: var(--muted); font-size: 13px; }
+
+  /* --- type ------------------------------------------------------------------------------ */
+  .kicker {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+  h1 { font-size: 58px; line-height: 1.05; margin: 0 0 18px; letter-spacing: -0.02em; font-weight: 700; }
+  h2 { font-size: 34px; line-height: 1.15; margin: 0 0 8px; letter-spacing: -0.01em; font-weight: 680; }
+  .lede { font-size: 18px; line-height: 1.45; color: var(--ink-2); margin: 0 0 24px; max-width: 1060px; }
+  p, li { font-size: 16px; line-height: 1.45; }
+  code, .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.9em; white-space: nowrap; }
+  .muted { color: var(--muted); }
+  strong { font-weight: 650; }
+
+  /* --- pieces ---------------------------------------------------------------------------- */
+  .swatch {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    border-radius: 3px;
+    margin-right: 7px;
+    vertical-align: -1px;
+  }
+  .sw-plugins { background: var(--plugins); }
+  .sw-config { background: var(--config); }
+  .sw-cli { background: var(--cli); }
+  .sw-warn { background: var(--warn); }
+  .sw-built { background: var(--surface); border: 1.5px solid var(--ink-2); }
+  .sw-later { background: transparent; border: 1.5px dashed var(--later); }
+  .legend { display: flex; gap: 22px; font-size: 13px; color: var(--ink-2); flex-wrap: wrap; }
+
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: auto; }
+  .tile {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    background: var(--page);
+  }
+  .tile .value { font-size: 40px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+  .tile .label { font-size: 15px; color: var(--ink-2); margin-top: 6px; line-height: 1.35; }
+
+  .cards { display: grid; gap: 16px; }
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    background: var(--page);
+  }
+  .card h3 { font-size: 17px; margin: 0 0 6px; font-weight: 650; }
+  .card p { margin: 0; font-size: 15px; color: var(--ink-2); }
+  .card ul { margin: 6px 0 0; padding-left: 18px; }
+  .card li { font-size: 15px; color: var(--ink-2); margin: 2px 0; }
+
+  /* Steps in a lane */
+  .lane { display: flex; align-items: stretch; gap: 0; }
+  .step {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    background: var(--page);
+    min-width: 0;
+  }
+  .step h4 { margin: 0 0 4px; font-size: 16px; font-weight: 650; display: flex; justify-content: space-between; gap: 8px; }
+  .step h4 .n { font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .step p { margin: 0; font-size: 14px; line-height: 1.4; color: var(--ink-2); }
+  .step.s-plugins { border-color: var(--plugins); background: color-mix(in oklab, var(--plugins) 7%, var(--page)); }
+  .step.s-cli { border-color: var(--cli); background: color-mix(in oklab, var(--cli) 7%, var(--page)); }
+  .arrow { align-self: center; color: var(--muted); font-size: 20px; padding: 0 6px; }
+
+  /* Bars */
+  .bar { display: flex; gap: 2px; height: 40px; }
+  .bar > div { height: 100%; }
+  .bar > div:first-child { border-radius: 4px 0 0 4px; }
+  .bar > div:last-child { border-radius: 0 4px 4px 0; }
+  .bar > div:hover { filter: brightness(1.08); }
+  .bar-labels { display: flex; gap: 2px; margin-top: 8px; }
+  .bar-labels > div { font-size: 14px; line-height: 1.3; color: var(--ink-2); overflow: hidden; }
+  .bar-labels b { display: block; color: var(--ink); font-weight: 650; }
+
+  .tip {
+    position: fixed;
+    pointer-events: none;
+    z-index: 10;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    line-height: 1.35;
+    max-width: 280px;
+    display: none;
+  }
+
+  /* SVG diagrams */
+  svg text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--ink); }
+  svg .t-title { font-size: 17px; font-weight: 650; }
+  svg .t-sub { font-size: 15px; font-weight: 650; }
+  svg .t-body { font-size: 14px; fill: var(--ink-2); }
+  svg .t-small { font-size: 12.5px; fill: var(--muted); }
+  svg .t-mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; fill: var(--ink-2); }
+  svg .mid { text-anchor: middle; }
+  svg .box { fill: var(--page); stroke: var(--axis); stroke-width: 1.2; }
+  svg .box-core { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.5; }
+  svg .box-built { fill: var(--page); stroke: var(--ink-2); stroke-width: 1.3; }
+  svg .box-later { fill: transparent; stroke: var(--later); stroke-width: 1.3; stroke-dasharray: 5 4; }
+  svg .box-plugins { fill: color-mix(in oklab, var(--plugins) 11%, var(--surface)); stroke: var(--plugins); stroke-width: 1.6; }
+  svg .box-config { fill: color-mix(in oklab, var(--config) 13%, var(--surface)); stroke: var(--config); stroke-width: 1.6; }
+  svg .box-cli { fill: color-mix(in oklab, var(--cli) 11%, var(--surface)); stroke: var(--cli); stroke-width: 1.6; }
+  svg .box-warn { fill: color-mix(in oklab, var(--warn) 10%, var(--surface)); stroke: var(--warn); stroke-width: 1.6; }
+  svg .line { stroke: var(--axis); stroke-width: 1.5; fill: none; }
+  svg .flow { stroke: var(--muted); stroke-width: 2; fill: none; marker-end: url(#arrow); }
+  svg .flow-dash { stroke: var(--muted); stroke-width: 1.6; fill: none; stroke-dasharray: 5 4; marker-end: url(#arrow); }
+  svg .flow-warn { stroke: var(--warn); stroke-width: 2; fill: none; marker-end: url(#arrow-warn); }
+  svg .tagbox { fill: var(--surface); stroke: var(--axis); stroke-width: 1; }
+  svg .tagtext { font-size: 12px; font-weight: 650; fill: var(--ink-2); text-anchor: middle; }
+
+  /* Code and terminal cards */
+  .code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+    background: var(--page);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 0;
+    white-space: pre;
+    overflow: hidden;
+    color: var(--ink-2);
+  }
+  .code .k { color: var(--ink); font-weight: 600; }
+  .code .dim { color: var(--muted); }
+  .code .file { display: block; color: var(--muted); font-size: 11.5px; margin-bottom: 4px; font-family: system-ui, -apple-system, sans-serif; }
+  .code .v1 { color: var(--muted); }
+  .code .hl-plugins { color: var(--plugins); font-weight: 650; }
+  .code .hl-config { color: var(--config); font-weight: 650; }
+  .code .hl-cli { color: var(--cli); font-weight: 650; }
+  .term {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12.5px;
+    line-height: 1.45;
+    background: var(--term-bg);
+    color: var(--term-ink);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 0;
+    white-space: pre;
+    overflow: hidden;
+  }
+  .term .p { color: var(--term-dim); }
+  .term .tbl { display: block; line-height: 1.2; }
+  .term .ok { color: #3fbf8a; }
+  .term .err { color: #f07a4a; }
+
+  .lands { list-style: none; padding: 0; margin: 0; }
+  .lands li {
+    display: grid;
+    grid-template-columns: 1fr auto 150px;
+    gap: 14px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--grid);
+    font-size: 15px;
+    align-items: center;
+  }
+  .lands li span:nth-child(2) { font-variant-numeric: tabular-nums; }
+  .lands li span:last-child { color: var(--ink-2); font-size: 14px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 13px;
+    border-radius: 8px;
+    padding: 5px 10px;
+    border: 1.5px solid var(--ink-2);
+    background: var(--page);
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .chip.c-plugins { border-color: var(--plugins); background: color-mix(in oklab, var(--plugins) 11%, var(--surface)); }
+  .chip.c-cli { border-color: var(--cli); background: color-mix(in oklab, var(--cli) 11%, var(--surface)); }
+  .chip.c-later { border: 1.5px dashed var(--later); background: transparent; color: var(--ink-2); }
+  .group-label { font-size: 13px; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+
+  .open { width: 100%; border-collapse: collapse; }
+  .open td { padding: 9px 10px; border-bottom: 1px solid var(--grid); font-size: 15px; vertical-align: top; line-height: 1.4; }
+  .open td:first-child { width: 34px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .open td:last-child { color: var(--ink-2); width: 210px; }
+  .tag {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 1px 8px;
+    color: var(--ink-2);
+    background: var(--page);
+  }
+  .tag.decided { border-color: color-mix(in oklab, var(--plugins) 60%, transparent); }
+  .tag.open-t { border-color: color-mix(in oklab, var(--warn) 60%, transparent); }
+
+  @media print {
+    body { overflow: visible; background: white; }
+    nav, .tip { display: none !important; }
+    .stage { position: static; transform: none; width: auto; height: auto; }
+    .slide { position: relative; display: flex !important; width: 1280px; height: 720px; page-break-after: always; break-after: page; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" style="fill: var(--muted)"/>
+    </marker>
+    <marker id="arrow-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" style="fill: var(--warn)"/>
+    </marker>
+  </defs>
+</svg>
+
+<div class="stage" id="stage">
+
+<!-- 1 ------------------------------------------------------------------------------------- -->
+<section class="slide" data-title="Milestone 1">
+  <p class="kicker">Tri-AL v2 · Milestone 1</p>
+  <h1>The skeleton:<br>core, plugins, config, CLI</h1>
+  <p class="lede">How v2 is put together: a small core that finds plugins at runtime, one config file with
+    environment overrides, and the <code>tri-al</code> command. Storage, the pipeline and the
+    ClinicalTrials.gov plugin from milestones 2 and 3 all plug into this frame.</p>
+  <div class="tiles">
+    <div class="tile"><div class="value">0</div><div class="label">imports from the core to any plugin: it finds them through entry points</div></div>
+    <div class="tile"><div class="value">1 file</div><div class="label"><code>tri-al.toml</code> holds all config; <code>TRI_AL_*</code> variables override it</div></div>
+    <div class="tile"><div class="value">54</div><div class="label">tests at milestone 1: plugin loader, config, CLI and the sample plugin</div></div>
+    <div class="tile"><div class="value">4</div><div class="label">checks on every push: ruff lint, ruff format, strict mypy, pytest</div></div>
+  </div>
+  <p class="muted" style="margin:18px 0 0;font-size:14px">Branch <code>v2</code> · committed as <code>9a99581</code> on 2026-10-17 · not pushed yet · the package was renamed from <code>trial-al</code> to <code>tri-al</code> afterwards (<code>7fb7c15</code>); these slides use the new names</p>
+  <span class="num"></span>
+</section>
+
+<!-- 2 ------------------------------------------------------------------------------------- -->
+<section class="slide" data-title="The whole system">
+  <h2>The whole system, and where milestone 1 sits</h2>
+  <p class="lede">v2 is one Python package, the core, plus plugin packages. Milestone 1 built the frame
+    the rest hangs on: the plugin loader, config and the CLI. Colored boxes are milestone 1.</p>
+  <svg viewBox="0 0 1136 440" width="1136" height="440" role="img" aria-label="Layers of Tri-AL v2: browser and terminal, API server and job worker, the core library, the databases, and plugin packages on the side">
+    <!-- row A: how people use it -->
+    <rect class="box-later" x="0" y="0" width="410" height="64" rx="10"/>
+    <text class="t-title" x="18" y="28">Browser</text>
+    <text class="t-body" x="18" y="50">React + shadcn/ui dashboard</text>
+    <rect class="tagbox" x="354" y="20" width="40" height="22" rx="11"/><text class="tagtext" x="374" y="35">M5</text>
+
+    <rect class="box-cli" x="440" y="0" width="410" height="64" rx="10"/>
+    <text class="t-title" x="458" y="28">Terminal: <tspan style="font-family:ui-monospace,Menlo,monospace;font-size:15px">tri-al</tspan></text>
+    <text class="t-body" x="458" y="50">runs the core directly; <tspan style="font-family:ui-monospace,Menlo,monospace;font-size:13px">serve</tspan> will start the two below</text>
+    <rect class="tagbox" x="794" y="20" width="40" height="22" rx="11"/><text class="tagtext" x="814" y="35">M1</text>
+
+    <!-- row B: processes -->
+    <rect class="box-later" x="0" y="96" width="410" height="64" rx="10"/>
+    <text class="t-title" x="18" y="124">API server</text>
+    <text class="t-body" x="18" y="146">FastAPI · REST and live events · serves the app</text>
+    <rect class="tagbox" x="354" y="116" width="40" height="22" rx="11"/><text class="tagtext" x="374" y="131">M4</text>
+
+    <rect class="box-later" x="440" y="96" width="370" height="64" rx="10"/>
+    <text class="t-title" x="458" y="124">Job worker</text>
+    <text class="t-body" x="458" y="146">install, update, schedule</text>
+    <rect class="tagbox" x="754" y="116" width="40" height="22" rx="11"/><text class="tagtext" x="774" y="131">M4</text>
+
+    <path class="flow" d="M205 64 V94"/>
+    <text class="t-small" x="215" y="84">HTTP</text>
+    <path class="flow" d="M205 160 V190"/>
+    <path class="flow" d="M625 160 V190"/>
+    <path class="flow" d="M830 64 V190"/>
+
+    <!-- row C: the core library -->
+    <rect class="box-core" x="0" y="192" width="850" height="130" rx="12"/>
+    <text class="t-title" x="18" y="220">tri_al · the core library</text>
+    <rect class="box-plugins" x="16" y="236" width="112" height="72" rx="9"/>
+    <text class="t-sub" x="30" y="264">plugins</text>
+    <text class="t-small" x="30" y="286">loader, registry</text>
+    <rect class="box-config" x="136" y="236" width="104" height="72" rx="9"/>
+    <text class="t-sub" x="150" y="264">config</text>
+    <text class="t-small" x="150" y="286">file + env</text>
+    <rect class="box-cli" x="248" y="236" width="92" height="72" rx="9"/>
+    <text class="t-sub" x="262" y="264">cli</text>
+    <text class="t-small" x="262" y="286">Typer</text>
+    <rect class="box-built" x="352" y="236" width="150" height="72" rx="9"/>
+    <text class="t-sub" x="366" y="264">schema · storage</text>
+    <text class="t-small" x="366" y="286">milestone 2</text>
+    <rect class="box-built" x="514" y="236" width="130" height="72" rx="9"/>
+    <text class="t-sub" x="528" y="264">pipeline</text>
+    <text class="t-small" x="528" y="286">milestone 3</text>
+    <rect class="box-later" x="656" y="236" width="178" height="72" rx="9"/>
+    <text class="t-sub" x="670" y="264">jobs · stats · api</text>
+    <text class="t-small" x="670" y="286">milestone 4</text>
+
+    <!-- row D: data -->
+    <path class="box-built" d="M150 372 a100 12 0 0 1 200 0 v52 a100 12 0 0 1 -200 0 Z"/>
+    <path class="line" d="M150 372 a100 12 0 0 0 200 0" style="stroke:var(--ink-2)"/>
+    <text class="t-sub" x="172" y="406">trials.db</text>
+    <text class="t-small" x="250" y="406">trial data · M2</text>
+    <path class="box-built" d="M390 372 a100 12 0 0 1 200 0 v52 a100 12 0 0 1 -200 0 Z"/>
+    <path class="line" d="M390 372 a100 12 0 0 0 200 0" style="stroke:var(--ink-2)"/>
+    <text class="t-sub" x="412" y="406">app.db</text>
+    <text class="t-small" x="474" y="406">jobs · M2</text>
+    <rect class="box" x="650" y="366" width="200" height="64" rx="10"/>
+    <text class="t-sub" x="668" y="392">ClinicalTrials.gov</text>
+    <text class="t-small" x="668" y="414">API v2 and bulk zip</text>
+    <path class="flow" d="M250 322 V358"/>
+    <path class="flow" d="M490 322 V358"/>
+    <path class="flow" d="M750 366 V326"/>
+    <text class="t-small" x="760" y="352">fetched by ctgov</text>
+
+    <!-- plugins column -->
+    <rect class="box" x="890" y="0" width="246" height="436" rx="12"/>
+    <text class="t-title" x="908" y="30">Plugin packages</text>
+    <text class="t-small" x="908" y="50">installed beside the core</text>
+    <rect class="box-plugins" x="906" y="68" width="214" height="62" rx="9"/>
+    <text class="t-sub" x="920" y="94">tri-al-sample</text>
+    <text class="t-small" x="920" y="116">proves discovery works</text>
+    <rect class="tagbox" x="1066" y="80" width="40" height="22" rx="11"/><text class="tagtext" x="1086" y="95">M1</text>
+    <rect class="box-built" x="906" y="142" width="214" height="62" rx="9"/>
+    <text class="t-sub" x="920" y="168">tri-al-ctgov</text>
+    <text class="t-small" x="920" y="190">ClinicalTrials.gov source</text>
+    <rect class="tagbox" x="1066" y="154" width="40" height="22" rx="11"/><text class="tagtext" x="1086" y="169">M3</text>
+    <rect class="box-later" x="906" y="216" width="214" height="62" rx="9"/>
+    <text class="t-sub" x="920" y="242">tri-al-charts</text>
+    <text class="t-small" x="920" y="264">default dashboard charts</text>
+    <rect class="tagbox" x="1066" y="228" width="40" height="22" rx="11"/><text class="tagtext" x="1086" y="243">M5</text>
+    <rect class="box-later" x="906" y="290" width="214" height="62" rx="9"/>
+    <text class="t-sub" x="920" y="316">later</text>
+    <text class="t-small" x="920" y="338">vectors, auth, demographics…</text>
+    <text class="t-small" x="908" y="386">each registers into the core</text>
+    <text class="t-small" x="908" y="404">through the registry</text>
+    <path class="flow" d="M890 257 H854"/>
+  </svg>
+  <div class="legend" style="margin-top:10px">
+    <span><span class="swatch sw-plugins"></span><span class="swatch sw-config"></span><span class="swatch sw-cli"></span>built in milestone 1</span>
+    <span><span class="swatch sw-built"></span>built in milestones 2–3</span>
+    <span><span class="swatch sw-later"></span>still to come (M4–M6)</span>
+  </div>
+  <span class="num"></span>
+</section>
+
+<!-- 3 ------------------------------------------------------------------------------------- -->
+<section class="slide" data-title="Minimal core">
+  <h2>A minimal core; everything else is a plugin</h2>
+  <p class="lede">Plugins depend on the core, never the other way round. The core finds them at runtime and
+    meets each one at a single object, the registry.</p>
+  <svg viewBox="0 0 1136 330" width="1136" height="330" role="img" aria-label="The core, the registry in the middle, and plugin packages on the right">
+    <!-- core -->
+    <rect class="box-core" x="0" y="0" width="410" height="290" rx="12"/>
+    <text class="t-title" x="20" y="34">tri-al · the core</text>
+    <text class="t-small" x="20" y="54">only what every install needs</text>
+    <g>
+      <rect class="box-plugins" x="20" y="74" width="116" height="40" rx="8"/><text class="t-body mid" x="78" y="99" style="fill:var(--ink)">plugins</text>
+      <rect class="box-config" x="147" y="74" width="116" height="40" rx="8"/><text class="t-body mid" x="205" y="99" style="fill:var(--ink)">config</text>
+      <rect class="box-cli" x="274" y="74" width="116" height="40" rx="8"/><text class="t-body mid" x="332" y="99" style="fill:var(--ink)">cli</text>
+      <rect class="box-built" x="20" y="126" width="116" height="40" rx="8"/><text class="t-body mid" x="78" y="151">schema</text>
+      <rect class="box-built" x="147" y="126" width="116" height="40" rx="8"/><text class="t-body mid" x="205" y="151">storage</text>
+      <rect class="box-built" x="274" y="126" width="116" height="40" rx="8"/><text class="t-body mid" x="332" y="151">pipeline</text>
+      <rect class="box-built" x="20" y="178" width="116" height="40" rx="8"/><text class="t-body mid" x="78" y="203">testing</text>
+      <rect class="box-later" x="147" y="178" width="116" height="40" rx="8"/><text class="t-body mid" x="205" y="203">jobs</text>
+      <rect class="box-later" x="274" y="178" width="116" height="40" rx="8"/><text class="t-body mid" x="332" y="203">stats</text>
+      <rect class="box-later" x="20" y="230" width="116" height="40" rx="8"/><text class="t-body mid" x="78" y="255">api</text>
+      <rect class="box-later" x="147" y="230" width="116" height="40" rx="8"/><text class="t-body mid" x="205" y="255">access</text>
+    </g>
+
+    <!-- registry -->
+    <rect class="box-plugins" x="460" y="56" width="210" height="178" rx="12"/>
+    <text class="t-title" x="480" y="88">Registry</text>
+    <text class="t-small" x="480" y="108">one view per plugin</text>
+    <text class="t-mono" x="480" y="138">add_cli(app)</text>
+    <text class="t-mono" x="480" y="160">add_source(source)</text>
+    <text class="t-mono" x="480" y="182">add_migrations(db, …)</text>
+    <text class="t-mono" x="480" y="204">on(event, handler)</text>
+    <text class="t-small" x="480" y="224">+ 8 more</text>
+
+    <!-- plugins -->
+    <rect class="box-plugins" x="770" y="0" width="366" height="56" rx="10"/>
+    <text class="t-sub" x="790" y="24">tri-al-sample</text>
+    <text class="t-small" x="790" y="44">adds tri-al sample hello</text>
+    <rect class="tagbox" x="1080" y="17" width="40" height="22" rx="11"/><text class="tagtext" x="1100" y="32">M1</text>
+    <rect class="box-built" x="770" y="70" width="366" height="56" rx="10"/>
+    <text class="t-sub" x="790" y="94">tri-al-ctgov</text>
+    <text class="t-small" x="790" y="114">the ClinicalTrials.gov source, its migrations</text>
+    <rect class="tagbox" x="1080" y="87" width="40" height="22" rx="11"/><text class="tagtext" x="1100" y="102">M3</text>
+    <rect class="box-later" x="770" y="140" width="366" height="56" rx="10"/>
+    <text class="t-sub" x="790" y="164">tri-al-charts</text>
+    <text class="t-small" x="790" y="184">default dashboard charts</text>
+    <rect class="tagbox" x="1080" y="157" width="40" height="22" rx="11"/><text class="tagtext" x="1100" y="172">M5</text>
+    <rect class="box-later" x="770" y="210" width="366" height="56" rx="10"/>
+    <text class="t-sub" x="790" y="234">your plugin</text>
+    <text class="t-small" x="790" y="254">install the package and it shows up</text>
+
+    <!-- links -->
+    <path class="line" d="M752 28 V238 M752 28 H770 M752 98 H770 M752 168 H770 M752 238 H770"/>
+    <path class="flow" d="M752 145 H674"/>
+    <text class="t-small" x="684" y="136">register()</text>
+    <path class="flow" d="M460 145 H414"/>
+    <text class="t-small" x="418" y="166">records</text>
+    <path class="flow-dash" d="M205 292 C205 338 953 338 953 270"/>
+    <text class="t-small mid" x="579" y="300">found at runtime through the entry-point group tri_al.plugins; never imported by name</text>
+  </svg>
+  <div class="cards" style="grid-template-columns:repeat(3,1fr)">
+    <div class="card"><h3>The core never imports a plugin</h3><p>At startup it reads the entry-point group <code>tri_al.plugins</code>. Installing a package is enough; no list of plugins lives in the core.</p></div>
+    <div class="card"><h3>Plugins use only core interfaces</h3><p><code>Plugin</code>, <code>Registry</code>, and what they register: a source, migrations, CLI commands, event handlers. Plugins talk to each other through events.</p></div>
+    <div class="card"><h3>Each plugin owns its tables</h3><p>Prefixed table names and its own migrations, tracked under its name. Disabling a plugin leaves its tables where they are.</p></div>
+  </div>
+  <span class="num"></span>
+</section>
+
+<!-- 4 ------------------------------------------------------------------------------------- -->
+<section class="slide" data-title="The repository">
+  <h2>One repository, two generations</h2>
+  <p class="lede">v2 is a uv workspace sitting beside v1's Django code on the same branch. One command,
+    <code>uv sync</code>, sets up the core, the plugins and the tools; v2's tools ignore v1's files.</p>
+  <div style="display:grid;grid-template-columns:600px 1fr;gap:24px;align-items:start">
+<pre class="code" style="font-size:13px;line-height:1.55"><span class="k">Tri-AL/</span>
+├─ <span class="k">pyproject.toml</span>        <span class="dim">workspace root: members, dev tools, tool config</span>
+├─ <span class="k">uv.lock</span>               <span class="dim">one lock for everything</span>
+├─ <span class="k">.python-version</span>       <span class="dim">3.13, uv-managed</span>
+├─ <span class="k">core/</span>                 <span class="dim">package tri-al, command tri-al</span>
+│  ├─ src/tri_al/
+│  │  ├─ <span class="hl-plugins">plugins/</span>        <span class="dim">Plugin, Registry, loader</span>
+│  │  ├─ <span class="hl-config">config/</span>         <span class="dim">models, file + env loading</span>
+│  │  └─ <span class="hl-cli">cli/</span>            <span class="dim">app, plugins commands</span>
+│  └─ tests/             <span class="dim">loader, config, CLI</span>
+├─ <span class="k">plugins/</span>
+│  └─ <span class="hl-plugins">sample/</span>            <span class="dim">package tri-al-sample</span>
+├─ .github/workflows/
+│  ├─ <span class="k">v2.yml</span>             <span class="dim">new: hosted runners</span>
+│  └─ <span class="v1">deploy.yml</span>         <span class="dim">v1, unchanged</span>
+├─ docs/design.md
+└─ <span class="v1">panels/ visual/ manage.py …</span>   <span class="dim">v1 Django, untouched</span></pre>
+    <div class="cards" style="gap:12px">
+      <div class="card"><h3>A virtual root</h3><p>The root <code>pyproject.toml</code> is no package of its own. Its <code>dev</code> group pulls in both workspace members plus ruff, mypy and pytest, so <code>uv run tri-al</code> works with no flags.</p></div>
+      <div class="card"><h3>Each package stands alone</h3><p><code>core/</code> and every <code>plugins/*</code> has its own <code>pyproject.toml</code>, <code>src/</code> layout and tests, built with <code>uv_build</code>. Plugins depend on <code>tri-al</code>, never the reverse.</p></div>
+      <div class="card"><h3>Python 3.13, uv-managed only</h3><p><code>python-preference = "only-managed"</code>: macOS's own Python can't load SQLite extensions, which storage needs (design §5.2).</p></div>
+      <div class="card"><h3>v1 stays put</h3><p>No v1 file moved or deleted. ruff, mypy and pytest are scoped to v2; v1's self-hosted deploy workflow is unchanged.</p></div>
+    </div>
+  </div>
+  <span class="num"></span>
+</section>
+
+<!-- 5 ------------------------------------------------------------------------------------- -->
+<section class="slide" data-title="Loading plugins">
+  <h2>How the core loads plugins</h2>
+  <p class="lede">At every start the core finds the installed plugins, checks the enabled ones, puts them in
+    order, and only then lets them register. A problem anywhere stops the start, with the whole list.</p>
+  <div class="lane">
+    <div class="step s-plugins"><h4>Discover <span class="n">1</span></h4><p>read the entry points; each one is named after its plugin</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-plugins"><h4>Import <span class="n">2</span></h4><p>enabled plugins only; a disabled one's code never runs</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-plugins"><h4>Check <span class="n">3</span></h4><p>is a <code>Plugin</code>, names match, <code>api_version</code> is 1</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-plugins"><h4>Requires <span class="n">4</span></h4><p>each one installed and enabled</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-plugins"><h4>Settings <span class="n">5</span></h4><p>validate <code>[plugins.&lt;name&gt;]</code> with its model</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-plugins"><h4>Order <span class="n">6</span></h4><p>topological sort; cycles are errors</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-plugins"><h4>Register <span class="n">7</span></h4><p>call each <code>register</code>, in that order</p></div>
+  </div>
+  <svg viewBox="0 0 1136 220" width="1136" height="220" style="margin-top:26px" role="img" aria-label="If checks find problems, one PluginLoadError lists them all; otherwise plugins register in order. inspect_plugins is a read-only variant.">
+    <rect class="box-plugins" x="0" y="72" width="190" height="72" rx="10"/>
+    <text class="t-sub" x="18" y="102">load_plugins()</text>
+    <text class="t-small" x="18" y="124">steps 1–6 collect problems</text>
+    <path class="flow" d="M190 108 H236"/>
+    <path class="box" d="M300 66 L362 108 L300 150 L238 108 Z"/>
+    <text class="t-body mid" x="300" y="104" style="fill:var(--ink)">any</text>
+    <text class="t-body mid" x="300" y="122" style="fill:var(--ink)">problem?</text>
+    <path class="flow-warn" d="M300 66 V40 H396"/>
+    <text class="t-small" x="310" y="32">yes</text>
+    <path class="flow" d="M300 150 V176 H396"/>
+    <text class="t-small" x="310" y="194">no</text>
+    <rect class="box-warn" x="400" y="0" width="330" height="80" rx="10"/>
+    <text class="t-sub" x="418" y="26">PluginLoadError</text>
+    <text class="t-body" x="418" y="50">every problem at once, one line each,</text>
+    <text class="t-body" x="418" y="69">before any plugin has registered</text>
+    <rect class="box-plugins" x="400" y="140" width="330" height="72" rx="10"/>
+    <text class="t-sub" x="418" y="168">register, in load order</text>
+    <text class="t-body" x="418" y="192">→ plugins, settings, contributions</text>
+
+    <rect class="box" x="790" y="4" width="346" height="208" rx="12"/>
+    <text class="t-sub" x="810" y="34">inspect_plugins()</text>
+    <text class="t-small" x="810" y="54">what <tspan style="font-family:ui-monospace,Menlo,monospace">tri-al plugins list</tspan> shows</text>
+    <text class="t-body" x="810" y="88">• imports every installed plugin,</text>
+    <text class="t-body" x="822" y="108">enabled or not</text>
+    <text class="t-body" x="810" y="134">• registers nothing, never raises</text>
+    <text class="t-body" x="810" y="160">• a status per plugin: version,</text>
+    <text class="t-body" x="822" y="180">enabled, problems</text>
+    <text class="t-body" x="810" y="204" style="font-size:13px">• plus configured ones not installed</text>
+  </svg>
+  <span class="num"></span>
+</section>
+
+<!-- 6 ------------------------------------------------------------------------------------- -->
+<section class="slide" data-title="Order and errors">
+  <h2>Load order, and what errors look like</h2>
+  <p class="lede"><code>requires</code> lists plugins that must load first. Every check produces one plain line
+    naming the plugin and, where it can, what to do about it.</p>
+  <div style="display:grid;grid-template-columns:430px 1fr;gap:28px;align-items:start">
+    <div>
+      <svg viewBox="0 0 430 420" width="430" height="420" role="img" aria-label="Example: ctgov and vectors load first; demographics requires ctgov; semantic_search requires vectors. A cycle and a missing requirement are errors.">
+        <text class="t-small" x="0" y="14">EXAMPLE PLUGINS</text>
+        <text class="t-small" x="0" y="40">loads first</text>
+        <text class="t-small" x="250" y="40">loads after</text>
+        <rect class="box-plugins" x="0" y="54" width="170" height="48" rx="9"/><text class="t-sub" x="16" y="84">ctgov</text>
+        <rect class="box-plugins" x="0" y="126" width="170" height="48" rx="9"/><text class="t-sub" x="16" y="156">vectors</text>
+        <rect class="box-plugins" x="250" y="54" width="180" height="48" rx="9"/><text class="t-sub" x="266" y="84">demographics</text>
+        <rect class="box-plugins" x="250" y="126" width="180" height="48" rx="9"/><text class="t-sub" x="266" y="156">semantic_search</text>
+        <path class="flow" d="M170 78 H246"/>
+        <path class="flow" d="M170 150 H246"/>
+        <text class="t-small" x="180" y="70">required by</text>
+
+        <line x1="0" y1="214" x2="430" y2="214" style="stroke:var(--grid)"/>
+        <text class="t-small" x="0" y="242">REFUSED</text>
+        <rect class="box-warn" x="0" y="256" width="120" height="44" rx="9"/><text class="t-sub" x="18" y="284">a</text>
+        <rect class="box-warn" x="190" y="256" width="120" height="44" rx="9"/><text class="t-sub" x="208" y="284">b</text>
+        <path class="flow-warn" d="M120 268 H186"/>
+        <path class="flow-warn" d="M190 290 H124"/>
+        <text class="t-small" x="322" y="284">a cycle</text>
+        <rect class="box-warn" x="0" y="330" width="120" height="44" rx="9"/><text class="t-sub" x="18" y="358">c</text>
+        <rect class="box-later" x="190" y="330" width="120" height="44" rx="9"/><text class="t-sub" x="208" y="358" style="fill:var(--ink-2)">nope</text>
+        <path class="flow-warn" d="M186 352 H124"/>
+        <text class="t-small" x="322" y="350">not installed</text>
+        <text class="t-small" x="322" y="366">or disabled</text>
+        <text class="t-small" x="0" y="404">Arrows point from a plugin to the ones that need it.</text>
+      </svg>
+    </div>
+    <ul class="lands" style="margin-top:4px">
+      <li style="grid-template-columns:150px 1fr"><strong>Other API</strong><code style="white-space:normal">alpha: written for plugin API 2, but this tri-al supports API 1; upgrade the plugin or tri-al</code></li>
+      <li style="grid-template-columns:150px 1fr"><strong>Disabled need</strong><code style="white-space:normal">c: requires plugin 'nope', which is disabled; run `tri-al plugins enable nope`</code></li>
+      <li style="grid-template-columns:150px 1fr"><strong>Missing need</strong><code style="white-space:normal">c: requires plugin 'nope', which is not installed</code></li>
+      <li style="grid-template-columns:150px 1fr"><strong>Cycle</strong><code style="white-space:normal">a: requires form a cycle: a -&gt; b -&gt; a</code></li>
+      <li style="grid-template-columns:150px 1fr"><strong>Bad setting</strong><code style="white-space:normal">sample: invalid setting greeting: Input should be a valid string</code></li>
+      <li style="grid-template-columns:150px 1fr"><strong>Stray setting</strong><code style="white-space:normal">alpha: takes no settings, but [plugins.alpha] sets colour</code></li>
+      <li style="grid-template-columns:150px 1fr"><strong>Import fails</strong><code style="white-space:normal">alpha: failed to import alpha_pkg:plugin: ModuleNotFoundError(…)</code></li>
+      <li style="grid-template-columns:150px 1fr"><strong>Same name twice</strong><code style="white-space:normal">alpha: other-pkg 1.0 also provides a plugin with this name; uninstall one of them</code></li>
+      <li style="grid-template-columns:150px 1fr"><strong>register() raises</strong><span style="font-size:15px;color:inherit"><code>alpha: register() failed: …</code> <span class="muted" style="font-size:13px">stops at once</span></span></li>
+    </ul>
+  </div>
+  <span class="num"></span>
+</section>
+
+<!-- 7 ------------------------------------------------------------------------------------- -->
+<section class="slide" data-title="Anatomy of a plugin">
+  <h2>What a plugin looks like</h2>
+  <p class="lede">A package with one entry point, which names a <code>Plugin</code> object. The core calls its
+    <code>register</code> function with a registry scoped to that plugin, holding its validated settings.</p>
+  <div style="display:grid;grid-template-columns:520px 1fr;gap:26px;align-items:start">
+    <div style="display:grid;gap:12px">
+<pre class="code"><span class="file">plugins/sample/pyproject.toml</span><span class="k">[project.entry-points."tri_al.plugins"]</span>
+<span class="hl-plugins">sample</span> = "tri_al_sample:<span class="hl-plugins">plugin</span>"</pre>
+<pre class="code" style="font-size:12px;line-height:1.42"><span class="file">plugins/sample/src/tri_al_sample/__init__.py (abridged)</span><span class="k">class</span> Settings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    greeting: str = "Hello"
+
+<span class="k">def</span> register(registry: Registry) -&gt; None:
+    settings = registry.settings
+    assert isinstance(settings, Settings)
+    cli = typer.Typer()
+    @cli.command()
+    <span class="k">def</span> hello(name: str = "world") -&gt; None:
+        typer.echo(f"{settings.greeting}, {name}!")
+
+    registry.<span class="hl-plugins">add_cli</span>(cli)
+
+<span class="hl-plugins">plugin</span> = Plugin(
+    name="sample",
+    version=version("tri-al-sample"),
+    api_version=1,   <span class="dim"># a literal, not the core's constant</span>
+    register=register,
+    settings=Settings,
+)</pre>
+    </div>
+    <div>
+      <p class="group-label">Plugin fields</p>
+      <ul class="lands" style="margin-bottom:20px">
+        <li style="grid-template-columns:120px 1fr"><code>name</code><span>matches the entry point; lowercase, digits, <code>_</code></span></li>
+        <li style="grid-template-columns:120px 1fr"><code>api_version</code><span>must equal the core's plugin API, now 1</span></li>
+        <li style="grid-template-columns:120px 1fr"><code>requires</code><span>plugins that must load first</span></li>
+        <li style="grid-template-columns:120px 1fr"><code>settings</code><span>Pydantic model for its config section</span></li>
+        <li style="grid-template-columns:120px 1fr"><code>register</code><span>called once, with its registry</span></li>
+        <li style="grid-template-columns:120px 1fr"><code>version</code><span>with <code>description</code>, shown by <code>plugins list</code></span></li>
+      </ul>
+      <p class="group-label">Registry methods, by when they became real</p>
+      <div style="display:grid;grid-template-columns:110px 1fr;gap:10px 12px;align-items:center">
+        <span class="muted" style="font-size:14px">Milestone 1</span>
+        <div class="chips"><span class="chip c-plugins">add_cli</span></div>
+        <span class="muted" style="font-size:14px">Milestone 2</span>
+        <div class="chips"><span class="chip">add_sqlite_extension</span><span class="chip">add_migrations</span></div>
+        <span class="muted" style="font-size:14px">Milestone 3</span>
+        <div class="chips"><span class="chip">add_source</span><span class="chip">on</span></div>
+        <span class="muted" style="font-size:14px">Still stubs</span>
+        <div class="chips"><span class="chip c-later">add_enricher</span><span class="chip c-later">add_chart</span><span class="chip c-later">add_filter_field</span><span class="chip c-later">add_search_provider</span><span class="chip c-later">add_routes</span><span class="chip c-later">add_job</span><span class="chip c-later">set_access_policy</span></div>
+      </div>
+      <p class="muted" style="margin:12px 0 0;font-size:14px">A stub raises <code>NotImplementedError</code>, so a plugin that needs one fails at startup.</p>
+    </div>
+  </div>
+  <span class="num"></span>
+</section>
+
+<!-- 8 ------------------------------------------------------------------------------------- -->
+<section class="slide" data-title="Config">
+  <h2>Config: one file, with the environment on top</h2>
+  <p class="lede">Defaults live in the code, <code>tri-al.toml</code> changes them, and <code>TRI_AL_*</code>
+    variables override both. Everything is validated, and an error says where a bad value came from.</p>
+  <div style="display:grid;grid-template-columns:470px 1fr;gap:30px;align-items:start">
+    <svg viewBox="0 0 470 410" width="470" height="410" role="img" aria-label="Config layers: defaults at the bottom, the file above, environment variables above that, the validated config on top">
+      <path class="flow" d="M18 392 V22"/>
+      <text class="t-small" x="0" y="14">wins</text>
+      <rect class="box-config" x="44" y="0" width="426" height="86" rx="12" style="stroke-width:2.2"/>
+      <text class="t-title" x="64" y="30">Validated config</text>
+      <text class="t-body" x="64" y="54">unknown keys are errors; each plugin's section</text>
+      <text class="t-body" x="64" y="74">is checked against its model when it loads</text>
+      <path class="flow" d="M257 112 V90"/>
+      <rect class="box" x="44" y="116" width="426" height="86" rx="12"/>
+      <text class="t-sub" x="64" y="144">TRI_AL_* variables</text>
+      <text class="t-body" x="64" y="166"><tspan style="font-family:ui-monospace,Menlo,monospace;font-size:13px">__</tspan> nests, names are lowercased:</text>
+      <text class="t-mono" x="64" y="188">TRI_AL_SERVER__PORT → server.port</text>
+      <path class="flow" d="M257 228 V206"/>
+      <rect class="box" x="44" y="232" width="426" height="86" rx="12"/>
+      <text class="t-sub" x="64" y="260">tri-al.toml</text>
+      <text class="t-body" x="64" y="282">read with tomllib, from $TRI_AL_CONFIG</text>
+      <text class="t-body" x="64" y="302">or ./tri-al.toml; no file means defaults</text>
+      <path class="flow" d="M257 344 V322"/>
+      <rect class="box" x="44" y="348" width="426" height="60" rx="12"/>
+      <text class="t-sub" x="64" y="374">Defaults</text>
+      <text class="t-body" x="64" y="394">Pydantic models in tri_al.config</text>
+    </svg>
+    <div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+<pre class="code"><span class="file">tri-al.toml</span><span class="k">[server]</span>
+port = 9000
+
+<span class="k">[plugins.sample]</span>
+greeting = "Hi"</pre>
+<pre class="code"><span class="file">environment</span>TRI_AL_SERVER__PORT=9100</pre>
+      </div>
+      <p class="group-label">What the app gets</p>
+      <ul class="lands">
+        <li><code>server.host</code><span><code>127.0.0.1</code></span><span>default (local only)</span></li>
+        <li><code>server.port</code><span><code>9100</code></span><span><span class="swatch sw-config"></span>env beats the file</span></li>
+        <li><code>data.dir</code><span><code>data</code></span><span>default</span></li>
+        <li><code>update.schedule</code><span><code>daily</code></span><span>default</span></li>
+        <li><code>plugins.sample.enabled</code><span><code>true</code></span><span>default: installed = on</span></li>
+        <li><code>plugins.sample.greeting</code><span><code>"Hi"</code></span><span>file</span></li>
+      </ul>
+      <p style="margin:14px 0 0;font-size:14px;color:var(--ink-2)">With <code>TRI_AL_SERVER__PORT=lots</code>:<br><code>server.port: Input should be a valid integer, … (from TRI_AL_SERVER__PORT)</code></p>
+      <p class="muted" style="margin:10px 0 0;font-size:14px"><code>plugins enable|disable</code> edits the file with tomlkit and keeps its comments. Changes apply on the next start.</p>
+    </div>
+  </div>
+  <span class="num"></span>
+</section>
+
+<!-- 9 ------------------------------------------------------------------------------------- -->
+<section class="slide" data-title="The CLI">
+  <h2>The <code style="font-size:0.9em">tri-al</code> command</h2>
+  <p class="lede">The command is assembled at every start: core commands first, then a group for each enabled
+    plugin that adds one. If plugins can't load, the core commands still work, so you can see why and fix it.</p>
+  <svg viewBox="0 0 1136 220" width="1136" height="220" role="img" aria-label="Startup: create the app, load config, load plugins, mount plugin commands, run the command; on failure, warn and keep core commands">
+    <rect class="box" x="0" y="20" width="150" height="70" rx="10"/>
+    <text class="t-mono" x="16" y="50" style="fill:var(--ink)">tri-al …</text>
+    <text class="t-small" x="16" y="72">you run it</text>
+    <path class="flow" d="M150 55 H180"/>
+    <rect class="box-cli" x="184" y="20" width="176" height="70" rx="10"/>
+    <text class="t-sub" x="200" y="48">core commands</text>
+    <text class="t-small" x="200" y="70">plugins, install, doctor…</text>
+    <path class="flow" d="M360 55 H390"/>
+    <rect class="box-config" x="394" y="20" width="150" height="70" rx="10"/>
+    <text class="t-sub" x="410" y="48">load_config()</text>
+    <text class="t-small" x="410" y="70">file + environment</text>
+    <path class="flow" d="M544 55 H574"/>
+    <rect class="box-plugins" x="578" y="20" width="150" height="70" rx="10"/>
+    <text class="t-sub" x="594" y="48">load_plugins()</text>
+    <text class="t-small" x="594" y="70">check, order, register</text>
+    <path class="flow" d="M728 55 H758"/>
+    <rect class="box-plugins" x="762" y="20" width="196" height="70" rx="10"/>
+    <text class="t-sub" x="778" y="48">mount plugin groups</text>
+    <text class="t-small" x="778" y="70">tri-al &lt;plugin&gt; …</text>
+    <path class="flow" d="M958 55 H988"/>
+    <rect class="box-cli" x="992" y="20" width="144" height="70" rx="10"/>
+    <text class="t-sub" x="1008" y="48">run it</text>
+    <text class="t-small" x="1008" y="70">Typer dispatches</text>
+
+    <path class="flow-warn" d="M653 90 V136"/>
+    <text class="t-small" x="662" y="118" style="fill:var(--warn)">can't load</text>
+    <rect class="box-warn" x="430" y="140" width="530" height="72" rx="10"/>
+    <text class="t-sub" x="448" y="166">skip plugin groups, warn once on stderr</text>
+    <text class="t-body" x="448" y="190"><tspan style="font-family:ui-monospace,Menlo,monospace;font-size:13px">plugins list</tspan> shows why; <tspan style="font-family:ui-monospace,Menlo,monospace;font-size:13px">plugins disable</tspan> fixes it</text>
+    <path class="flow" d="M960 176 H1064 V94"/>
+  </svg>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:22px">
+    <div><p class="group-label">Milestone 1</p><div class="chips"><span class="chip c-cli">plugins list</span><span class="chip c-cli">plugins enable</span><span class="chip c-cli">plugins disable</span><span class="chip c-cli">--version</span></div></div>
+    <div><p class="group-label">Milestones 2–3</p><div class="chips"><span class="chip">doctor</span><span class="chip">install</span><span class="chip">update</span></div></div>
+    <div><p class="group-label">Still stubs</p><div class="chips"><span class="chip c-later">serve</span><span class="chip c-later">worker</span><span class="chip c-later">rebuild</span><span class="chip c-later">backup</span><span class="chip c-later">bench</span></div></div>
+    <div><p class="group-label">From plugins</p><div class="chips"><span class="chip c-plugins">sample hello</span></div></div>
+  </div>
+  <p class="muted" style="margin:16px 0 0;font-size:14px">A stub prints <code>tri-al serve: not implemented yet</code> and exits with code 1, so a script can't mistake it for success. Plugin groups appear under their own "Plugins" heading in <code>--help</code>, and a plugin can't take a core command's name.</p>
+  <span class="num"></span>
+</section>
+
+<!-- 10 ------------------------------------------------------------------------------------ -->
+<section class="slide" data-title="End to end">
+  <h2>End to end: the sample plugin</h2>
+  <p class="lede">The sample plugin exists to prove the whole path, from an installed package to a working
+    command that reads its own settings. Real output from milestone 1:</p>
+  <div class="lane" style="margin-bottom:20px">
+    <div class="step s-plugins"><h4>Entry point</h4><p>one line in its <code>pyproject.toml</code></p></div>
+    <div class="arrow">→</div>
+    <div class="step s-plugins"><h4>Enabled</h4><p>no config section, so on</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>Settings</h4><p><code>greeting</code> from file or env, validated</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-plugins"><h4>Register</h4><p><code>add_cli</code> adds a <code>hello</code> command</p></div>
+    <div class="arrow">→</div>
+    <div class="step s-cli"><h4>Run</h4><p><code>tri-al sample hello</code></p></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+<pre class="term"><span class="p">$</span> uv run tri-al plugins list
+<span class="tbl">┏━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Plugin ┃ Version ┃ Enabled ┃ Status ┃ Description             ┃
+┡━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ sample │ 0.1.0   │ yes     │ <span class="ok">ok</span>     │ Sample plugin that adds │
+│        │         │         │        │ `tri-al sample hello`.  │
+└────────┴─────────┴─────────┴────────┴─────────────────────────┘</span>
+<span class="p">$</span> uv run tri-al sample hello --name Pouyan
+Hello, Pouyan!
+
+<span class="p">$</span> TRI_AL_PLUGINS__SAMPLE__GREETING=Salaam \
+    uv run tri-al sample hello
+Salaam, world!</pre>
+<pre class="term"><span class="p">$</span> uv run tri-al plugins disable sample
+Plugin 'sample' disabled in tri-al.toml.
+
+<span class="p">$</span> cat tri-al.toml
+[plugins.sample]
+enabled = false
+
+<span class="p">$</span> uv run tri-al sample hello
+<span class="err">Error: No such command 'sample'.</span>
+
+<span class="p">$</span> uv run tri-al serve
+tri-al serve: not implemented yet
+<span class="p">exit code 1</span></pre>
+  </div>
+  <p class="muted" style="margin:10px 0 0;font-size:13px">Output from milestone 1, with names updated to <code>tri-al</code>. The table is narrowed to fit; error output is shortened. The ctgov plugin (milestone 3) now appears in the list too.</p>
+  <span class="num"></span>
+</section>
+
+<!-- 11 ------------------------------------------------------------------------------------ -->
+<section class="slide" data-title="Checks">
+  <h2>Checks on every push</h2>
+  <p class="lede">The same commands run on your machine and in GitHub Actions on hosted runners. v1's
+    self-hosted deploy workflow is separate and unchanged.</p>
+  <div class="lane">
+    <div class="step"><h4>Install</h4><p><code>uv sync --locked</code></p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>Lint</h4><p><code>ruff check</code></p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>Format</h4><p><code>ruff format --check</code></p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>Types</h4><p><code>mypy</code>, strict</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><h4>Tests</h4><p><code>pytest</code></p></div>
+    <div class="arrow">→</div>
+    <div class="step s-cli"><h4>Smoke test</h4><p><code>plugins list</code></p></div>
+  </div>
+  <p class="group-label" style="margin:26px 0 8px">The 54 milestone 1 tests, by area <span style="text-transform:none;letter-spacing:0;font-weight:400">(hover for what they cover)</span></p>
+  <div class="bar" style="height:30px" aria-label="54 tests by area">
+    <div style="flex:18;background:var(--plugins)" data-tip="<b>Plugin loader · 18</b><br>loading and settings, disabled plugins not imported, order by requires, other API, name mismatch, not a Plugin, import failure, missing/disabled needs, cycles, bad or stray settings, bad and duplicate names, all problems at once, register() failure, inspect, registry"></div>
+    <div style="flex:12;background:var(--config)" data-tip="<b>Config · 12</b><br>defaults, reading the file, env overrides and type conversion, TRI_AL_CONFIG, unknown keys, errors naming the variable, malformed variables, invalid TOML, editing the file keeps comments"></div>
+    <div style="flex:20;background:var(--cli)" data-tip="<b>CLI · 20</b><br>--version, all 8 stubs exit 1, plugins list (table, problems, empty, bad config), enable/disable round trip, unknown name, TRI_AL_CONFIG, env override warning, dependents warning, plugin command groups, core commands survive broken plugins"></div>
+    <div style="flex:4;background:var(--muted)" data-tip="<b>Sample plugin · 4</b><br>found through its real entry point; hello uses the default, file and env greeting"></div>
+  </div>
+  <div class="bar-labels">
+    <div style="flex:18"><b>18</b>plugin loader</div>
+    <div style="flex:12"><b>12</b>config</div>
+    <div style="flex:20"><b>20</b>CLI</div>
+    <div style="flex:4"><b>4</b>sample</div>
+  </div>
+  <div class="cards" style="grid-template-columns:repeat(4,1fr);margin-top:22px">
+    <div class="card"><h3>ruff</h3><p>Lint and format for <code>core/</code> and <code>plugins/</code>. v1 and <code>docs/</code> are excluded: ruff now formats code inside Markdown and would rewrite the design doc's examples.</p></div>
+    <div class="card"><h3>mypy, strict</h3><p>All v2 code, tests included, with Pydantic's mypy plugin.</p></div>
+    <div class="card"><h3>pytest</h3><p>Warnings fail tests. Fake plugins are in-memory entry points, so tests never install packages.</p></div>
+    <div class="card"><h3>Pinned tools</h3><p><code>actions/checkout@v7</code>, <code>astral-sh/setup-uv@v10.3.0</code>; the lock works with uv 0.9.5 and 0.13.1. CI has also run <code>doctor</code> since milestone 2.</p></div>
+  </div>
+  <span class="num"></span>
+</section>
+
+<!-- 12 ------------------------------------------------------------------------------------ -->
+<section class="slide" data-title="Decisions and open items">
+  <h2>Decisions made, and what's still open</h2>
+  <p class="lede">The first four were choices the design left open; later milestones kept them. The rest are
+    small and none blocks anything.</p>
+  <table class="open">
+    <tr><td>1</td><td><strong>Installed means enabled.</strong> A plugin loads unless its section says <code>enabled = false</code>; <code>enabled</code> is reserved in every plugin section.</td><td><span class="tag decided">decided</span> · milestone 1</td></tr>
+    <tr><td>2</td><td><strong>On/off state lives in <code>tri-al.toml</code></strong>, not a database. Changes apply on the next start.</td><td><span class="tag decided">decided</span> · confirmed in M2</td></tr>
+    <tr><td>3</td><td><strong>The plugin API version must match exactly</strong> (an integer, now 1). Plugins write the number, not the core's constant, or the check could never fail.</td><td><span class="tag decided">decided</span> · milestone 1</td></tr>
+    <tr><td>4</td><td><strong>Fail at startup, with every problem at once,</strong> but keep core commands working so the problem can be seen and fixed.</td><td><span class="tag decided">decided</span> · milestone 1</td></tr>
+    <tr><td>5</td><td><strong>"Secrets only from the environment"</strong> (design §5.7) isn't enforced: a secret written in the file would be accepted.</td><td><span class="tag open-t">open</span> · later</td></tr>
+    <tr><td>6</td><td><strong>CI hasn't run on GitHub yet</strong>, because <code>v2</code> isn't pushed.</td><td><span class="tag open-t">your call</span> · push</td></tr>
+    <tr><td>7</td><td><strong>Your local uv is 0.9.5</strong>; the latest is 0.13.1. Both work; builds pin <code>uv_build &lt; 0.10</code>.</td><td><span class="tag open-t">your call</span></td></tr>
+    <tr><td>8</td><td><strong>Stubs left:</strong> 5 commands (<code>serve</code>, <code>worker</code>, <code>rebuild</code>, <code>backup</code>, <code>bench</code>) and 7 registry methods.</td><td>milestones 4–6</td></tr>
+  </table>
+  <span class="num"></span>
+</section>
+
+</div>
+
+<nav>
+  <button id="prev" aria-label="Previous slide">‹</button>
+  <span class="count" id="count"></span>
+  <button id="next" aria-label="Next slide">›</button>
+  <span class="hint">← → or space</span>
+</nav>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+(() => {
+  const slides = [...document.querySelectorAll(".slide")];
+  const stage = document.getElementById("stage");
+  const count = document.getElementById("count");
+  const prev = document.getElementById("prev");
+  const next = document.getElementById("next");
+  slides.forEach((slide, i) => { slide.querySelector(".num").textContent = `${i + 1} / ${slides.length}`; });
+
+  let current = 0;
+  try {
+    const saved = Number(new URLSearchParams(location.hash.slice(1)).get("slide"));
+    if (saved >= 1 && saved <= slides.length) current = saved - 1;
+  } catch (_) {}
+
+  function show(i) {
+    current = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach((slide, j) => slide.classList.toggle("active", j === current));
+    count.textContent = `${current + 1} / ${slides.length}`;
+    prev.disabled = current === 0;
+    next.disabled = current === slides.length - 1;
+    try { history.replaceState(null, "", `#slide=${current + 1}`); } catch (_) {}
+    hideTip();
+  }
+  function fit() {
+    const scale = Math.min(window.innerWidth / 1300, (window.innerHeight - 52) / 735);
+    stage.style.setProperty("--scale", String(Math.max(scale, 0.2)));
+  }
+  prev.addEventListener("click", () => show(current - 1));
+  next.addEventListener("click", () => show(current + 1));
+  document.addEventListener("keydown", (e) => {
+    if (["ArrowRight", "PageDown", " ", "Enter"].includes(e.key)) { e.preventDefault(); show(current + 1); }
+    else if (["ArrowLeft", "PageUp", "Backspace"].includes(e.key)) { e.preventDefault(); show(current - 1); }
+    else if (e.key === "Home") show(0);
+    else if (e.key === "End") show(slides.length - 1);
+  });
+  let touchX = null;
+  document.addEventListener("touchstart", (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+  document.addEventListener("touchend", (e) => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    if (Math.abs(dx) > 50) show(current + (dx < 0 ? 1 : -1));
+    touchX = null;
+  });
+  window.addEventListener("resize", fit);
+
+  // Tooltips for every element with data-tip.
+  const tip = document.getElementById("tip");
+  function hideTip() { tip.style.display = "none"; }
+  document.addEventListener("mousemove", (e) => {
+    const target = e.target.closest("[data-tip]");
+    if (!target) { hideTip(); return; }
+    tip.innerHTML = target.dataset.tip;
+    tip.style.display = "block";
+    const x = Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 8);
+    const y = Math.min(e.clientY + 16, window.innerHeight - tip.offsetHeight - 8);
+    tip.style.left = `${x}px`;
+    tip.style.top = `${y}px`;
+  });
+  document.addEventListener("mouseleave", hideTip);
+
+  fit();
+  show(current);
+})();
+</script>
+</body>
+</html>

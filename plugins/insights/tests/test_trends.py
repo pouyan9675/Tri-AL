@@ -86,7 +86,7 @@ def storage(tmp_path_factory: pytest.TempPathFactory) -> Iterator[SQLiteStorage]
 
 
 def run(reader: SQLiteReader, filter: TrialFilter, *, index: bool, **settings: Any) -> Rows:
-    [chart] = charts(Settings(**settings))
+    chart = next(chart for chart in charts(Settings(**settings)) if chart.id == "emerging_trends")
     conn = reader.connection
     if index:
         built = TrialIndex.build(conn, reader.data_version())
@@ -113,7 +113,12 @@ def test_registers_the_chart_in_its_section() -> None:
 
     plugin.register(Registry("insights", Settings(), contributions))
 
-    [chart] = contributions.charts.values()
+    assert list(contributions.charts) == [
+        "emerging_trends",
+        "research_clusters",
+        "research_landscape_3d",
+    ]
+    chart = contributions.charts["emerging_trends"]
     assert (chart.id, chart.widget, chart.section, chart.plugin) == (
         "emerging_trends",
         "trends",
@@ -122,6 +127,11 @@ def test_registers_the_chart_in_its_section() -> None:
     )
     assert chart.precompute
     assert chart.layout.width == 4
+    clusters = contributions.charts["research_clusters"]
+    assert (clusters.widget, clusters.section, clusters.layout.width) == ("scatter", SECTION, 4)
+    assert clusters.page == "dashboard"
+    solid = contributions.charts["research_landscape_3d"]
+    assert (solid.widget, solid.page, solid.precompute) == ("scatter3d", "analysis", True)
 
 
 def test_settings() -> None:

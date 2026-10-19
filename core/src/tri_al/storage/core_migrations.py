@@ -398,6 +398,26 @@ CREATE TABLE enricher_state (
 ) WITHOUT ROWID;
 """
 
+_TRIALS_4 = """\
+CREATE TABLE embedding_models (
+    id INTEGER NOT NULL PRIMARY KEY,
+    engine TEXT NOT NULL,
+    model TEXT NOT NULL,
+    max_tokens INTEGER NOT NULL,
+    text_version INTEGER NOT NULL,
+    dimensions INTEGER NOT NULL,
+    dtype TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (engine, model, max_tokens, text_version, dtype)
+);
+CREATE TABLE trial_embeddings (
+    trial_id INTEGER NOT NULL PRIMARY KEY REFERENCES trials (id) ON DELETE CASCADE,
+    model_id INTEGER NOT NULL REFERENCES embedding_models (id),
+    vector BLOB NOT NULL
+);
+CREATE INDEX trial_embeddings_by_model ON trial_embeddings (model_id);
+"""
+
 _APP_2 = """\
 ALTER TABLE jobs ADD COLUMN stage TEXT;
 ALTER TABLE jobs ADD COLUMN unit TEXT;
@@ -409,12 +429,56 @@ ALTER TABLE jobs ADD COLUMN updated_at TEXT;
 CREATE INDEX jobs_by_update ON jobs (updated_at);
 """
 
+_APP_3 = """\
+DROP INDEX jobs_one_running_data_job;
+CREATE UNIQUE INDEX jobs_one_running_data_job ON jobs (status)
+    WHERE status = 'running' AND type IN ('install', 'update', 'rebuild', 'embeddings');
+"""
+
+_APP_4 = """\
+DROP INDEX jobs_one_running_data_job;
+CREATE UNIQUE INDEX jobs_one_running_data_job ON jobs (status)
+    WHERE status = 'running' AND type IN ('install', 'update', 'rebuild', 'embeddings', 'stats');
+"""
+
+# Trials stored before 5 and 6 have no design, keywords, arms or timeline details until
+# `tri-al renormalize` reads them from their raw documents (older trial_text blobs still read).
+_TRIALS_5 = """\
+ALTER TABLE trials ADD COLUMN allocation TEXT;
+ALTER TABLE trials ADD COLUMN intervention_model TEXT;
+ALTER TABLE trials ADD COLUMN observational_model TEXT;
+ALTER TABLE trials ADD COLUMN time_perspective TEXT;
+ALTER TABLE trials ADD COLUMN masking TEXT;
+"""
+
+_TRIALS_6 = """\
+ALTER TABLE trials ADD COLUMN start_date_type TEXT;
+ALTER TABLE trials ADD COLUMN primary_completion_date_type TEXT;
+ALTER TABLE trials ADD COLUMN completion_date_type TEXT;
+ALTER TABLE trials ADD COLUMN results_first_posted TEXT;
+ALTER TABLE trials ADD COLUMN status_verified TEXT;
+ALTER TABLE trials ADD COLUMN last_known_status TEXT;
+"""
+
+_APP_5 = """\
+DROP INDEX jobs_one_running_data_job;
+CREATE UNIQUE INDEX jobs_one_running_data_job ON jobs (status)
+    WHERE status = 'running'
+    AND type IN ('install', 'update', 'rebuild', 'embeddings', 'stats', 'renormalize');
+"""
+
 TRIALS_MIGRATIONS = (
     Migration(1, "initial trials schema", _trials_1),
     Migration(2, "compressed raw documents; Kosovo and former countries", _trials_2),
     Migration(3, "contentless full-text index; compressed trial text", _trials_3),
+    Migration(4, "trial embeddings: one float16 vector per trial", _TRIALS_4),
+    Migration(5, "trial design: allocation, models, time perspective and masking", _TRIALS_5),
+    Migration(6, "trial timeline: actual or estimated dates, results, status details", _TRIALS_6),
 )
 APP_MIGRATIONS = (
     Migration(1, "initial app schema", _APP_1),
     Migration(2, "job stages, errors, origin and cancelling", _APP_2),
+    Migration(3, "embedding backfills are data jobs", _APP_3),
+    Migration(4, "recomputing the stats is a data job", _APP_4),
+    Migration(5, "renormalizing trials is a data job", _APP_5),
 )

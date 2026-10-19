@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   Monitor,
   Moon,
+  Orbit,
   Pill,
   Settings2,
   Sun,
@@ -132,6 +133,9 @@ export default function CommandPalette({
               <CommandGroup heading="Go to">
                 <CommandItem onSelect={() => go(() => void navigate({ to: "/" }))}>
                   <LayoutDashboard /> Dashboard
+                </CommandItem>
+                <CommandItem onSelect={() => go(() => void navigate({ to: "/analysis" }))}>
+                  <Orbit /> Analysis
                 </CommandItem>
                 <CommandItem onSelect={() => go(() => void navigate({ to: "/trials" }))}>
                   <TableProperties /> Trials

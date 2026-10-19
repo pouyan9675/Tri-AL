@@ -1,9 +1,9 @@
 import { useLabels } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 
-type Tone = "good" | "info" | "warning" | "critical" | "neutral" | "muted";
+export type StatusTone = "good" | "info" | "warning" | "critical" | "neutral" | "muted";
 
-const TONES: Record<string, Tone> = {
+const TONES: Record<string, StatusTone> = {
   RECRUITING: "good",
   ENROLLING_BY_INVITATION: "good",
   AVAILABLE: "good",
@@ -17,7 +17,8 @@ const TONES: Record<string, Tone> = {
   WITHDRAWN: "critical",
 };
 
-const DOT: Record<Tone, string> = {
+/** A status tone as a filled dot or marker. */
+export const STATUS_DOT: Record<StatusTone, string> = {
   good: "bg-good",
   info: "bg-info",
   warning: "bg-warning",
@@ -26,7 +27,7 @@ const DOT: Record<Tone, string> = {
   muted: "bg-muted-foreground/40",
 };
 
-const TINT: Record<Tone, string> = {
+const TINT: Record<StatusTone, string> = {
   good: "border-good/25 bg-good/8",
   info: "border-info/25 bg-info/8",
   warning: "border-warning/35 bg-warning/10",
@@ -35,10 +36,15 @@ const TINT: Record<Tone, string> = {
   muted: "border-border bg-transparent text-muted-foreground",
 };
 
+/** How a status is coloured: green when enrolling, blue before or after, red when stopped. */
+export function statusTone(status: string | null | undefined): StatusTone {
+  return (status && TONES[status]) || "muted";
+}
+
 /** A trial's overall status: always its name, with a colored dot. */
 export function StatusBadge({ status, className }: { status: string | null; className?: string }) {
   const label = useLabels();
-  const tone = (status && TONES[status]) || "muted";
+  const tone = statusTone(status);
   return (
     <span
       className={cn(
@@ -47,7 +53,7 @@ export function StatusBadge({ status, className }: { status: string | null; clas
         className,
       )}
     >
-      <span className={cn("size-1.5 shrink-0 rounded-full", DOT[tone])} />
+      <span className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[tone])} />
       <span className="truncate">{status ? label("status", status) : "No status"}</span>
     </span>
   );

@@ -10,7 +10,7 @@ from tri_al.jobs import JobType
 from tri_al.plugins import PluginError, Registry
 from tri_al.plugins.registry import Contributions
 from tri_al.search import Hit, ProviderResult, merge
-from tri_al.stats import Chart, ChartContext, Layout, Rows
+from tri_al.stats import Chart, ChartContext, Layout, Rows, Series
 
 
 def rows(ctx: ChartContext, filter: TrialFilter) -> Rows:
@@ -44,6 +44,11 @@ def test_chart_specs_are_checked() -> None:
         Chart(id="x", title="X", widget="radar", query=rows)  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="1 to 4"):
         Layout(width=5)
+    with pytest.raises(ValueError, match="only line and area"):
+        Chart(id="x", title="X", widget="bar", query=rows, series=(Series("a", "A"),))
+    assert Chart(id="x", title="X", widget="bar", query=rows).page == "dashboard"
+    with pytest.raises(ValueError, match="unknown page"):
+        Chart(id="x", title="X", widget="bar", query=rows, page="report")  # type: ignore[arg-type]
 
 
 def test_filter_fields_cant_take_core_names() -> None:

@@ -2,8 +2,8 @@
  * Trends: ranked lists of what is rising, one column per group (conditions, interventions)
  * for each of a few time windows, picked with a toggle. Each entry shows its trials per
  * month as small bars (the window in the accent color), its trials in the window, its growth
- * (adjusted for small counts) and how sure that is (a three-step meter and a word); low
- * confidence is faded. The tooltip has the raw numbers, and a click lists its trials.
+ * (adjusted for small counts) and how sure that is (a three-step meter in light, brand and
+ * deep blue, and a word); low confidence is faded. The tooltip has the raw numbers, and a click lists its trials.
  * `tri_al.stats.charts` describes the rows.
  */
 import { Link } from "@tanstack/react-router";
@@ -108,10 +108,14 @@ export function formatChance(value: number): string {
   return value.toPrecision(2).replace(/\.?0+$/, "");
 }
 
-const CONFIDENCE: Record<Confidence, { label: string; steps: number }> = {
-  high: { label: "High", steps: 3 },
-  medium: { label: "Medium", steps: 2 },
-  low: { label: "Low", steps: 1 },
+/**
+ * Each level's bars are a step of the blue ramp around the brand blue. On a dark theme the
+ * ramp runs the other way, so higher confidence still stands out more from the background.
+ */
+const CONFIDENCE: Record<Confidence, { label: string; steps: number; color: string }> = {
+  high: { label: "High", steps: 3, color: "bg-(--seq-700)" },
+  medium: { label: "Medium", steps: 2, color: "bg-chart-1" },
+  low: { label: "Low", steps: 1, color: "bg-(--seq-300)" },
 };
 
 /** Name, monthly bars (from a medium width), trials, growth and confidence. */
@@ -315,7 +319,7 @@ const low = (item: Item) => item.confidence === "low";
 
 /** Confidence as one to three rising bars and its word. */
 function Meter({ confidence }: { confidence: Confidence }) {
-  const { label, steps } = CONFIDENCE[confidence];
+  const { label, steps, color } = CONFIDENCE[confidence];
   return (
     <span className="flex items-center justify-end gap-1.5 text-[0.7rem]">
       <span className="hidden @md:inline">{label}</span>
@@ -326,7 +330,7 @@ function Meter({ confidence }: { confidence: Confidence }) {
             className={cn(
               "w-1 rounded-[1px]",
               height,
-              step < steps ? "bg-foreground/75" : "bg-muted-foreground/25",
+              step < steps ? color : "bg-muted-foreground/25",
             )}
           />
         ))}

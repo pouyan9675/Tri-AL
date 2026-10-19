@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from tri_al.config.schedule import Schedule
+from tri_al.embeddings import DEFAULT_ENGINE, DEFAULT_MAX_TOKENS, DEFAULT_MODEL
 
 
 class _Section(BaseModel):
@@ -67,6 +68,21 @@ class UpdateConfig(_Section):
         return Schedule.parse(self.schedule)
 
 
+class EmbeddingsConfig(_Section):
+    """Trial vectors, made for new and changed trials in each update (``[embeddings]``).
+
+    ``tri-al embeddings generate`` makes the rest, or all of them again after a change here.
+    """
+
+    enabled: bool = True
+    engine: str = DEFAULT_ENGINE
+    model: str = DEFAULT_MODEL
+    max_tokens: int = Field(default=DEFAULT_MAX_TOKENS, ge=8, le=512)  # input the model reads
+    float16: bool = True  # on a GPU; a CPU uses float32
+    batch_size: int = Field(default=256, ge=1, le=4096)
+    device: str | None = None  # cpu, mps or cuda; default: the best there is
+
+
 class PluginSection(BaseModel):
     """A ``[plugins.<name>]`` section.
 
@@ -88,6 +104,7 @@ class Config(_Section):
     server: ServerConfig = Field(default_factory=ServerConfig)
     data: DataConfig = Field(default_factory=DataConfig)
     update: UpdateConfig = Field(default_factory=UpdateConfig)
+    embeddings: EmbeddingsConfig = Field(default_factory=EmbeddingsConfig)
     plugins: dict[str, PluginSection] = Field(default_factory=dict)
 
     def plugin_enabled(self, name: str) -> bool:

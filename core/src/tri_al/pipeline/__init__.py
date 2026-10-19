@@ -20,10 +20,17 @@ from tri_al.pipeline.source import (
     Source,
     ignore_progress,
 )
-from tri_al.pipeline.summary import RunSummary, SourceCounts
+from tri_al.pipeline.summary import (
+    EmbeddingSummary,
+    RenormalizeSummary,
+    RunSummary,
+    SourceCounts,
+    StatsSummary,
+)
 
 __all__ = [
     "EVENTS",
+    "EmbeddingSummary",
     "Event",
     "FetchContext",
     "FetchError",
@@ -33,9 +40,11 @@ __all__ = [
     "PipelineError",
     "Progress",
     "ProgressCallback",
+    "RenormalizeSummary",
     "RunSummary",
     "Source",
     "SourceCounts",
+    "StatsSummary",
     "Subscription",
     "TrialsChanged",
     "UpdateFinished",

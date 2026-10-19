@@ -150,6 +150,19 @@ trials = Table(
     Column("num_sites", Integer, nullable=False),
     Column("content_hash", BLOB),
     Column("ingested_at", UTCDateTime, nullable=False),
+    # Design (migration 5); who is masked is in trial_text.
+    Column("allocation", Text),
+    Column("intervention_model", Text),
+    Column("observational_model", Text),
+    Column("time_perspective", Text),
+    Column("masking", Text),
+    # Timeline (migration 6); why a trial stopped is in trial_text.
+    Column("start_date_type", Text),
+    Column("primary_completion_date_type", Text),
+    Column("completion_date_type", Text),
+    Column("results_first_posted", ISODate),
+    Column("status_verified", ISODate),
+    Column("last_known_status", Text),
     UniqueConstraint("source", "source_id"),
     # (phase, status) also serves filters on phase alone.
     Index("trials_status", "status"),
@@ -172,7 +185,8 @@ trial_text = Table(
     "trial_text",
     trials_metadata,
     _trial_id(primary_key=True),
-    # Summary, description, eligibility and outcomes, packed and zstd-compressed (docs.py).
+    # Summary, description, eligibility, outcomes, keywords, arms, intervention descriptions,
+    # who is masked and why the trial stopped, packed and zstd-compressed (docs.py).
     Column("text", BLOB, nullable=False),
     Column("dict_id", Integer, ForeignKey("doc_dicts.id")),  # NULL: no dictionary
 )
@@ -183,6 +197,30 @@ trial_docs = Table(
     _trial_id(primary_key=True),
     Column("doc", BLOB, nullable=False),  # the raw document, zstd-compressed
     Column("dict_id", Integer, ForeignKey("doc_dicts.id")),  # NULL: no dictionary
+)
+
+embedding_models = Table(
+    "embedding_models",
+    trials_metadata,
+    Column("id", Integer, primary_key=True),
+    Column("engine", Text, nullable=False),
+    Column("model", Text, nullable=False),
+    Column("max_tokens", Integer, nullable=False),  # input tokens the model reads
+    Column("text_version", Integer, nullable=False),  # tri_al.embeddings.TEXT_VERSION
+    Column("dimensions", Integer, nullable=False),
+    Column("dtype", Text, nullable=False),  # how vectors are stored: float16
+    Column("created_at", UTCDateTime, nullable=False),
+    UniqueConstraint("engine", "model", "max_tokens", "text_version", "dtype"),
+)
+
+# One vector per trial, from the model that made it; a vector of another model is stale.
+trial_embeddings = Table(
+    "trial_embeddings",
+    trials_metadata,
+    Column("trial_id", Integer, ForeignKey("trials.id", ondelete="CASCADE"), primary_key=True),
+    Column("model_id", Integer, ForeignKey("embedding_models.id"), nullable=False),
+    Column("vector", BLOB, nullable=False),  # little-endian, embedding_models.dtype
+    Index("trial_embeddings_by_model", "model_id"),
 )
 
 trial_conditions = Table(
@@ -312,6 +350,7 @@ ENTITY_TABLES = (conditions, mesh_terms, interventions, sponsors)
 LINK_TABLES = (
     trial_text,
     trial_docs,
+    trial_embeddings,
     trial_conditions,
     trial_mesh,
     trial_interventions,
@@ -332,7 +371,7 @@ DEFERRED_INDEXES = tuple(
 
 # --- app.db ---------------------------------------------------------------------------------
 
-DATA_JOB_TYPES = ("install", "update", "rebuild")
+DATA_JOB_TYPES = ("install", "update", "rebuild", "embeddings", "stats", "renormalize")
 
 jobs = Table(
     "jobs",
@@ -359,7 +398,8 @@ jobs = Table(
     Index("jobs_by_status", "status", "id"),
     Index("jobs_by_update", "updated_at"),
 )
-# Only one install, update or rebuild runs at a time (docs/design.md §5.4).
+# Only one data job (install, update, rebuild, embeddings, stats or renormalize) runs at a
+# time (§5.4).
 Index(
     "jobs_one_running_data_job",
     jobs.c.status,

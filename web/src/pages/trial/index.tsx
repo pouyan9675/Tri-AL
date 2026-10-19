@@ -1,22 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { ArrowUpRight, Copy, MapPin, Users } from "lucide-react";
-import type { TrialDetail } from "@/api/client";
+import { ArrowUpRight, Copy, MapPin, UserRound, Users } from "lucide-react";
+import type { Change, TrialDetail } from "@/api/client";
 import { changesQuery, trialQuery } from "@/api/queries";
 import { ErrorState } from "@/components/route-states";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDate, formatNumber, humanize } from "@/lib/format";
+import { formatNumber, humanize } from "@/lib/format";
 import { useLabels } from "@/lib/labels";
 import { notify } from "@/lib/notify";
 import type { TrialTab } from "@/router";
 import { ChangesTab } from "./changes";
 import { LocationsTab } from "./locations";
 import { EligibilityTab, OutcomesTab, OverviewTab } from "./sections";
+import { TrialTimeline } from "./timeline";
 
 const route = getRouteApi("/trials/$sourceId");
 
@@ -41,7 +41,7 @@ export function TrialPage() {
       className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 sm:p-6"
       data-testid="trial"
     >
-      {data ? <Header trial={data} /> : <HeaderSkeleton />}
+      {data ? <Header trial={data} changes={changes.data?.changes} /> : <HeaderSkeleton />}
       <Tabs
         value={tab}
         onValueChange={(value) =>
@@ -103,22 +103,9 @@ function Count({ value }: { value: number | undefined }) {
   );
 }
 
-function Header({ trial }: { trial: TrialDetail }) {
+function Header({ trial, changes }: { trial: TrialDetail; changes?: Change[] }) {
   const label = useLabels();
   const url = REGISTRY_URL[trial.source]?.(trial.source_id);
-  const facts: { label: string; value: string; hint?: string }[] = [
-    {
-      label: "Enrollment",
-      value: formatNumber(trial.enrollment),
-      hint: trial.enrollment_type ? humanize(trial.enrollment_type) : undefined,
-    },
-    { label: "Start", value: formatDate(trial.start_date) },
-    { label: "Primary completion", value: formatDate(trial.primary_completion_date) },
-    { label: "Completion", value: formatDate(trial.completion_date) },
-    { label: "First posted", value: formatDate(trial.first_posted) },
-    { label: "Last update", value: formatDate(trial.last_update) },
-  ];
-
   return (
     <header className="flex flex-col gap-5">
       <div className="flex flex-col gap-3">
@@ -136,6 +123,15 @@ function Header({ trial }: { trial: TrialDetail }) {
             <Copy className="size-3 text-muted-foreground group-hover:text-foreground" />
           </button>
           <StatusBadge status={trial.status} />
+          {trial.status === "UNKNOWN" && trial.last_known_status && (
+            <Badge
+              variant="outline"
+              className="h-6 rounded-full px-2 text-muted-foreground"
+              title="ClinicalTrials.gov marks a trial Unknown when its status hasn't been verified in two years"
+            >
+              Last known: {label("status", trial.last_known_status)}
+            </Badge>
+          )}
           {trial.phase && (
             <Badge variant="outline" className="h-6 rounded-full px-2">
               {label("phase", trial.phase)}
@@ -186,6 +182,13 @@ function Header({ trial }: { trial: TrialDetail }) {
                 {sponsor.name}
               </Link>
             ))}
+          {trial.enrollment !== null && (
+            <span className="inline-flex items-center gap-1.5">
+              <UserRound className="size-3.5" />
+              {formatNumber(trial.enrollment)} participants
+              {trial.enrollment_type && ` (${humanize(trial.enrollment_type).toLowerCase()})`}
+            </span>
+          )}
           <span className="inline-flex min-w-0 items-center gap-1.5">
             <MapPin className="size-3.5 shrink-0" />
             <span className="truncate">
@@ -196,21 +199,7 @@ function Header({ trial }: { trial: TrialDetail }) {
           </span>
         </div>
       </div>
-      <Card className="grid grid-cols-2 gap-px overflow-hidden bg-border p-0 shadow-xs sm:grid-cols-3 lg:grid-cols-6">
-        {facts.map((fact) => (
-          <div key={fact.label} className="bg-card px-4 py-3">
-            <div className="text-xs text-muted-foreground">{fact.label}</div>
-            <div className="mt-0.5 text-sm font-medium tabular">
-              {fact.value}
-              {fact.hint && (
-                <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                  {fact.hint}
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
-      </Card>
+      <TrialTimeline trial={trial} changes={changes} />
     </header>
   );
 }

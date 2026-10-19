@@ -59,7 +59,7 @@ PLUGIN = (
 
 
 def test_migrating_twice_changes_nothing(engine: Engine) -> None:
-    assert migrate(engine, {"core": TRIALS_MIGRATIONS}) == {"core": [1, 2, 3]}
+    assert migrate(engine, {"core": TRIALS_MIGRATIONS}) == {"core": [1, 2, 3, 4, 5, 6]}
     before = schema(engine)
 
     assert migrate(engine, {"core": TRIALS_MIGRATIONS}) == {"core": []}

@@ -7,6 +7,7 @@ import { type ComponentType, lazy } from "react";
 import { BarWidget } from "./bar";
 import type { WidgetProps } from "./common";
 import { PieWidget } from "./pie";
+import { ScatterWidget } from "./scatter";
 import { AreaWidget, LineWidget } from "./series";
 import { StatWidget } from "./stat";
 import { TableWidget } from "./table";
@@ -21,6 +22,8 @@ export type WidgetDefinition = {
 };
 
 const MapWidget = lazy(() => import("./map"));
+// three.js and the scene: only the analysis page draws one.
+const Scatter3DWidget = lazy(() => import("./scatter3d"));
 
 export const WIDGETS: Record<string, WidgetDefinition> = {
   stat: { component: StatWidget, card: false, table: false },
@@ -31,6 +34,8 @@ export const WIDGETS: Record<string, WidgetDefinition> = {
   table: { component: TableWidget, card: true, table: false },
   map: { component: MapWidget, card: true, table: true },
   trends: { component: TrendsWidget, card: true, table: false },
+  scatter: { component: ScatterWidget, card: true, table: false },
+  scatter3d: { component: Scatter3DWidget, card: true, table: false },
 };
 
 export function widgetFor(type: string): WidgetDefinition | undefined {

@@ -10,6 +10,7 @@ dependencies = [
     "numpy>=2.3",
     "orjson>=3.13.0",
     "pydantic>=2.12",
+    "sentence-transformers>=5.1",
     "sqlalchemy>=2.1",
     "tomlkit>=0.13",
     "typer>=0.20",

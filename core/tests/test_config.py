@@ -17,6 +17,11 @@ def test_missing_file_means_defaults(tmp_path: Path) -> None:
     assert config.server.port == 8000
     assert config.data.dir == Path("data")
     assert config.update.schedule == "daily"
+    assert config.embeddings.engine == "sentence-transformers"
+    assert config.embeddings.model == "sentence-transformers/all-MiniLM-L6-v2"
+    assert config.embeddings.max_tokens == 64
+    assert config.embeddings.float16
+    assert config.embeddings.enabled
     assert config.plugins == {}
 
 

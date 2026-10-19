@@ -1,6 +1,18 @@
 """The stats engine (docs/design.md §5.5): chart specs, facets, counts and the trial index."""
 
-from tri_al.stats.charts import WIDGETS, Chart, ChartContext, Facet, Layout, Rows, Widget
+from tri_al.stats.charts import (
+    PAGES,
+    WIDGETS,
+    Chart,
+    ChartContext,
+    Derived,
+    Facet,
+    Layout,
+    Page,
+    Rows,
+    Series,
+    Widget,
+)
 from tri_al.stats.counts import (
     CODED_FIELDS,
     LINK_DIMENSIONS,
@@ -30,6 +42,7 @@ __all__ = [
     "CORE_FACETS",
     "FACET_PREFIX",
     "LINK_DIMENSIONS",
+    "PAGES",
     "PRECOMPUTED_FACET_LIMIT",
     "WIDGETS",
     "Chart",
@@ -39,12 +52,15 @@ __all__ = [
     "Count",
     "Counts",
     "DateField",
+    "Derived",
     "Facet",
     "IndexCounts",
     "Layout",
     "LinkDimension",
+    "Page",
     "ResultCache",
     "Rows",
+    "Series",
     "SqlCounts",
     "StatsEngine",
     "Timeline",

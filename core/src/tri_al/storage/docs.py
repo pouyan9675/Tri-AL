@@ -82,16 +82,28 @@ class Decoder:
 
 
 type PackedOutcome = tuple[str, str, str | None, str | None]  # kind, measure, description, time
+type PackedArm = tuple[str, str | None, str | None, tuple[str, ...]]  # label, type, ..., names
 
 
 @dataclass(frozen=True, slots=True)
 class TrialText:
-    """A trial's long text, as ``trial_text`` keeps it (one compressed blob per trial)."""
+    """A trial's long text, as ``trial_text`` keeps it (one compressed blob per trial).
+
+    Besides the text the full-text index covers (summary, description, eligibility and
+    outcomes), it holds what only the trial's page shows: keywords, arms, intervention
+    descriptions (by intervention name), who is masked and why the trial stopped. Blobs written
+    before migrations 5 and 6 have only the first four or eight parts; the rest read as empty.
+    """
 
     brief_summary: str | None = None
     description: str | None = None
     eligibility_criteria: str | None = None
     outcomes: tuple[PackedOutcome, ...] = ()
+    keywords: tuple[str, ...] = ()
+    arms: tuple[PackedArm, ...] = ()
+    intervention_descriptions: tuple[tuple[str, str], ...] = ()  # name, description
+    masked_roles: tuple[str, ...] = ()
+    why_stopped: str | None = None
 
     def pack(self) -> bytes:
         """The text as compact JSON, ready to compress."""
@@ -101,15 +113,39 @@ class TrialText:
                 self.description,
                 self.eligibility_criteria,
                 [list(outcome) for outcome in self.outcomes],
+                list(self.keywords),
+                [
+                    [label, type_, description, list(names)]
+                    for label, type_, description, names in self.arms
+                ],
+                [list(pair) for pair in self.intervention_descriptions],
+                list(self.masked_roles),
+                self.why_stopped,
             ]
         )
 
     @classmethod
     def unpack(cls, data: bytes) -> "TrialText":
-        summary, description, eligibility, outcomes = orjson.loads(data)
-        return cls(summary, description, eligibility, tuple(_outcome(o) for o in outcomes))
+        summary, description, eligibility, outcomes, *details = orjson.loads(data)
+        keywords, arms, interventions, masked, why_stopped = [*details, [], [], [], [], None][:5]
+        return cls(
+            summary,
+            description,
+            eligibility,
+            tuple(_outcome(o) for o in outcomes),
+            tuple(keywords),
+            tuple(_arm(arm) for arm in arms),
+            tuple((name, text) for name, text in interventions),
+            tuple(masked),
+            why_stopped,
+        )
 
 
 def _outcome(row: list[Any]) -> PackedOutcome:
     kind, measure, description, time_frame = row
     return (kind, measure, description, time_frame)
+
+
+def _arm(row: list[Any]) -> PackedArm:
+    label, type_, description, names = row
+    return (label, type_, description, tuple(names))

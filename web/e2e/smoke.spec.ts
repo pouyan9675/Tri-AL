@@ -14,7 +14,8 @@ async function api<T>(page: Page, path: string): Promise<T> {
 
 test("dashboard → filter → trial detail → ⌘K", async ({ page }) => {
   const meta = await api<{ trials: number }>(page, "/api/meta");
-  const dashboard = await api<{ charts: { id: string }[] }>(page, "/api/dashboard");
+  const dashboard = await api<{ charts: { id: string; page: string }[] }>(page, "/api/dashboard");
+  const charts = dashboard.charts.filter((chart) => chart.page === "dashboard");
   const recruiting = await api<{ total: number }>(
     page,
     "/api/facets?status=RECRUITING&fields=status&limit=1",
@@ -27,9 +28,9 @@ test("dashboard → filter → trial detail → ⌘K", async ({ page }) => {
     page.getByText(`${number(meta.trials)} trials from ClinicalTrials.gov`),
   ).toBeVisible();
   const widgets = page.getByTestId("widget");
-  await expect(widgets).toHaveCount(dashboard.charts.length);
+  await expect(widgets).toHaveCount(charts.length);
   await expect(page.locator('[data-testid="widget"][data-state="ready"]')).toHaveCount(
-    dashboard.charts.length,
+    charts.length,
   );
   await expect(page.locator('[data-widget="map"] svg[role="img"] path').first()).toBeVisible();
   await expect(page.getByText("Live", { exact: true })).toBeVisible(); // the event stream is open
@@ -82,6 +83,75 @@ test("dashboard → filter → trial detail → ⌘K", async ({ page }) => {
   await page.keyboard.press("ControlOrMeta+k");
   await page.getByRole("combobox").fill("study");
   await expect(page.getByTestId("capped-notice")).toBeVisible();
+});
+
+test("the analysis page draws the landscape in 3-D", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  const rows = (
+    await api<{ rows: { type: string; label?: string; embedded_trials?: number }[] }>(
+      page,
+      "/api/stats/research_landscape_3d",
+    )
+  ).rows;
+  const [summary] = rows;
+  const clusters = rows.filter((row) => row.type === "cluster");
+
+  await page.goto("/");
+  await page.getByRole("link", { name: "Analysis", exact: true }).click();
+  await expect(page).toHaveURL(/\/analysis$/);
+  const widget = page.locator('[data-widget="scatter3d"]');
+  await expect(widget).toHaveAttribute("data-state", "ready");
+  await expect(widget).toContainText(
+    `${number(summary?.embedded_trials ?? 0)} trials first posted`,
+  );
+  const view = page.getByTestId("landscape-3d-canvas");
+  await expect(view.locator("canvas")).toBeVisible();
+  const list = page.getByRole("list", { name: "Clusters" });
+  await expect(list.getByRole("button")).toHaveCount(clusters.length);
+
+  // Stop it turning, then find a trial near the middle, where the map is densest.
+  await page.getByRole("button", { name: "Stop turning" }).click();
+  const box = await view.boundingBox();
+  if (!box) throw new Error("the view has no box");
+  let tooltip = false;
+  for (const [dx, dy] of [
+    [0, 0],
+    [-40, 0],
+    [40, 0],
+    [0, -40],
+    [0, 40],
+    [-80, 30],
+    [80, -30],
+  ]) {
+    await page.mouse.move(box.x + box.width / 2 + (dx ?? 0), box.y + box.height / 2 + (dy ?? 0));
+    if (
+      await page
+        .getByRole("tooltip")
+        .isVisible({ timeout: 1000 })
+        .catch(() => false)
+    ) {
+      tooltip = true;
+      break;
+    }
+  }
+  expect(tooltip).toBe(true);
+  await expect(page.getByRole("tooltip")).toContainText(/NCT\d{8}/);
+
+  // A click pins it, with a link to the trial.
+  await page.mouse.down();
+  await page.mouse.up();
+  const pinned = page.getByTestId("pinned-trial");
+  await expect(pinned.getByRole("link", { name: /Open NCT\d{8}/ })).toBeVisible();
+
+  // Choosing a cluster lights it up.
+  const first = list.getByRole("button").first();
+  await first.click();
+  await expect(first).toHaveAttribute("aria-pressed", "true");
+  await expect(first).toContainText(clusters[0]?.label ?? "");
+  expect(errors).toEqual([]);
 });
 
 test("settings show the data, jobs and plugins", async ({ page }) => {
