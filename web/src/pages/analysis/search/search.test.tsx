@@ -148,7 +148,13 @@ describe("advanced search", () => {
     ).toBe("/analysis/search?status=RECRUITING&primary_outcome=ADAS-Cog");
     expect(searches()).toEqual([]);
 
+    // Words first; the other fields are folded away until asked for.
+    const more = screen.getByRole("button", { name: /Participants, design and location/ });
+    expect(more).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("textbox", { name: "Age in years" })).not.toBeInTheDocument();
+
     await userEvent.type(screen.getByRole("textbox", { name: "Anywhere" }), "amyloid PET");
+    await userEvent.click(more);
     await userEvent.type(screen.getByRole("textbox", { name: "Age in years" }), "70");
     await userEvent.click(
       within(screen.getByRole("radiogroup", { name: "Sex" })).getByRole("radio", {
@@ -167,6 +173,10 @@ describe("advanced search", () => {
     expect(router.state.location.href).toBe(
       "/analysis/search?status=RECRUITING&text=amyloid+PET&sex=FEMALE&masking=DOUBLE&age=70",
     );
+    // A search that uses them opens with them, and says how many are set.
+    expect(
+      screen.getByRole("button", { name: "Participants, design and location, 3 set" }),
+    ).toHaveAttribute("aria-expanded", "true");
     const sent = searches().at(-1);
     expect(sent?.getAll("status")).toEqual(["RECRUITING"]);
     expect(sent?.get("text")).toBe("amyloid PET");
@@ -204,6 +214,9 @@ describe("advanced search", () => {
 
   it("finds a place, and shows each trial's nearest site", async () => {
     const { router } = await show("/analysis/search");
+    await userEvent.click(
+      screen.getByRole("button", { name: /Participants, design and location/ }),
+    );
     await userEvent.click(screen.getByRole("combobox", { name: "Place" }));
     await userEvent.type(screen.getByPlaceholderText(/A city/), "bos");
     await userEvent.click(await screen.findByText("Boston, Massachusetts, United States"));
@@ -218,9 +231,14 @@ describe("advanced search", () => {
 
   it("won't search an age it can't read", async () => {
     await show("/analysis/search");
+    const more = screen.getByRole("button", { name: /Participants, design and location/ });
+    await userEvent.click(more);
     await userEvent.type(screen.getByRole("textbox", { name: "Age in years" }), "old");
     expect(screen.getByText(/An age \(70\) or a range/)).toBeVisible();
     expect(screen.getByRole("button", { name: "Search" })).toBeDisabled();
+    // It stays open while the age can't be read, so the reason stays in sight.
+    await userEvent.click(more);
+    expect(screen.getByText(/An age \(70\) or a range/)).toBeVisible();
   });
 
   it("clears the search but keeps the filter", async () => {

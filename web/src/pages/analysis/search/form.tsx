@@ -1,12 +1,15 @@
 /**
  * The advanced search form: words in chosen parts of a trial, whom it takes, how it's designed
- * and where it runs. It edits a draft; Search puts the draft in the URL, which runs it.
+ * and where it runs. The words come first; the other fields fold away until they're wanted
+ * (open when the search uses them). It edits a draft; Search puts the draft in the URL, which
+ * runs it.
  */
 import { useQuery } from "@tanstack/react-query";
-import { CircleHelp, Plus, SearchIcon, X } from "lucide-react";
+import { ChevronRight, CircleHelp, Plus, SearchIcon, X } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { metaQuery } from "@/api/queries";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -24,6 +27,7 @@ import {
   DESIGN_FIELDS,
   type DesignField,
   DISTANCES,
+  extraFieldCount,
   FIELDS,
   parseAge,
   type Sex,
@@ -58,6 +62,8 @@ export function SearchForm({
   const [draft, setDraft] = useState<AdvancedSearch>(initial);
   const [age, setAge] = useState(initial.age ?? "");
   const ageValid = !age.trim() || parseAge(age) !== undefined;
+  const [more, setMore] = useState(() => extraFieldCount(initial) > 0);
+  const extras = extraFieldCount({ ...draft, age });
   const id = useId();
 
   const set = (patch: Partial<AdvancedSearch>) => setDraft((prev) => ({ ...prev, ...patch }));
@@ -163,100 +169,120 @@ export function SearchForm({
         </div>
       </Group>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_1.4fr_1fr]">
-        <Group title="Participants" description="Trials that would take this person.">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`${id}-age`} className="text-xs text-muted-foreground">
-              Age in years
-            </Label>
-            <Input
-              id={`${id}-age`}
-              className="h-8"
-              placeholder="70, or a range: 60..80"
-              value={age}
-              onChange={(event) => setAge(event.target.value)}
-              aria-invalid={!ageValid}
-              inputMode="numeric"
-              autoComplete="off"
-            />
-            {!ageValid && (
-              <p className="text-xs text-destructive">
-                An age (70) or a range (60..80, ..17, 65..).
-              </p>
-            )}
-          </div>
-          <Choice
-            label="Sex"
-            value={draft.sex ?? ANY}
-            options={[
-              [ANY, "Any"],
-              ["FEMALE", "Female"],
-              ["MALE", "Male"],
-            ]}
-            onChange={(value) => set({ sex: value === ANY ? undefined : (value as Sex) })}
-          />
-          <Choice
-            label="Healthy volunteers"
-            value={yesNo(draft.healthy_volunteers)}
-            options={[
-              [ANY, "Any"],
-              ["yes", "Accepted"],
-              ["no", "Not accepted"],
-            ]}
-            onChange={(value) => set({ healthy_volunteers: fromYesNo(value) })}
-          />
-        </Group>
-
-        <Group title="Design" description="Any of the chosen values, field by field.">
-          <DesignChoices draft={draft} set={set} />
-          <Choice
-            label="Placebo"
-            value={yesNo(draft.placebo)}
-            options={[
-              [ANY, "Any"],
-              ["yes", "With a placebo"],
-              ["no", "Without"],
-            ]}
-            onChange={(value) => set({ placebo: fromYesNo(value) })}
-          />
-        </Group>
-
-        <Group title="Location" description="Trials with a site within a distance of a city.">
-          <PlacePicker
-            place={draft.place}
-            onChoose={(place) =>
-              set(
-                place
-                  ? {
-                      near: `${place.lat},${place.lon}`,
-                      place: placeName(place),
-                      within: draft.within ?? DEFAULT_DISTANCE,
-                    }
-                  : { near: undefined, place: undefined, within: undefined },
-              )
-            }
-          />
-          <Select
-            value={String(draft.within ?? DEFAULT_DISTANCE)}
-            onValueChange={(value) => set({ within: Number(value) })}
-            disabled={!draft.near}
+      {/* Kept open while the age can't be read, so its message shows. */}
+      <Collapsible open={more || !ageValid} onOpenChange={setMore} className="flex flex-col gap-4">
+        <CollapsibleTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="group -ml-2 w-fit text-muted-foreground"
+            aria-label={`Participants, design and location${extras > 0 ? `, ${extras} set` : ""}`}
           >
-            <SelectTrigger className="w-full" aria-label="Distance">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {DISTANCES.map((km) => (
-                <SelectItem key={km} value={String(km)}>
-                  Within {km} km
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            ClinicalTrials.gov places each site at its city, so distances are between cities.
-          </p>
-        </Group>
-      </div>
+            <ChevronRight className="transition-transform group-data-[state=open]:rotate-90" />
+            Participants, design and location
+            {extras > 0 && (
+              <span className="rounded-full bg-brand/10 px-1.5 text-xs font-medium text-foreground tabular">
+                {extras} set
+              </span>
+            )}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="grid gap-5 lg:grid-cols-[1fr_1.4fr_1fr]">
+          <Group title="Participants" description="Trials that would take this person.">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={`${id}-age`} className="text-xs text-muted-foreground">
+                Age in years
+              </Label>
+              <Input
+                id={`${id}-age`}
+                className="h-8"
+                placeholder="70, or a range: 60..80"
+                value={age}
+                onChange={(event) => setAge(event.target.value)}
+                aria-invalid={!ageValid}
+                inputMode="numeric"
+                autoComplete="off"
+              />
+              {!ageValid && (
+                <p className="text-xs text-destructive">
+                  An age (70) or a range (60..80, ..17, 65..).
+                </p>
+              )}
+            </div>
+            <Choice
+              label="Sex"
+              value={draft.sex ?? ANY}
+              options={[
+                [ANY, "Any"],
+                ["FEMALE", "Female"],
+                ["MALE", "Male"],
+              ]}
+              onChange={(value) => set({ sex: value === ANY ? undefined : (value as Sex) })}
+            />
+            <Choice
+              label="Healthy volunteers"
+              value={yesNo(draft.healthy_volunteers)}
+              options={[
+                [ANY, "Any"],
+                ["yes", "Accepted"],
+                ["no", "Not accepted"],
+              ]}
+              onChange={(value) => set({ healthy_volunteers: fromYesNo(value) })}
+            />
+          </Group>
+
+          <Group title="Design" description="Any of the chosen values, field by field.">
+            <DesignChoices draft={draft} set={set} />
+            <Choice
+              label="Placebo"
+              value={yesNo(draft.placebo)}
+              options={[
+                [ANY, "Any"],
+                ["yes", "With a placebo"],
+                ["no", "Without"],
+              ]}
+              onChange={(value) => set({ placebo: fromYesNo(value) })}
+            />
+          </Group>
+
+          <Group title="Location" description="Trials with a site within a distance of a city.">
+            <PlacePicker
+              place={draft.place}
+              onChoose={(place) =>
+                set(
+                  place
+                    ? {
+                        near: `${place.lat},${place.lon}`,
+                        place: placeName(place),
+                        within: draft.within ?? DEFAULT_DISTANCE,
+                      }
+                    : { near: undefined, place: undefined, within: undefined },
+                )
+              }
+            />
+            <Select
+              value={String(draft.within ?? DEFAULT_DISTANCE)}
+              onValueChange={(value) => set({ within: Number(value) })}
+              disabled={!draft.near}
+            >
+              <SelectTrigger className="w-full" aria-label="Distance">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DISTANCES.map((km) => (
+                  <SelectItem key={km} value={String(km)}>
+                    Within {km} km
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              ClinicalTrials.gov places each site at its city, so distances are between cities.
+            </p>
+          </Group>
+        </CollapsibleContent>
+      </Collapsible>
 
       <div className="flex gap-2">
         <Button type="submit" disabled={!ageValid}>
@@ -270,6 +296,7 @@ export function SearchForm({
             setRows(["text"]);
             setDraft({});
             setAge("");
+            setMore(false);
             onClear();
           }}
         >

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { apiQuery, hasQuery, parseAdvancedSearch, parseAge, withoutAdvanced } from "./advanced";
+import {
+  apiQuery,
+  extraFieldCount,
+  hasQuery,
+  parseAdvancedSearch,
+  parseAge,
+  withoutAdvanced,
+} from "./advanced";
 
 describe("advanced search params", () => {
   it("reads the fields it knows and drops what's malformed", () => {
@@ -54,6 +61,20 @@ describe("advanced search params", () => {
     expect(hasQuery({})).toBe(false);
     expect(hasQuery({ sort: "-start_date", place: "Boston" })).toBe(false);
     expect(hasQuery({ placebo: false })).toBe(true);
+  });
+
+  it("counts the fields set besides text", () => {
+    expect(extraFieldCount({ title: "a", sort: "relevance", within: 50 })).toBe(0);
+    expect(extraFieldCount({ age: " ", masking: [] })).toBe(0);
+    expect(
+      extraFieldCount({
+        age: "70",
+        healthy_volunteers: false,
+        placebo: false,
+        masking: ["DOUBLE"],
+      }),
+    ).toBe(4);
+    expect(extraFieldCount({ near: "1,2", sex: "MALE", allocation: ["RANDOMIZED"] })).toBe(3);
   });
 
   it("sends the API what it reads, in a stable order", () => {

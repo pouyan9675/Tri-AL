@@ -135,6 +135,19 @@ export function hasQuery(search: AdvancedSearch): boolean {
   return Object.keys(fields).length > 0;
 }
 
+/** How many of the fields besides text are set: the person, the design and the place. */
+export function extraFieldCount(search: AdvancedSearch): number {
+  const set = [
+    !!search.age?.trim(),
+    !!search.sex,
+    search.healthy_volunteers !== undefined,
+    search.placebo !== undefined,
+    !!search.near,
+    ...DESIGN_FIELDS.map((field) => (search[field]?.length ?? 0) > 0),
+  ];
+  return set.filter(Boolean).length;
+}
+
 /** The search as the API reads it: no display-only `place`, and arrays sorted (cache keys). */
 export function apiQuery(search: AdvancedSearch) {
   const { place: _place, ...query } = search;
