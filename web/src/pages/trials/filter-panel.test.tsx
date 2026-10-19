@@ -74,7 +74,7 @@ describe("the filter panel", () => {
 
   it("filters by words", async () => {
     const { onChange } = setup();
-    await userEvent.type(screen.getByLabelText("Filter by words"), "amyloid{Enter}");
+    await userEvent.type(screen.getByLabelText("Filter by words or trial IDs"), "amyloid{Enter}");
     expect(onChange).toHaveBeenCalledWith({ q: "amyloid" });
   });
 });

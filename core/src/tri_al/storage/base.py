@@ -12,6 +12,7 @@ from tri_al.filters import EVERY_TRIAL, TrialFilter
 from tri_al.schema import TrialRecord
 
 type NameKind = Literal["condition", "intervention", "sponsor"]
+type IdMatch = Literal["exact", "prefix"]  # a trial found by its ID, or by the start of it
 type SortKey = Literal["last_update", "start_date", "first_posted", "enrollment", "id"]
 
 SORT_KEYS: tuple[SortKey, ...] = ("last_update", "start_date", "first_posted", "enrollment", "id")
@@ -92,8 +93,9 @@ class SearchHit:
     title: str
     status: str | None
     phase: str | None
-    score: float  # higher is a better match; only comparable within one search
+    score: float | None  # higher is a better match, within one search; None for an ID match
     snippet: tuple[SnippetPart, ...] = ()
+    id_match: IdMatch | None = None  # found by its ID rather than its text
 
 
 @dataclass(frozen=True, slots=True)

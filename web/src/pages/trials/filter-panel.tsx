@@ -101,8 +101,8 @@ function TextFilter({ value, onChange }: { value?: string; onChange: (q?: string
         value={text}
         onChange={(event) => setText(event.target.value)}
         onBlur={() => (text.trim() || undefined) !== value && onChange(text.trim() || undefined)}
-        placeholder="Words in the trial…"
-        aria-label="Filter by words"
+        placeholder="Words or NCT IDs…"
+        aria-label="Filter by words or trial IDs"
         className="h-9 bg-card pr-8 pl-8"
       />
       {text && (

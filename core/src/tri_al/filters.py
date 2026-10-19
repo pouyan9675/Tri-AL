@@ -166,7 +166,7 @@ class TrialFilter:
     last_update: DateRange | None = None
     enrollment: IntRange | None = None
     has_results: bool | None = None
-    q: str | None = None  # full-text: every word must match, as in search
+    q: str | None = None  # full-text: every word must match, as in search; or trial IDs
     extra: tuple[tuple[FilterField, tuple[str, ...]], ...] = field(default=())
 
     def __post_init__(self) -> None:

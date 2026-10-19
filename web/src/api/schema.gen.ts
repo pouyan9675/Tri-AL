@@ -93,10 +93,15 @@ export interface paths {
         };
         /**
          * Search
-         * @description Full-text search, merged across search providers, within the filter.
+         * @description Trials named by ID, then full-text search merged across search providers, within the
+         *     filter.
          *
-         *     Each hit has a snippet of the text it matched. ``names`` adds conditions, interventions
-         *     and sponsors whose names match, for jumping to a filter.
+         *     Every term with a letter and a digit, such as ``NCT04437511`` or ``nct04437511``, finds
+         *     the trial with that ID (``id_match`` is ``exact``), so a pasted list of IDs finds each
+         *     one. A single term of 7 or more characters also finds the trials whose ID starts with it
+         *     (``prefix``), for finding a trial as its ID is typed. Each hit has a snippet of the text
+         *     it matched. ``names`` adds conditions, interventions and sponsors whose names match, for
+         *     jumping to a filter.
          */
         get: operations["search"];
         put?: never;
@@ -687,10 +692,18 @@ export interface components {
             status: string | null;
             /** Phase */
             phase: string | null;
-            /** Score */
-            score: number;
+            /**
+             * Score
+             * @description Higher is better, among text matches; null for an ID match.
+             */
+            score: number | null;
             /** Snippet */
             snippet: components["schemas"]["SnippetPartOut"][];
+            /**
+             * Id Match
+             * @description Found by its ID (`exact`) or the start of it (`prefix`), before every text match; null for a text match.
+             */
+            id_match: ("exact" | "prefix") | null;
         };
         /** SearchOut */
         SearchOut: {
@@ -993,7 +1006,7 @@ export interface operations {
                 /** @description `from..to`, either end open: `100..500`, `1000..` */
                 enrollment?: string | null;
                 has_results?: boolean | null;
-                /** @description Full-text: every word must match */
+                /** @description Full-text: every word must match; or trial IDs, which find those */
                 q?: string | null;
                 /** @description One of last_update, start_date, first_posted, enrollment, id; a leading `-` sorts descending */
                 sort?: string;
@@ -1140,7 +1153,7 @@ export interface operations {
     search: {
         parameters: {
             query: {
-                /** @description Words to find */
+                /** @description Words or trial IDs to find */
                 q: string;
                 limit?: number;
                 /** @description Matching names to include, for words of 3+ letters */
@@ -1250,7 +1263,7 @@ export interface operations {
                 /** @description `from..to`, either end open: `100..500`, `1000..` */
                 enrollment?: string | null;
                 has_results?: boolean | null;
-                /** @description Full-text: every word must match */
+                /** @description Full-text: every word must match; or trial IDs, which find those */
                 q?: string | null;
             };
             header?: never;
@@ -1351,7 +1364,7 @@ export interface operations {
                 /** @description `from..to`, either end open: `100..500`, `1000..` */
                 enrollment?: string | null;
                 has_results?: boolean | null;
-                /** @description Full-text: every word must match */
+                /** @description Full-text: every word must match; or trial IDs, which find those */
                 q?: string | null;
             };
             header?: never;

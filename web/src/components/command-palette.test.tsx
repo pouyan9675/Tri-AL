@@ -37,6 +37,24 @@ function result(q: string, capped: boolean) {
   };
 }
 
+function hit(id: number, sourceId: string, idMatch: "exact" | "prefix" | null) {
+  return {
+    id,
+    source: "ctgov",
+    source_id: sourceId,
+    title: `Study ${sourceId}`,
+    status: "COMPLETED",
+    phase: "PHASE2",
+    score: idMatch ? null : 4.2,
+    snippet: [{ text: "A study.", match: false }],
+    id_match: idMatch,
+  };
+}
+
+function byId(q: string, hits: ReturnType<typeof hit>[], candidates = 0) {
+  return { data_version: 3, query: q, hits, candidates, capped: false, names: [] };
+}
+
 describe("the ⌘K palette", () => {
   beforeEach(() => navigate.mockReset());
 
@@ -62,6 +80,48 @@ describe("the ⌘K palette", () => {
       to: "/trials/$sourceId",
       params: { sourceId: "NCT04437511" },
     });
+  });
+
+  it("puts a trial found by its ID first and opens it with Enter", async () => {
+    mockApi({
+      "/api/meta": META,
+      "/api/search": () =>
+        byId("nct04437511", [hit(1, "NCT04437511", "exact"), hit(2, "NCT06000001", null)], 1),
+    });
+    renderWithProviders(<CommandPalette open onOpenChange={() => {}} />);
+    await userEvent.type(screen.getByRole("combobox"), "nct04437511");
+
+    expect(await screen.findByText("Trial ID")).toBeInTheDocument();
+    expect(screen.getByText("Text matches")).toBeInTheDocument();
+    expect(screen.getByText("NCT04437511", { selector: "mark" })).toBeInTheDocument();
+    expect(screen.getByText("1 by ID · 1 text match")).toBeInTheDocument();
+    expect(screen.getByText(/List every trial with/)).toBeInTheDocument();
+
+    await userEvent.keyboard("{Enter}");
+    expect(navigate).toHaveBeenCalledWith({
+      to: "/trials/$sourceId",
+      params: { sourceId: "NCT04437511" },
+    });
+  });
+
+  it("completes the start of an ID", async () => {
+    mockApi({
+      "/api/meta": META,
+      "/api/search": () =>
+        byId("nct0443", [hit(1, "NCT04430010", "prefix"), hit(2, "NCT04437511", "prefix")]),
+    });
+    renderWithProviders(<CommandPalette open onOpenChange={() => {}} />);
+    await userEvent.type(screen.getByRole("combobox"), "nct0443");
+
+    expect(await screen.findByText("Trial IDs starting with nct0443")).toBeInTheDocument();
+    expect(screen.getAllByTestId("hit-id").map((id) => id.textContent)).toEqual([
+      "NCT04430010",
+      "NCT04437511",
+    ]);
+    expect(screen.getAllByText("NCT0443", { selector: "mark" })).toHaveLength(2);
+    expect(screen.getByText("2 by ID")).toBeInTheDocument();
+    // The trial list has no use for the start of an ID.
+    expect(screen.queryByText(/List every trial with/)).not.toBeInTheDocument();
   });
 
   it("says when a broad search ranked only the newest matches", async () => {

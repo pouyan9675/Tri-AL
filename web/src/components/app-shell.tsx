@@ -75,7 +75,7 @@ export function AppShell() {
               onFocus={loadPalette}
             >
               <SearchIcon className="size-4" />
-              <span>Search trials…</span>
+              <span>Search trials or IDs…</span>
               <Kbd className="ml-auto">⌘K</Kbd>
             </Button>
             <Button

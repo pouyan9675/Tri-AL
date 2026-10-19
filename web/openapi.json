@@ -396,10 +396,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Full-text: every word must match",
+              "description": "Full-text: every word must match; or trial IDs, which find those",
               "title": "Q"
             },
-            "description": "Full-text: every word must match"
+            "description": "Full-text: every word must match; or trial IDs, which find those"
           },
           {
             "name": "sort",
@@ -617,7 +617,7 @@
           "search"
         ],
         "summary": "Search",
-        "description": "Full-text search, merged across search providers, within the filter.\n\nEach hit has a snippet of the text it matched. ``names`` adds conditions, interventions\nand sponsors whose names match, for jumping to a filter.",
+        "description": "Trials named by ID, then full-text search merged across search providers, within the\nfilter.\n\nEvery term with a letter and a digit, such as ``NCT04437511`` or ``nct04437511``, finds\nthe trial with that ID (``id_match`` is ``exact``), so a pasted list of IDs finds each\none. A single term of 7 or more characters also finds the trials whose ID starts with it\n(``prefix``), for finding a trial as its ID is typed. Each hit has a snippet of the text\nit matched. ``names`` adds conditions, interventions and sponsors whose names match, for\njumping to a filter.",
         "operationId": "search",
         "parameters": [
           {
@@ -628,10 +628,10 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 500,
-              "description": "Words to find",
+              "description": "Words or trial IDs to find",
               "title": "Q"
             },
-            "description": "Words to find"
+            "description": "Words or trial IDs to find"
           },
           {
             "name": "limit",
@@ -1383,10 +1383,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Full-text: every word must match",
+              "description": "Full-text: every word must match; or trial IDs, which find those",
               "title": "Q"
             },
-            "description": "Full-text: every word must match"
+            "description": "Full-text: every word must match; or trial IDs, which find those"
           }
         ],
         "responses": {
@@ -1802,10 +1802,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Full-text: every word must match",
+              "description": "Full-text: every word must match; or trial IDs, which find those",
               "title": "Q"
             },
-            "description": "Full-text: every word must match"
+            "description": "Full-text: every word must match; or trial IDs, which find those"
           }
         ],
         "responses": {
@@ -3292,8 +3292,16 @@
             "title": "Phase"
           },
           "score": {
-            "type": "number",
-            "title": "Score"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score",
+            "description": "Higher is better, among text matches; null for an ID match."
           },
           "snippet": {
             "items": {
@@ -3301,6 +3309,22 @@
             },
             "type": "array",
             "title": "Snippet"
+          },
+          "id_match": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "exact",
+                  "prefix"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Match",
+            "description": "Found by its ID (`exact`) or the start of it (`prefix`), before every text match; null for a text match."
           }
         },
         "additionalProperties": false,
@@ -3313,7 +3337,8 @@
           "status",
           "phase",
           "score",
-          "snippet"
+          "snippet",
+          "id_match"
         ],
         "title": "SearchHitOut"
       },

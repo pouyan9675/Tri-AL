@@ -1,7 +1,8 @@
 /**
- * The ⌘K palette: full-text search over every trial (`/api/search`), names that jump to a
- * filter, and the pages. Loaded on first use. A broad search ranks only the newest matches
- * (the API's `capped`), and the palette says so.
+ * The ⌘K palette: trials by ID (one, a pasted list, or the start of one as it's typed),
+ * full-text search over every trial (`/api/search`), names that jump to a filter, and the
+ * pages. Loaded on first use. A broad search ranks only the newest matches (the API's
+ * `capped`), and the palette says so.
  */
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -20,7 +21,7 @@ import {
   TableProperties,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { NameHit, SearchHit } from "@/api/client";
+import type { NameHit, SearchHit, SearchResult } from "@/api/client";
 import { metaQuery, searchQuery } from "@/api/queries";
 import { StatusBadge } from "@/components/status-badge";
 import {
@@ -45,6 +46,8 @@ const NAME_FIELD = {
   sponsor: "sponsors",
 } as const;
 const NAME_ICON = { condition: Activity, intervention: Pill, sponsor: Building2 } as const;
+/** What the API strips from the ends of an ID it's given (`trial_id_terms`). */
+const ID_EDGES = /^["'`()[\]{}<>.:#]+|["'`()[\]{}<>.:#]+$/g;
 
 export default function CommandPalette({
   open,
@@ -77,6 +80,12 @@ export default function CommandPalette({
   const { setTheme } = useTheme();
   const result = q && search.data?.query === q ? search.data : q ? search.data : undefined;
   const pending = q !== text.trim() || search.isFetching;
+  const byId = result?.hits.filter((hit) => hit.id_match) ?? [];
+  const byText = result?.hits.filter((hit) => !hit.id_match) ?? [];
+  const exact = byId.filter((hit) => hit.id_match === "exact");
+  const started = byId.filter((hit) => hit.id_match === "prefix");
+  // The trial list matches whole IDs and words, not the start of an ID.
+  const listable = result ? byText.length > 0 || exact.length > 0 || !started.length : false;
 
   // New results select their first row, so Enter opens the best match.
   const [selected, setSelected] = useState("");
@@ -119,7 +128,9 @@ export default function CommandPalette({
             value={text}
             onValueChange={setText}
             placeholder={
-              meta.data ? `Search ${formatNumber(meta.data.trials)} trials…` : "Search trials…"
+              meta.data
+                ? `Search ${formatNumber(meta.data.trials)} trials or NCT IDs…`
+                : "Search trials or NCT IDs…"
             }
             className="h-10"
           />
@@ -157,7 +168,8 @@ export default function CommandPalette({
                 </CommandItem>
               </CommandGroup>
               <p className="px-3 pt-2 pb-3 text-xs text-muted-foreground">
-                Type a drug, a condition, a sponsor or an NCT number. Every word must match.
+                Type a drug, a condition or a sponsor (every word must match), or one or more NCT
+                numbers.
               </p>
             </>
           )}
@@ -177,10 +189,24 @@ export default function CommandPalette({
                   </span>
                 </div>
               )}
-              {result.hits.length > 0 && (
-                <CommandGroup heading="Trials">
-                  {result.hits.map((hit) => (
-                    <TrialItem key={hit.id} hit={hit} onSelect={() => openTrial(hit)} />
+              {exact.length > 0 && (
+                <CommandGroup heading={exact.length === 1 ? "Trial ID" : "Trial IDs"}>
+                  {exact.map((hit) => (
+                    <TrialItem key={hit.id} hit={hit} q={q} onSelect={() => openTrial(hit)} />
+                  ))}
+                </CommandGroup>
+              )}
+              {started.length > 0 && (
+                <CommandGroup heading={`Trial IDs starting with ${q.replace(ID_EDGES, "")}`}>
+                  {started.map((hit) => (
+                    <TrialItem key={hit.id} hit={hit} q={q} onSelect={() => openTrial(hit)} />
+                  ))}
+                </CommandGroup>
+              )}
+              {byText.length > 0 && (
+                <CommandGroup heading={byId.length > 0 ? "Text matches" : "Trials"}>
+                  {byText.map((hit) => (
+                    <TrialItem key={hit.id} hit={hit} q={q} onSelect={() => openTrial(hit)} />
                   ))}
                 </CommandGroup>
               )}
@@ -204,17 +230,19 @@ export default function CommandPalette({
                   })}
                 </CommandGroup>
               )}
-              <CommandGroup>
-                <CommandItem
-                  value="all-results"
-                  onSelect={() => go(() => void navigate({ to: "/trials", search: { q } }))}
-                >
-                  <ArrowRight className="text-muted-foreground" />
-                  <span>
-                    List every trial with “<span className="font-medium">{q}</span>”
-                  </span>
-                </CommandItem>
-              </CommandGroup>
+              {listable && (
+                <CommandGroup>
+                  <CommandItem
+                    value="all-results"
+                    onSelect={() => go(() => void navigate({ to: "/trials", search: { q } }))}
+                  >
+                    <ArrowRight className="text-muted-foreground" />
+                    <span>
+                      List every trial with “<span className="font-medium">{q}</span>”
+                    </span>
+                  </CommandItem>
+                </CommandGroup>
+              )}
               {result.hits.length === 0 && result.names.length === 0 && !pending && (
                 <p className="px-3 py-6 text-center text-sm text-muted-foreground">
                   No trials match “{q}”.
@@ -237,17 +265,25 @@ export default function CommandPalette({
           <span className="flex items-center gap-1">
             <Kbd>esc</Kbd> close
           </span>
-          {q && result && result.candidates !== null && (
-            <span className="ml-auto tabular">
-              {result.capped
-                ? `${formatNumber(result.candidates)} newest ranked`
-                : `${formatNumber(result.candidates)} match${result.candidates === 1 ? "" : "es"}`}
-            </span>
-          )}
+          {q && result && <span className="ml-auto tabular">{countLine(result, byId.length)}</span>}
         </div>
       </Command>
     </CommandDialog>
   );
+}
+
+/** The footer's counts: the trials found by ID, then the text matches ranked. */
+function countLine({ candidates, capped }: SearchResult, byId: number) {
+  const parts = byId > 0 ? [`${formatNumber(byId)} by ID`] : [];
+  if (candidates !== null && (candidates > 0 || byId === 0)) {
+    const kind = byId > 0 ? "text match" : "match";
+    parts.push(
+      capped
+        ? `${formatNumber(candidates)} newest ranked`
+        : `${formatNumber(candidates)} ${kind}${candidates === 1 ? "" : "es"}`,
+    );
+  }
+  return parts.join(" · ");
 }
 
 /** Snippet parts with their offset in the snippet, which keys them. */
@@ -260,8 +296,21 @@ function withOffsets(parts: SearchHit["snippet"]) {
   });
 }
 
-function TrialItem({ hit, onSelect }: { hit: SearchHit; onSelect: () => void }) {
+/** How much of the hit's ID the query matched: all of it, its start, or none. */
+function matchedLength(hit: SearchHit, q: string) {
+  if (hit.id_match === "exact") return hit.source_id.length;
+  if (hit.id_match !== "prefix") return 0;
+  const typed = q.replace(ID_EDGES, "").toUpperCase();
+  return hit.source_id.toUpperCase().startsWith(typed) ? typed.length : 0;
+}
+
+const MARK = "rounded-[3px] bg-brand/15 px-0.5 text-foreground dark:bg-brand/30";
+// No padding, so the ID still reads as one word where the match ends.
+const ID_MARK = "rounded-[2px] bg-brand/15 font-medium text-foreground dark:bg-brand/30";
+
+function TrialItem({ hit, q, onSelect }: { hit: SearchHit; q: string; onSelect: () => void }) {
   const label = useLabels();
+  const matched = matchedLength(hit, q);
   return (
     <CommandItem value={`trial-${hit.id}`} onSelect={onSelect} className="items-start gap-3 py-2">
       <div className="min-w-0 flex-1 space-y-1">
@@ -270,10 +319,7 @@ function TrialItem({ hit, onSelect }: { hit: SearchHit; onSelect: () => void }) 
           <div className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
             {withOffsets(hit.snippet).map((part) =>
               part.match ? (
-                <mark
-                  key={part.at}
-                  className="rounded-[3px] bg-brand/15 px-0.5 text-foreground dark:bg-brand/30"
-                >
+                <mark key={part.at} className={MARK}>
                   {part.text}
                 </mark>
               ) : (
@@ -283,7 +329,16 @@ function TrialItem({ hit, onSelect }: { hit: SearchHit; onSelect: () => void }) 
           </div>
         )}
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span className="font-mono text-[0.7rem]">{hit.source_id}</span>
+          <span className="font-mono text-[0.7rem]" data-testid="hit-id">
+            {matched > 0 ? (
+              <>
+                <mark className={ID_MARK}>{hit.source_id.slice(0, matched)}</mark>
+                {hit.source_id.slice(matched)}
+              </>
+            ) : (
+              hit.source_id
+            )}
+          </span>
           {hit.phase && hit.phase !== "NA" && <span>· {label("phase", hit.phase)}</span>}
         </div>
       </div>

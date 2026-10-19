@@ -115,6 +115,8 @@ FILTERS = [
     TrialFilter(has_results=True),
     TrialFilter(q="memory"),
     TrialFilter(q="memory tau", status=("COMPLETED",), countries=("DE",)),
+    TrialFilter(q="NCT00000007, nct00000042 NCT00000399"),
+    TrialFilter(q="NCT00000042 memory", status=("TERMINATED", "COMPLETED")),
     TrialFilter(phase=("NOT_A_PHASE",)),
 ]
 

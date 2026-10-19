@@ -259,6 +259,34 @@ def test_search(client: TestClient) -> None:
     assert client.get("/api/search").status_code == 422
 
 
+def test_search_finds_trials_by_id_first(client: TestClient) -> None:
+    result = body(client.get("/api/search", params={"q": "f3, F1"}), m.SearchOut)
+
+    assert [(hit.source_id, hit.id_match, hit.score) for hit in result.hits] == [
+        ("F3", "exact", None),
+        ("F1", "exact", None),
+    ]
+    within = body(
+        client.get("/api/search", params={"q": "F1 F2", "status": "COMPLETED"}), m.SearchOut
+    )
+    assert [hit.source_id for hit in within.hits] == ["F2"]
+    text = body(client.get("/api/search", params={"q": "alzheimer"}), m.SearchOut)
+    assert {hit.id_match for hit in text.hits} == {None}
+
+
+def test_trials_text_filter_finds_ids(client: TestClient) -> None:
+    page = body(client.get("/api/trials", params={"q": "f1 F3"}), m.TrialPageOut)
+
+    assert (sorted(item.source_id for item in page.items), page.total) == (["F1", "F3"], 2)
+
+
+def test_trial_ids_in_small_letters(client: TestClient) -> None:
+    trial = body(client.get("/api/trials/f1"), m.TrialDetailOut)
+
+    assert trial.source_id == "F1"
+    assert client.get("/api/trials/f1/changes").status_code == 200
+
+
 def test_facets(client: TestClient) -> None:
     facets = body(client.get("/api/facets", params={"status": "COMPLETED"}), m.FacetsOut)
 

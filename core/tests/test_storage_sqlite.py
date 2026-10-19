@@ -3,17 +3,22 @@ import sqlite3
 from collections.abc import Iterator
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pytest
 from sqlalchemy import Connection, text
 
+from tri_al.filters import TrialFilter
 from tri_al.schema import TrialRecord
 from tri_al.storage import (
+    Sort,
+    SQLiteReader,
     SQLiteStorage,
     Storage,
     StorageError,
     create_engine,
     docs,
+    filtering,
     migrate,
     sqlite,
 )
@@ -116,6 +121,117 @@ def test_searches_rank_only_the_newest_candidates(
     assert result.capped
     assert sorted(hit.source_id for hit in result.hits) == ["NCT3", "NCT4"]
     assert not storage.search("memory 1", limit=10).capped
+
+
+@pytest.mark.parametrize(
+    ("words", "terms"),
+    [
+        ("NCT04437511", ["NCT04437511"]),
+        ("nct04437511", ["nct04437511", "NCT04437511"]),
+        ("NCT01, NCT02;NCT03\nNCT04", ["NCT01", "NCT02", "NCT03", "NCT04"]),
+        ('"NCT01", (NCT02). [#NCT03]', ["NCT01", "NCT02", "NCT03"]),
+        ("CTRI/2020/05/025013", ["CTRI/2020/05/025013"]),
+        ("donanemab in 2020", []),  # an ID has a letter and a digit
+        ("NCT" + "0" * 70, []),
+    ],
+)
+def test_trial_id_terms(words: str, terms: list[str]) -> None:
+    assert filtering.trial_id_terms(words) == terms
+
+
+@pytest.mark.parametrize(
+    ("words", "prefixes"),
+    [
+        ("nct0443", ["nct0443", "NCT0443"]),
+        ("NCT044", []),  # too short
+        ("NCT0443 NCT0444", []),  # not one term
+        ("NCT0443ü", []),
+    ],
+)
+def test_trial_id_prefixes(words: str, prefixes: list[str]) -> None:
+    assert filtering.trial_id_prefixes(words) == prefixes
+
+
+@pytest.fixture
+def numbered(storage: SQLiteStorage) -> list[TrialRecord]:
+    trials = [
+        replace(minimal_trial(), source_id=source_id, title=f"Study {source_id}", status=status)
+        for source_id, status in [
+            ("NCT04437511", "COMPLETED"),
+            ("NCT04437290", "RECRUITING"),
+            ("NCT04430010", "COMPLETED"),
+            ("NCT05310071", "COMPLETED"),
+            ("ChiCTR2000029308", "COMPLETED"),
+        ]
+    ]
+    storage.upsert_batch(trials)
+    return trials
+
+
+def test_find_by_id_finds_every_id_in_order(
+    storage: SQLiteStorage, numbered: list[TrialRecord]
+) -> None:
+    with storage.read() as reader:
+        found = reader.find_by_id("nct05310071, NCT04437511 chictr2000029308 ChiCTR2000029308")
+
+        assert [(source_id(reader, i), how) for i, how in found] == [
+            ("NCT05310071", "exact"),
+            ("NCT04437511", "exact"),
+            ("ChiCTR2000029308", "exact"),
+        ]
+        assert reader.find_by_id("NCT99999999") == []
+        assert reader.find_by_id("donanemab") == []
+
+
+def test_find_by_id_completes_the_start_of_an_id(
+    storage: SQLiteStorage, numbered: list[TrialRecord]
+) -> None:
+    with storage.read() as reader:
+
+        def found(text: str, **options: Any) -> list[tuple[str, str]]:
+            return [(source_id(reader, i), how) for i, how in reader.find_by_id(text, **options)]
+
+        assert found("nct0443") == [
+            ("NCT04430010", "prefix"),
+            ("NCT04437290", "prefix"),
+            ("NCT04437511", "prefix"),
+        ]
+        assert found("NCT0443", limit=2) == [("NCT04430010", "prefix"), ("NCT04437290", "prefix")]
+        assert found("NCT0443", filter=TrialFilter(status=("RECRUITING",))) == [
+            ("NCT04437290", "prefix")
+        ]
+        assert found("NCT0443751") == [("NCT04437511", "prefix")]
+        # A whole ID is an exact match, and the start of another isn't looked for in a list.
+        assert found("NCT04437511") == [("NCT04437511", "exact")]
+        assert found("NCT0443 NCT05310071") == [("NCT05310071", "exact")]
+
+
+def test_find_ids_reads_small_letters(storage: SQLiteStorage, numbered: list[TrialRecord]) -> None:
+    with storage.read() as reader:
+        assert reader.find_ids(" nct04437511 ") == reader.find_ids("NCT04437511")
+        assert len(reader.find_ids("ChiCTR2000029308")) == 1
+        assert reader.find_ids("nct0443") == []
+
+
+def test_search_text_finds_trials_named_by_id_and_those_that_mention_it(
+    storage: SQLiteStorage, numbered: list[TrialRecord]
+) -> None:
+    extension = replace(
+        minimal_trial(),
+        source_id="NCT06000001",
+        title="Open-label extension",
+        brief_summary="For participants who completed NCT04437511.",
+    )
+    storage.upsert_batch([extension])
+
+    with storage.read() as reader:
+        found = reader.query_trials(TrialFilter(q="nct04437511"), sort=Sort("id", False))
+
+        assert [s.source_id for s in found.items] == ["NCT04437511", "NCT06000001"]
+
+
+def source_id(reader: SQLiteReader, trial_id: int) -> str:
+    return reader.summaries([trial_id])[0].source_id
 
 
 def test_reads_see_one_commit(storage: SQLiteStorage) -> None:

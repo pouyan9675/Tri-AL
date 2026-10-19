@@ -259,17 +259,24 @@ def search(
     request: Request,
     state: State,
     filter: Filter,
-    q: Annotated[str, Query(min_length=1, max_length=500, description="Words to find")],
+    q: Annotated[
+        str, Query(min_length=1, max_length=500, description="Words or trial IDs to find")
+    ],
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     names: Annotated[
         int,
         Query(ge=0, le=50, description="Matching names to include, for words of 3+ letters"),
     ] = 8,
 ) -> Response:
-    """Full-text search, merged across search providers, within the filter.
+    """Trials named by ID, then full-text search merged across search providers, within the
+    filter.
 
-    Each hit has a snippet of the text it matched. ``names`` adds conditions, interventions
-    and sponsors whose names match, for jumping to a filter.
+    Every term with a letter and a digit, such as ``NCT04437511`` or ``nct04437511``, finds
+    the trial with that ID (``id_match`` is ``exact``), so a pasted list of IDs finds each
+    one. A single term of 7 or more characters also finds the trials whose ID starts with it
+    (``prefix``), for finding a trial as its ID is typed. Each hit has a snippet of the text
+    it matched. ``names`` adds conditions, interventions and sponsors whose names match, for
+    jumping to a filter.
     """
     filter = filter.without("q")  # q is the search itself here
     with state.read() as reader:
@@ -280,17 +287,19 @@ def search(
 
         def run() -> bytes:
             conn = reader.connection
+            by_id = dict(reader.find_by_id(q, filter=filter, limit=limit))
             results = {
                 name: provider.search(conn, q, filter, limit)
                 for name, provider in state.providers.items()
             }
-            hits = merge(results, limit)
+            scored: list[tuple[int, float | None]] = [(trial_id, None) for trial_id in by_id]
+            scored += [(hit.id, hit.score) for hit in merge(results, limit) if hit.id not in by_id]
             fts = results.get("fts")
             return orjson.dumps(
                 {
                     "data_version": version,
                     "query": q,
-                    "hits": reader.describe_hits([(hit.id, hit.score) for hit in hits], q),
+                    "hits": reader.describe_hits(scored[:limit], q, by_id),
                     "candidates": None if fts is None else fts.candidates,
                     "capped": any(result.capped for result in results.values()),
                     # Below three letters the name index can't help (a full scan).

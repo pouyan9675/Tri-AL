@@ -12,7 +12,7 @@ background after an update and asks SQLite meanwhile.
 """
 
 import itertools
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from functools import partial
@@ -35,7 +35,7 @@ from tri_al.stats.counts import (
 )
 from tri_al.storage import Cursor, Sort
 from tri_al.storage import tables as t
-from tri_al.storage.filtering import match_expression, where
+from tri_al.storage.filtering import text_query, where
 
 type Mask = npt.NDArray[np.bool_]
 type Ids = npt.NDArray[np.int32]
@@ -333,14 +333,14 @@ class TrialIndex:
         )
 
     def _full_text(self, conn: Connection, q: str) -> Mask:
-        match = match_expression(q)
-        if match is None:
+        query = text_query(q)
+        if query is None:
             return self.present
-        return self._raw_ids(
-            conn, "SELECT rowid FROM trials_fts WHERE trials_fts MATCH ?", (match,)
-        )
+        return self._raw_ids(conn, *query)
 
-    def _raw_ids(self, conn: Connection, sql: str, params: tuple[Any, ...]) -> Mask:
+    def _raw_ids(
+        self, conn: Connection, sql: str, params: tuple[Any, ...] | Mapping[str, Any]
+    ) -> Mask:
         """A mask of the ids ``sql`` selects, read on the sqlite3 cursor in bulk.
 
         A broad text query finds over half a million trials; SQLAlchemy's per-row work

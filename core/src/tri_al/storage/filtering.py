@@ -5,6 +5,7 @@ Fields on ``trials`` itself become comparisons; fields on link tables become
 condition) or test against. Charts and plugins build their queries on ``where``.
 """
 
+import json
 import re
 
 from sqlalchemy import ColumnElement, Integer, Select, column, select, text
@@ -14,6 +15,15 @@ from tri_al.filters import TrialFilter
 from tri_al.storage import tables as t
 
 _WORD = re.compile(r"\w+")
+_TERM = re.compile(r"[^\s,;]+")
+_TERM_EDGES = "\"'`()[]{}<>.:#"
+_LETTER = re.compile(r"[^\W\d_]")
+_DIGIT = re.compile(r"\d")
+
+MAX_ID = 64
+"""The longest term that may be a trial ID."""
+MIN_ID_PREFIX = 7
+"""The shortest start of a trial ID that search completes, such as ``NCT0443``."""
 
 
 def match_expression(words: str, *, any_word: bool = False) -> str | None:
@@ -27,13 +37,57 @@ def match_expression(words: str, *, any_word: bool = False) -> str | None:
     return (" OR " if any_word else " ").join(f'"{word}"' for word in found)
 
 
-def full_text_ids(match: str, *, name: str = "fts_q") -> TextualSelect:
-    """The rowids of the trials an FTS5 ``match`` expression finds."""
-    return (
-        text(f"SELECT rowid FROM trials_fts WHERE trials_fts MATCH :{name}")
-        .bindparams(**{name: match})
-        .columns(column("rowid", Integer))
-    )
+def trial_id_terms(words: str) -> list[str]:
+    """The terms in ``words`` that may be trial IDs, each as typed and in capitals.
+
+    A term is what's between spaces, commas and semicolons, without quotes, brackets or a
+    full stop around it, and it must hold a letter and a digit: ``NCT04437511``,
+    ``nct04437511,`` or ``CTRI/2020/05/025013``. So a pasted list of IDs finds every one.
+    """
+    found: dict[str, None] = {}
+    for term in _TERM.findall(words):
+        term = term.strip(_TERM_EDGES)
+        if len(term) <= MAX_ID and _LETTER.search(term) and _DIGIT.search(term):
+            found[term] = None
+            found[term.upper()] = None
+    return list(found)
+
+
+def trial_id_prefixes(words: str) -> list[str]:
+    """``trial_id_terms`` of ``words`` if it's one term that may start a trial ID, else []."""
+    if len(_TERM.findall(words)) != 1:
+        return []
+    terms = trial_id_terms(words)
+    return terms if terms and terms[0].isascii() and len(terms[0]) >= MIN_ID_PREFIX else []
+
+
+def text_query(q: str) -> tuple[str, dict[str, str]] | None:
+    """SQL for the ids of the trials ``TrialFilter.q`` finds, and its parameters.
+
+    They are the trials whose text has every word, and the trials called by one of its
+    ``trial_id_terms``. None if ``q`` has no words.
+    """
+    match = match_expression(q)
+    if match is None:
+        return None
+    sql = "SELECT rowid FROM trials_fts WHERE trials_fts MATCH :fts_q"
+    params = {"fts_q": match}
+    if ids := trial_id_terms(q):
+        sql += (
+            " UNION SELECT id FROM trials WHERE source_id IN "
+            "(SELECT value FROM json_each(:fts_ids))"
+        )
+        params["fts_ids"] = json.dumps(ids)
+    return sql, params
+
+
+def text_query_ids(q: str) -> TextualSelect | None:
+    """``text_query`` as a select of ``rowid``."""
+    query = text_query(q)
+    if query is None:
+        return None
+    sql, params = query
+    return text(sql).bindparams(**params).columns(column("rowid", Integer))
 
 
 def where(filter: TrialFilter) -> list[ColumnElement[bool]]:
@@ -108,9 +162,9 @@ def where(filter: TrialFilter) -> list[ColumnElement[bool]]:
         )
     clauses += (c.id.in_(subquery) for subquery in linked)
     if filter.q is not None:
-        match = match_expression(filter.q)
-        if match is not None:
-            clauses.append(c.id.in_(full_text_ids(match)))
+        found = text_query_ids(filter.q)
+        if found is not None:
+            clauses.append(c.id.in_(found))
     clauses += (filter_field.clause(values) for filter_field, values in filter.extra)
     return clauses
 

@@ -331,6 +331,11 @@ class StorageContract:
             (TrialFilter(q="music"), ["ISRCTN00000001"]),
             (TrialFilter(q="alzheimer", status=("COMPLETED",)), ["NCT90000002"]),
             (TrialFilter(q="!!"), ["NCT90000001", "NCT90000002", "NCT90000003", "ISRCTN00000001"]),
+            # Trial IDs, in any case and as a list, find those trials; the start of one doesn't.
+            (TrialFilter(q="NCT90000003"), ["NCT90000003"]),
+            (TrialFilter(q="isrctn00000001, (NCT90000002);"), ["NCT90000002", "ISRCTN00000001"]),
+            (TrialFilter(q="NCT90000002", status=("RECRUITING",)), []),
+            (TrialFilter(q="NCT9000000"), []),
         ],
     )
     def test_query_trials_filters(
@@ -477,7 +482,10 @@ class StorageContract:
         hits = storage.search("zebrafish").hits
 
         assert source_ids(hits) == ["NCT2", "NCT1"]
-        assert hits[0].score > hits[1].score
+        first, second = hits[0].score, hits[1].score
+        assert first is not None
+        assert second is not None
+        assert first > second
 
     def test_search_limit(self, storage: Storage, ids: list[int]) -> None:
         assert len(storage.search("alzheimer").hits) == 2

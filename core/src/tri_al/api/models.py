@@ -190,8 +190,14 @@ class SearchHitOut(_Out):
     title: str
     status: str | None
     phase: str | None
-    score: float
+    score: float | None = Field(
+        description="Higher is better, among text matches; null for an ID match."
+    )
     snippet: list[SnippetPartOut]
+    id_match: Literal["exact", "prefix"] | None = Field(
+        description="Found by its ID (`exact`) or the start of it (`prefix`), before every "
+        "text match; null for a text match."
+    )
 
 
 class NameHitOut(_Out):

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { ArrowUpRight, Copy, MapPin, UserRound, Users } from "lucide-react";
+import { useEffect } from "react";
 import type { Change, TrialDetail } from "@/api/client";
 import { changesQuery, trialQuery } from "@/api/queries";
 import { ErrorState } from "@/components/route-states";
@@ -30,6 +31,18 @@ export function TrialPage() {
   const navigate = route.useNavigate();
   const trial = useQuery(trialQuery(sourceId));
   const changes = useQuery(changesQuery(sourceId));
+  // The API finds an ID in small letters too (/trials/nct04437511); show the trial's own.
+  const canonical = trial.data?.source_id;
+  useEffect(() => {
+    if (canonical && canonical !== sourceId) {
+      void navigate({
+        to: "/trials/$sourceId",
+        params: { sourceId: canonical },
+        search: (prev) => prev,
+        replace: true,
+      });
+    }
+  }, [canonical, sourceId, navigate]);
 
   if (trial.isError) {
     return <ErrorState error={trial.error} onRetry={() => void trial.refetch()} />;

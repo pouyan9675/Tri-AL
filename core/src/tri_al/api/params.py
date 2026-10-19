@@ -54,7 +54,10 @@ def trial_filter(
         str | None, Query(description="`from..to`, either end open: `100..500`, `1000..`")
     ] = None,
     has_results: bool | None = None,
-    q: Annotated[str | None, Query(description="Full-text: every word must match")] = None,
+    q: Annotated[
+        str | None,
+        Query(description="Full-text: every word must match; or trial IDs, which find those"),
+    ] = None,
 ) -> TrialFilter:
     fields = request.app.state.tri_al.filter_fields
     extra = tuple(

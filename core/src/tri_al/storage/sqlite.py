@@ -22,12 +22,14 @@ from sqlalchemy import (
     Select,
     Table,
     TextClause,
+    and_,
     bindparam,
     column,
     delete,
     func,
     insert,
     literal,
+    or_,
     select,
     table,
     text,
@@ -54,6 +56,7 @@ from tri_al.storage import tables as t
 from tri_al.storage.base import (
     NEWEST_FIRST,
     Cursor,
+    IdMatch,
     NameHit,
     NameKind,
     Refreshed,
@@ -73,7 +76,13 @@ from tri_al.storage.engine import (
     create_engine,
     raw_connection,
 )
-from tri_al.storage.filtering import match_expression, matching_ids, where
+from tri_al.storage.filtering import (
+    match_expression,
+    matching_ids,
+    trial_id_prefixes,
+    trial_id_terms,
+    where,
+)
 from tri_al.storage.migrations import (
     Migration,
     MigrationCallback,
@@ -362,13 +371,20 @@ class SQLiteReader:
         return _find_trial(self._conn, source, source_id, self._decoder, raw=raw)
 
     def find_ids(self, source_id: str) -> list[tuple[str, int]]:
-        """``(source, id)`` of every trial called ``source_id``, one per registry at most."""
-        stmt = (
-            select(t.trials.c.source, t.trials.c.id)
-            .where(t.trials.c.source_id == source_id)
-            .order_by(t.trials.c.source)
-        )
-        return [(source, id_) for source, id_ in self._conn.execute(stmt)]
+        """``(source, id)`` of every trial called ``source_id``, one per registry at most.
+
+        An id that matches none is tried in capitals, so ``nct04437511`` finds NCT04437511.
+        """
+        wanted = source_id.strip()
+        for candidate in dict.fromkeys((wanted, wanted.upper())):
+            stmt = (
+                select(t.trials.c.source, t.trials.c.id)
+                .where(t.trials.c.source_id == candidate)
+                .order_by(t.trials.c.source)
+            )
+            if found := [(source, id_) for source, id_ in self._conn.execute(stmt)]:
+                return found
+        return []
 
     def content_hashes(
         self, source: str, source_ids: Iterable[str] | None = None
@@ -417,10 +433,23 @@ class SQLiteReader:
         """``rank_matches`` in this read transaction."""
         return rank_matches(self._conn, text, filter=filter, limit=limit)
 
+    def find_by_id(
+        self, text: str, *, filter: TrialFilter = EVERY_TRIAL, limit: int = 20
+    ) -> list[tuple[int, IdMatch]]:
+        """``id_matches`` in this read transaction."""
+        return id_matches(self._conn, text, filter=filter, limit=limit)
+
     def describe_hits(
-        self, scored: Sequence[tuple[int, float]], text: str | None
+        self,
+        scored: Sequence[tuple[int, float | None]],
+        text: str | None,
+        id_matches: Mapping[int, IdMatch] | None = None,
     ) -> list[SearchHit]:
-        """Hits for ``(id, score)`` pairs, in that order, with snippets matching ``text``."""
+        """Hits for ``(id, score)`` pairs, in that order, with snippets matching ``text``.
+
+        ``id_matches`` says which trials were found by their ID, and how.
+        """
+        id_matches = id_matches or {}
         ids = [trial_id for trial_id, _ in scored]
         if not ids:
             return []
@@ -444,6 +473,7 @@ class SQLiteReader:
                 rows[trial_id].phase,
                 score,
                 snippets.get(trial_id, ()),
+                id_matches.get(trial_id),
             )
             for trial_id, score in scored
             if trial_id in rows
@@ -1413,6 +1443,44 @@ def rank_matches(
     )
     rows = conn.execute(stmt).all()
     return [(rowid, -rank) for rowid, rank, _ in rows], rows[0][2] if rows else 0
+
+
+def id_matches(
+    conn: Connection, text: str, *, filter: TrialFilter = EVERY_TRIAL, limit: int = 20
+) -> list[tuple[int, IdMatch]]:
+    """Up to ``limit`` trials that ``text`` names by ID, as ``(id, how)``, in ``filter``.
+
+    First the trials called by one of its ``trial_id_terms`` (``exact``), in the order they
+    come in ``text``. Then, if ``text`` is one term (``trial_id_prefixes``), the trials whose
+    ID starts with it (``prefix``), in ID order, so search finds trials as an ID is typed.
+    """
+    c = t.trials.c
+    found: dict[int, IdMatch] = {}
+    if terms := trial_id_terms(text):
+        rows = conn.execute(
+            select(c.id, c.source, c.source_id).where(_in(c.source_id, terms), *where(filter))
+        ).all()
+        order = {term: position for position, term in enumerate(terms)}
+        for row in sorted(rows, key=lambda row: (order[row.source_id], row.source, row.id)):
+            found.setdefault(row.id, "exact")
+    prefixes = trial_id_prefixes(text)
+    if prefixes and len(found) < limit:
+        # In BINARY order, what starts with a prefix sorts before it with its last letter raised.
+        starts = or_(
+            *(
+                and_(c.source_id > prefix, c.source_id < prefix[:-1] + chr(ord(prefix[-1]) + 1))
+                for prefix in prefixes
+            )
+        )
+        stmt = (
+            select(c.id)
+            .where(starts, *where(filter))
+            .order_by(c.source_id, c.id)
+            .limit(limit - len(found))
+        )
+        for (trial_id,) in conn.execute(stmt):
+            found.setdefault(trial_id, "prefix")
+    return list(found.items())[:limit]
 
 
 # --- snippets -----------------------------------------------------------------------------
