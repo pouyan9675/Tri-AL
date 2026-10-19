@@ -188,3 +188,47 @@ test("a new data version over the event stream refreshes the page", async ({ pag
   await expect(page.getByText("Data updated just now").first()).toBeVisible();
   await expect(page.getByTestId("data-status")).toHaveText("Data updated just now");
 });
+
+test("the conditions section analyses a term picked by name", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  const overview = await api<{ trials: number; term: { term: string } }>(
+    page,
+    "/api/terms/condition/D000544",
+  );
+
+  await page.goto("/analysis/conditions");
+  await expect(page.getByTestId("term-suggestions")).toBeVisible();
+  await page.getByRole("combobox", { name: "Choose a condition" }).click();
+  await page.getByPlaceholder(/Search conditions/).fill("alzheimer disease");
+  await page.getByRole("option", { name: /^Alzheimer Disease D000544/ }).click();
+  await expect(page).toHaveURL(/\/analysis\/conditions\?term=D000544$/);
+
+  const header = page.getByTestId("term-header");
+  await expect(header.getByRole("heading", { name: overview.term.term })).toBeVisible();
+  await expect(header).toContainText(number(overview.trials));
+  // Every analysis loads; the first after a start can wait for the index and the vectors.
+  for (const id of [
+    "term-timeline",
+    "term-readouts",
+    "term-related",
+    "term-network",
+    "term-pipeline",
+    "term-attrition",
+    "term-durations",
+    "term-profile",
+    "term-themes",
+    "term-similar",
+  ]) {
+    await expect(page.getByTestId(id)).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
+  }
+  await expect(page.getByTestId("related-interventions").getByRole("link").first()).toBeVisible();
+
+  // A related intervention opens in its own section, with its own analyses.
+  await page.getByTestId("related-interventions").getByRole("link").first().click();
+  await expect(page).toHaveURL(/\/analysis\/interventions\?term=/);
+  await expect(page.getByTestId("term-header")).toBeVisible();
+  expect(errors).toEqual([]);
+});

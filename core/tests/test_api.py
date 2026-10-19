@@ -386,6 +386,17 @@ def test_the_openapi_schema_names_every_operation(client: TestClient) -> None:
         "updateAiSettings",
         "listAiModels",
         "annotateTrial",
+        "findTerms",
+        "getTerm",
+        "getTermTimeline",
+        "getTermReadouts",
+        "getTermRelated",
+        "getTermPipeline",
+        "getTermAttrition",
+        "getTermDurations",
+        "getTermProfile",
+        "getTermThemes",
+        "getTermSimilar",
     }
     assert "TrialPageOut" in schema["components"]["schemas"]
     params = {p["name"] for p in schema["paths"]["/api/trials"]["get"]["parameters"]}
@@ -432,6 +443,7 @@ def test_meta_sends_the_labels_of_coded_fields(client: TestClient) -> None:
         "time_perspective",
         "masking",
         "masked_role",
+        "phase_group",
     }
     assert meta.labels["masking"]["QUADRUPLE"] == "Quadruple-blind"
 

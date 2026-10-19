@@ -21,6 +21,7 @@ from tri_al.plugins import LoadedPlugins
 from tri_al.search import FullTextProvider, SearchProvider
 from tri_al.stats import CORE_FACETS, Chart, Facet, StatsEngine
 from tri_al.storage import SQLiteReader, SQLiteStorage, open_app_db
+from tri_al.terms import TermVectorCache
 
 
 @dataclass
@@ -39,6 +40,7 @@ class ApiState:
     ai: AiService
     use_index: bool = True
     build: str = ""
+    term_vectors: TermVectorCache = field(default_factory=TermVectorCache)
     _storage: SQLiteStorage | None = None
     _stats: StatsEngine | None = None
     _lock: threading.Lock = field(default_factory=threading.Lock)

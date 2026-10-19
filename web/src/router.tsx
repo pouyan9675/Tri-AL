@@ -17,11 +17,12 @@ import {
   onPage,
   trialQuery,
 } from "@/api/queries";
+import { termQuery } from "@/api/terms";
 import { AppShell } from "@/components/app-shell";
 import { NotFound, RouteError } from "@/components/route-states";
 import { parseFilter, parseTrialsSearch } from "@/lib/filters";
 import { parseSearch, stringifySearch } from "@/lib/search-params";
-import { parseLinkingSearch } from "@/pages/analysis/sections";
+import { parseLinkingSearch, parseTermSearch } from "@/pages/analysis/sections";
 
 export type RouterContext = { queryClient: QueryClient };
 
@@ -93,18 +94,29 @@ export const analysisSearchRoute = createRoute({
   component: emptySection,
 });
 
+// A MeSH term in depth (`pages/analysis/terms`); its first request starts with the chunk.
 export const analysisConditionsRoute = createRoute({
   getParentRoute: () => analysisRoute,
   path: "conditions",
   staticData: { title: "Conditions" },
-  component: emptySection,
+  validateSearch: parseTermSearch,
+  loaderDeps: ({ search }) => search,
+  loader: ({ context: { queryClient }, deps: { term, ...filter } }) => {
+    if (term) void queryClient.prefetchQuery(termQuery("condition", term, filter));
+  },
+  component: lazyRouteComponent(() => import("@/pages/analysis/terms"), "ConditionsSection"),
 });
 
 export const analysisInterventionsRoute = createRoute({
   getParentRoute: () => analysisRoute,
   path: "interventions",
   staticData: { title: "Interventions" },
-  component: emptySection,
+  validateSearch: parseTermSearch,
+  loaderDeps: ({ search }) => search,
+  loader: ({ context: { queryClient }, deps: { term, ...filter } }) => {
+    if (term) void queryClient.prefetchQuery(termQuery("intervention", term, filter));
+  },
+  component: lazyRouteComponent(() => import("@/pages/analysis/terms"), "InterventionsSection"),
 });
 
 export const trialsRoute = createRoute({

@@ -39,9 +39,9 @@ from sqlalchemy import (
 from tri_al import embeddings
 from tri_al.filters import TrialFilter
 from tri_al.stats import ChartContext, Rows
+from tri_al.stats.methods import months_before
 from tri_al.storage import Migration, filtering
 from tri_al.storage import tables as t
-from tri_al_insights.trends import months_before
 
 MIGRATIONS = (
     Migration(

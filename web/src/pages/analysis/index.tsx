@@ -3,7 +3,8 @@
  * each its own route under `/analysis`. All take the same filter. The landscape section is
  * drawn from chart specs (those whose `page` is "analysis"), so plugins add analyses to it
  * without front-end code; it starts with the research landscape in 3-D. Trial linking is
- * `linking.tsx`; the other sections are still empty.
+ * `linking.tsx`, Conditions and Interventions are `terms/` (one MeSH term in depth), and
+ * Advanced search is still empty.
  */
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link, Outlet, useRouterState } from "@tanstack/react-router";

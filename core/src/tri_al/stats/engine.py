@@ -155,6 +155,10 @@ class UnknownChart(LookupError):
     pass
 
 
+class IndexUnavailable(RuntimeError):
+    """The trial index for a data version isn't ready (or the data moved on meanwhile)."""
+
+
 class StatsEngine:
     """Charts, facets, counts and trial pages for one API worker.
 
@@ -225,6 +229,24 @@ class StatsEngine:
                 timeout,
             )
             return self._index
+
+    def full_index(self, reader: SQLiteReader, timeout: float = 60.0) -> TrialIndex:
+        """The index for the reader's data version, waiting for it if it's being built.
+
+        For analyses only the index answers (``tri_al.terms``). Without an index kept
+        (``use_index=False``, in tests and benchmarks) it builds one for the data version.
+        Raises ``IndexUnavailable`` if the index isn't ready in time, or the data changed.
+        """
+        version = reader.data_version()
+        if not self.use_index:
+            built: TrialIndex = self.cached(
+                reader, ("index",), lambda: TrialIndex.build(reader.connection, version)
+            )
+            return built
+        index = self.wait_for_index(version, timeout)
+        if index is None or index.data_version != version:
+            raise IndexUnavailable(version)
+        return index
 
     def _build(self) -> None:
         try:

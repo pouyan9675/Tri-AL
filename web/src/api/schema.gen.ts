@@ -390,6 +390,240 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Findterms
+         * @description MeSH terms of one kind whose name contains ``q`` (or whose code is ``q``), best first:
+         *     the exact name, then names starting with it, then a word starting with it, each by
+         *     trials. Without ``q``, the terms most trials are tagged with.
+         */
+        get: operations["findTerms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terms/{kind}/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Getterm
+         * @description The term in brief: its trials, narrower terms, statuses, sponsors and reach.
+         */
+        get: operations["getTerm"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terms/{kind}/{code}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gettermtimeline
+         * @description Trials started per year by phase group, the term's share of all trials started, lead
+         *     sponsors new to it, and its momentum: its share of newly posted trials in the last 3, 6
+         *     and 12 months against the 12 months before each (a two-sided exact binomial test).
+         */
+        get: operations["getTermTimeline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terms/{kind}/{code}/readouts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gettermreadouts
+         * @description Active trials by when their primary completion is due over the next 24 months: when
+         *     their main results come.
+         */
+        get: operations["getTermReadouts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terms/{kind}/{code}/related": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gettermrelated
+         * @description Conditions and interventions tagged with the term's trials more often than with the
+         *     filter's other trials: lift (smoothed), and an exact test corrected for the terms tested.
+         *     The network links the most related terms by the trials they share, in communities.
+         */
+        get: operations["getTermRelated"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terms/{kind}/{code}/pipeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gettermpipeline
+         * @description The other kind's terms in the term's trials by phase (a condition's interventions, an
+         *     intervention's conditions), and the term's trials by phase and status.
+         */
+        get: operations["getTermPipeline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terms/{kind}/{code}/attrition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gettermattrition
+         * @description How often the term's trials stop early against the filter's others, phase by phase,
+         *     and the reasons they give, sorted into kinds by their words.
+         */
+        get: operations["getTermAttrition"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terms/{kind}/{code}/durations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gettermdurations
+         * @description Kaplan-Meier curves: months from start to primary completion by phase group, and from
+         *     completion to posted results, for the term's trials and the filter's others.
+         */
+        get: operations["getTermDurations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terms/{kind}/{code}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gettermprofile
+         * @description Design, population and scale against the filter's other trials, with the baseline
+         *     weighted to the term's mix of phases, and standardized differences.
+         */
+        get: operations["getTermProfile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terms/{kind}/{code}/themes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gettermthemes
+         * @description Sub-themes: the term's trials (up to 4,000) clustered by their vectors, laid out in
+         *     two dimensions and named by their titles' distinctive words.
+         */
+        get: operations["getTermThemes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terms/{kind}/{code}/similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gettermsimilar
+         * @description Terms whose trials read most like the term's: the nearest average trial vectors,
+         *     across the whole registry (there's no filter). The first request after a new data
+         *     version builds every term's average, which takes a few seconds.
+         */
+        get: operations["getTermSimilar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events": {
         parameters: {
             query?: never;
@@ -645,6 +879,34 @@ export interface components {
              */
             interventions: string[];
         };
+        /** BenchmarkOut */
+        BenchmarkOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Section */
+            section: string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "share" | "years" | "participants" | "sites";
+            /** Value */
+            value: number | null;
+            /**
+             * Baseline
+             * @description The filter's other trials, with its phase mix.
+             */
+            baseline: number | null;
+            /**
+             * Difference
+             * @description Standardized: 0.2 small, 0.5 medium, 0.8 large.
+             */
+            difference: number | null;
+            /** Trials */
+            trials: number;
+        };
         /** ChangeOut */
         ChangeOut: {
             /** Run Id */
@@ -708,6 +970,24 @@ export interface components {
             /** Precomputed */
             precomputed: boolean;
         };
+        /** CurveOut */
+        CurveOut: {
+            /** Group */
+            group: string;
+            /** Trials */
+            trials: number;
+            /** Events */
+            events: number;
+            /**
+             * Median
+             * @description Months.
+             */
+            median: number | null;
+            /** Months */
+            months: number[];
+            /** Values */
+            values: number[];
+        };
         /** DashboardOut */
         DashboardOut: {
             /** Data Version */
@@ -716,6 +996,17 @@ export interface components {
             charts: components["schemas"]["ChartSpecOut"][];
             /** Facets */
             facets: components["schemas"]["FacetSpecOut"][];
+        };
+        /** EnrollmentBinOut */
+        EnrollmentBinOut: {
+            /** Low */
+            low: number;
+            /** High */
+            high: number | null;
+            /** Share */
+            share: number;
+            /** Baseline */
+            baseline: number;
         };
         /** ErrorOut */
         ErrorOut: {
@@ -756,6 +1047,23 @@ export interface components {
             facets: {
                 [key: string]: components["schemas"]["FacetValueOut"][];
             };
+        };
+        /** FunnelRowOut */
+        FunnelRowOut: {
+            /** Phase */
+            phase: string | null;
+            /** Trials */
+            trials: number;
+            /** Active */
+            active: number;
+            /** Completed */
+            completed: number;
+            /** Stopped */
+            stopped: number;
+            /** Unknown */
+            unknown: number;
+            /** Other */
+            other: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -946,7 +1254,7 @@ export interface components {
             search_candidates: number;
             /**
              * Labels
-             * @description Display names of coded fields: status, phase, study_type, sponsor_class, intervention_type, primary_purpose, arm_type, allocation, intervention_model, observational_model, time_perspective, masking and masked_role. A code without one is shown as itself.
+             * @description Display names of coded fields: status, phase, study_type, sponsor_class, intervention_type, primary_purpose, arm_type, allocation, intervention_model, observational_model, time_perspective, masking, masked_role and phase_group (the phase groups term analyses count by, in order). A code without one is shown as itself.
              */
             labels: {
                 [key: string]: {
@@ -961,6 +1269,52 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** MomentumOut */
+        MomentumOut: {
+            /** Months */
+            months: number;
+            /**
+             * Since
+             * Format: date
+             */
+            since: string;
+            /**
+             * Until
+             * Format: date
+             */
+            until: string;
+            /**
+             * Trials
+             * @description First posted in the window.
+             */
+            trials: number;
+            /**
+             * Baseline
+             * @description First posted in the 12 months before.
+             */
+            baseline: number;
+            /** Expected */
+            expected: number;
+            /**
+             * Growth
+             * @description Its share in the window over its share before, smoothed.
+             */
+            growth: number;
+            /** Raw Growth */
+            raw_growth: number | null;
+            /** P */
+            p: number;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "rising" | "falling" | "steady";
+        };
         /** NameHitOut */
         NameHitOut: {
             /**
@@ -972,6 +1326,43 @@ export interface components {
             id: number;
             /** Name */
             name: string;
+        };
+        /** NetworkEdgeOut */
+        NetworkEdgeOut: {
+            /**
+             * Source
+             * @description Index into nodes.
+             */
+            source: number;
+            /** Target */
+            target: number;
+            /** Trials */
+            trials: number;
+            /** Jaccard */
+            jaccard: number;
+        };
+        /** NetworkNodeOut */
+        NetworkNodeOut: {
+            /** Code */
+            code: string;
+            /** Term */
+            term: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "condition" | "intervention";
+            /** Trials */
+            trials: number;
+            /** Lift */
+            lift: number | null;
+            /**
+             * Group
+             * @description Its community; -1 for the term itself.
+             */
+            group: number;
+            /** Center */
+            center: boolean;
         };
         /** OutcomeOut */
         OutcomeOut: {
@@ -998,6 +1389,31 @@ export interface components {
              * @description The first `limit`, most terms shared first.
              */
             trials: components["schemas"]["LinkedTrialOut"][];
+        };
+        /** PipelineRowOut */
+        PipelineRowOut: {
+            /** Code */
+            code: string;
+            /** Term */
+            term: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "condition" | "intervention";
+            /** Trials */
+            trials: number;
+            /**
+             * Phases
+             * @description Trials in each of `phases`.
+             */
+            phases: number[];
+            /** Active */
+            active: number;
+            /** Highest */
+            highest: string | null;
+            /** Last Start */
+            last_start: string | null;
         };
         /** PluginChangedOut */
         PluginChangedOut: {
@@ -1048,6 +1464,85 @@ export interface components {
         PluginsOut: {
             /** Plugins */
             plugins: components["schemas"]["PluginOut"][];
+        };
+        /** QuarterCountOut */
+        QuarterCountOut: {
+            /** Quarter */
+            quarter: string;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /** Trials */
+            trials: number;
+            /** Phases */
+            phases: number[];
+        };
+        /** ReadoutOut */
+        ReadoutOut: {
+            trial: components["schemas"]["TrialSummaryOut"];
+            /**
+             * Primary Completion
+             * Format: date
+             */
+            primary_completion: string;
+            /** Estimated */
+            estimated: boolean;
+        };
+        /** ReasonExampleOut */
+        ReasonExampleOut: {
+            /** Source Id */
+            source_id: string;
+            /** Reason */
+            reason: string;
+        };
+        /** RelatedTermOut */
+        RelatedTermOut: {
+            /** Code */
+            code: string;
+            /** Term */
+            term: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "condition" | "intervention";
+            /** Trials */
+            trials: number;
+            /** Share */
+            share: number;
+            /**
+             * Elsewhere
+             * @description Share of the filter's other trials tagged with it.
+             */
+            elsewhere: number;
+            /**
+             * Lift
+             * @description How many times more common with the term, smoothed.
+             */
+            lift: number;
+            /** P */
+            p: number;
+            /**
+             * Q
+             * @description p corrected for every term tested (Benjamini-Hochberg).
+             */
+            q: number;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+        };
+        /** ResultsShareOut */
+        ResultsShareOut: {
+            /** Months */
+            months: number;
+            /** Share */
+            share: number | null;
+            /** Baseline */
+            baseline: number | null;
         };
         /** RunOut */
         RunOut: {
@@ -1122,6 +1617,27 @@ export interface components {
             /** Label */
             label: string;
         };
+        /** SimilarTermOut */
+        SimilarTermOut: {
+            /** Code */
+            code: string;
+            /** Term */
+            term: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "condition" | "intervention";
+            /** Similarity */
+            similarity: number;
+            /** Trials */
+            trials: number;
+            /**
+             * Shared
+             * @description Trials tagged with both; 0: never tagged together.
+             */
+            shared: number;
+        };
         /** SnippetPartOut */
         SnippetPartOut: {
             /** Text */
@@ -1150,6 +1666,380 @@ export interface components {
             rows: {
                 [key: string]: unknown;
             }[];
+        };
+        /** StopRateOut */
+        StopRateOut: {
+            /** Group */
+            group: string;
+            /** Closed */
+            closed: number;
+            /** Stopped */
+            stopped: number;
+            /** Rate */
+            rate: number | null;
+            /** Baseline Closed */
+            baseline_closed: number;
+            /** Baseline Rate */
+            baseline_rate: number | null;
+            /** Ratio */
+            ratio: number | null;
+            /** P */
+            p: number;
+            /** Q */
+            q: number;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+        };
+        /** StopReasonOut */
+        StopReasonOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Trials */
+            trials: number;
+            /** Examples */
+            examples: components["schemas"]["ReasonExampleOut"][];
+        };
+        /** TermAttritionOut */
+        TermAttritionOut: {
+            /** Data Version */
+            data_version: number;
+            /** Phases */
+            phases: components["schemas"]["StopRateOut"][];
+            /** Observed */
+            observed: number;
+            /**
+             * Expected
+             * @description Stopped trials at the baseline's rates, by phase.
+             */
+            expected: number;
+            /** Ratio */
+            ratio: number | null;
+            /** P */
+            p: number;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /** Stopped */
+            stopped: number;
+            /**
+             * Read
+             * @description Stopped trials whose reasons were read (at most 2,000).
+             */
+            read: number;
+            /** Stated */
+            stated: number;
+            /** Reasons */
+            reasons: components["schemas"]["StopReasonOut"][];
+        };
+        /** TermCountOut */
+        TermCountOut: {
+            /** Code */
+            code: string;
+            /** Term */
+            term: string;
+            /** Trials */
+            trials: number;
+        };
+        /** TermDurationsOut */
+        TermDurationsOut: {
+            /** Data Version */
+            data_version: number;
+            /**
+             * Completion
+             * @description Share still running by months since start, by phase group, then all.
+             */
+            completion: components["schemas"]["CurveOut"][];
+            /** Completion Baseline */
+            completion_baseline: components["schemas"]["CurveOut"][];
+            /** @description Share with results by months since completion. */
+            results: components["schemas"]["CurveOut"];
+            results_baseline: components["schemas"]["CurveOut"];
+            /** Results At */
+            results_at: components["schemas"]["ResultsShareOut"][];
+        };
+        /** TermOverviewOut */
+        TermOverviewOut: {
+            /** Data Version */
+            data_version: number;
+            term: components["schemas"]["TermRefOut"];
+            /**
+             * Trials
+             * @description The term's trials within the filter.
+             */
+            trials: number;
+            /**
+             * Registry Trials
+             * @description The term's trials without the filter.
+             */
+            registry_trials: number;
+            /**
+             * Within
+             * @description Trials within the filter.
+             */
+            within: number;
+            /**
+             * Direct
+             * @description The term's trials tagged with it, not only a narrower term.
+             */
+            direct: number;
+            /**
+             * Narrower
+             * @description Narrower terms, with trials in the filter.
+             */
+            narrower: components["schemas"]["TermCountOut"][];
+            /** Active */
+            active: number;
+            /** Completed */
+            completed: number;
+            /** Stopped */
+            stopped: number;
+            /** With Results */
+            with_results: number;
+            /** Lead Sponsors */
+            lead_sponsors: number;
+            /**
+             * Industry
+             * @description Trials with an industry lead sponsor.
+             */
+            industry: number;
+            /** Countries */
+            countries: number;
+            /** First Start */
+            first_start: string | null;
+            /**
+             * As Of
+             * Format: date
+             * @description The latest update of any trial: the data's today.
+             */
+            as_of: string;
+        };
+        /** TermPipelineOut */
+        TermPipelineOut: {
+            /** Data Version */
+            data_version: number;
+            /**
+             * Kind
+             * @description The rows' kind: the other kind than the term's.
+             * @enum {string}
+             */
+            kind: "condition" | "intervention";
+            /** Phases */
+            phases: string[];
+            /** Rows */
+            rows: components["schemas"]["PipelineRowOut"][];
+            /** Funnel */
+            funnel: components["schemas"]["FunnelRowOut"][];
+        };
+        /** TermProfileOut */
+        TermProfileOut: {
+            /** Data Version */
+            data_version: number;
+            /** Trials */
+            trials: number;
+            /** Baseline Trials */
+            baseline_trials: number;
+            /** Rows */
+            rows: components["schemas"]["BenchmarkOut"][];
+            /** Enrollment */
+            enrollment: components["schemas"]["EnrollmentBinOut"][];
+        };
+        /** TermReadoutsOut */
+        TermReadoutsOut: {
+            /** Data Version */
+            data_version: number;
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /**
+             * Until
+             * Format: date
+             */
+            until: string;
+            /**
+             * Total
+             * @description Active trials whose primary completion is due by `until`.
+             */
+            total: number;
+            /**
+             * Overdue
+             * @description Active trials whose primary completion date has passed.
+             */
+            overdue: number;
+            /** Quarters */
+            quarters: components["schemas"]["QuarterCountOut"][];
+            /**
+             * Trials
+             * @description The soonest 200.
+             */
+            trials: components["schemas"]["ReadoutOut"][];
+        };
+        /** TermRefOut */
+        TermRefOut: {
+            /**
+             * Code
+             * @description MeSH descriptor or supplementary concept code.
+             */
+            code: string;
+            /** Term */
+            term: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "condition" | "intervention";
+        };
+        /** TermRelatedOut */
+        TermRelatedOut: {
+            /** Data Version */
+            data_version: number;
+            /** Trials */
+            trials: number;
+            /**
+             * Others
+             * @description The filter's other trials, the baseline.
+             */
+            others: number;
+            /** Tested */
+            tested: number;
+            /** Conditions */
+            conditions: components["schemas"]["RelatedTermOut"][];
+            /** Interventions */
+            interventions: components["schemas"]["RelatedTermOut"][];
+            /**
+             * Nodes
+             * @description The term first.
+             */
+            nodes: components["schemas"]["NetworkNodeOut"][];
+            /** Edges */
+            edges: components["schemas"]["NetworkEdgeOut"][];
+        };
+        /** TermSimilarOut */
+        TermSimilarOut: {
+            /** Data Version */
+            data_version: number;
+            /** Embedded */
+            embedded: number;
+            /** Same */
+            same: components["schemas"]["SimilarTermOut"][];
+            /** Other */
+            other: components["schemas"]["SimilarTermOut"][];
+        };
+        /** TermThemesOut */
+        TermThemesOut: {
+            /** Data Version */
+            data_version: number;
+            /** Trials */
+            trials: number;
+            /** Embedded */
+            embedded: number;
+            /** Sampled */
+            sampled: number;
+            /** Silhouette */
+            silhouette: number | null;
+            /**
+             * Themes
+             * @description Largest first; empty under 30 trials with vectors.
+             */
+            themes: components["schemas"]["ThemeOut"][];
+            /** Points */
+            points: components["schemas"]["ThemePointOut"][];
+        };
+        /** TermTimelineOut */
+        TermTimelineOut: {
+            /** Data Version */
+            data_version: number;
+            /** Years */
+            years: components["schemas"]["YearCountOut"][];
+            /**
+             * Partial
+             * @description Whether the last year isn't over.
+             */
+            partial: boolean;
+            /** Momentum */
+            momentum: components["schemas"]["MomentumOut"][];
+        };
+        /** TermsOut */
+        TermsOut: {
+            /** Data Version */
+            data_version: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "condition" | "intervention";
+            /**
+             * Terms
+             * @description Trials count those tagged with a narrower term too, in the whole registry.
+             */
+            terms: components["schemas"]["TermCountOut"][];
+        };
+        /** ThemeOut */
+        ThemeOut: {
+            /** Cluster */
+            cluster: number;
+            /** Label */
+            label: string;
+            /** Words */
+            words: string[];
+            /** Terms */
+            terms: components["schemas"]["ThemeTermOut"][];
+            /** Size */
+            size: number;
+            /** Share */
+            share: number;
+            /**
+             * Growth
+             * @description Its share of trials started in 3 years over before.
+             */
+            growth: number;
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /** Examples */
+            examples: components["schemas"]["ThemeTrialOut"][];
+        };
+        /** ThemePointOut */
+        ThemePointOut: {
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+            /** Cluster */
+            cluster: number;
+            /** Source Id */
+            source_id: string;
+            /** Title */
+            title: string;
+        };
+        /** ThemeTermOut */
+        ThemeTermOut: {
+            /** Code */
+            code: string;
+            /** Term */
+            term: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "condition" | "intervention";
+        };
+        /** ThemeTrialOut */
+        ThemeTrialOut: {
+            /** Source Id */
+            source_id: string;
+            /** Title */
+            title: string;
         };
         /** TrialDetailOut */
         TrialDetailOut: {
@@ -1325,6 +2215,31 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** YearCountOut */
+        YearCountOut: {
+            /** Year */
+            year: number;
+            /**
+             * Trials
+             * @description Started that year.
+             */
+            trials: number;
+            /**
+             * Phases
+             * @description By phase group, in the order of meta labels.
+             */
+            phases: number[];
+            /**
+             * Share
+             * @description Of the filter's trials started that year.
+             */
+            share: number;
+            /**
+             * New Sponsors
+             * @description Lead sponsors whose first trial of it started then.
+             */
+            new_sponsors: number;
         };
     };
     responses: never;
@@ -2239,6 +3154,856 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description There's no data yet. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    findTerms: {
+        parameters: {
+            query: {
+                /** @description condition or intervention */
+                kind: "condition" | "intervention";
+                /** @description Part of a name, or a code */
+                q?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description There's no data yet. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    getTerm: {
+        parameters: {
+            query?: {
+                /** @description Overall status codes: RECRUITING, ... */
+                status?: string[] | null;
+                /** @description PHASE1, PHASE2_PHASE3, NA, ... */
+                phase?: string[] | null;
+                /** @description INTERVENTIONAL, ... */
+                study_type?: string[] | null;
+                /** @description Condition names */
+                conditions?: string[] | null;
+                /** @description MeSH descriptor codes; narrower terms match too */
+                mesh?: string[] | null;
+                /** @description Intervention names */
+                interventions?: string[] | null;
+                /** @description DRUG, DEVICE, ... */
+                intervention_types?: string[] | null;
+                /** @description Lead or collaborator names */
+                sponsors?: string[] | null;
+                /** @description The lead sponsor's class: INDUSTRY, NIH, ... */
+                sponsor_class?: string[] | null;
+                /** @description ISO 3166-1 alpha-2 codes */
+                countries?: string[] | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                start?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                completion?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                first_posted?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                last_update?: string | null;
+                /** @description `from..to`, either end open: `100..500`, `1000..` */
+                enrollment?: string | null;
+                has_results?: boolean | null;
+                /** @description Full-text: every word must match; or trial IDs, which find those */
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                kind: "condition" | "intervention";
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermOverviewOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description There's no data yet. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    getTermTimeline: {
+        parameters: {
+            query?: {
+                /** @description Overall status codes: RECRUITING, ... */
+                status?: string[] | null;
+                /** @description PHASE1, PHASE2_PHASE3, NA, ... */
+                phase?: string[] | null;
+                /** @description INTERVENTIONAL, ... */
+                study_type?: string[] | null;
+                /** @description Condition names */
+                conditions?: string[] | null;
+                /** @description MeSH descriptor codes; narrower terms match too */
+                mesh?: string[] | null;
+                /** @description Intervention names */
+                interventions?: string[] | null;
+                /** @description DRUG, DEVICE, ... */
+                intervention_types?: string[] | null;
+                /** @description Lead or collaborator names */
+                sponsors?: string[] | null;
+                /** @description The lead sponsor's class: INDUSTRY, NIH, ... */
+                sponsor_class?: string[] | null;
+                /** @description ISO 3166-1 alpha-2 codes */
+                countries?: string[] | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                start?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                completion?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                first_posted?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                last_update?: string | null;
+                /** @description `from..to`, either end open: `100..500`, `1000..` */
+                enrollment?: string | null;
+                has_results?: boolean | null;
+                /** @description Full-text: every word must match; or trial IDs, which find those */
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                kind: "condition" | "intervention";
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermTimelineOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description There's no data yet. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    getTermReadouts: {
+        parameters: {
+            query?: {
+                /** @description Overall status codes: RECRUITING, ... */
+                status?: string[] | null;
+                /** @description PHASE1, PHASE2_PHASE3, NA, ... */
+                phase?: string[] | null;
+                /** @description INTERVENTIONAL, ... */
+                study_type?: string[] | null;
+                /** @description Condition names */
+                conditions?: string[] | null;
+                /** @description MeSH descriptor codes; narrower terms match too */
+                mesh?: string[] | null;
+                /** @description Intervention names */
+                interventions?: string[] | null;
+                /** @description DRUG, DEVICE, ... */
+                intervention_types?: string[] | null;
+                /** @description Lead or collaborator names */
+                sponsors?: string[] | null;
+                /** @description The lead sponsor's class: INDUSTRY, NIH, ... */
+                sponsor_class?: string[] | null;
+                /** @description ISO 3166-1 alpha-2 codes */
+                countries?: string[] | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                start?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                completion?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                first_posted?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                last_update?: string | null;
+                /** @description `from..to`, either end open: `100..500`, `1000..` */
+                enrollment?: string | null;
+                has_results?: boolean | null;
+                /** @description Full-text: every word must match; or trial IDs, which find those */
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                kind: "condition" | "intervention";
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermReadoutsOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description There's no data yet. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    getTermRelated: {
+        parameters: {
+            query?: {
+                /** @description Overall status codes: RECRUITING, ... */
+                status?: string[] | null;
+                /** @description PHASE1, PHASE2_PHASE3, NA, ... */
+                phase?: string[] | null;
+                /** @description INTERVENTIONAL, ... */
+                study_type?: string[] | null;
+                /** @description Condition names */
+                conditions?: string[] | null;
+                /** @description MeSH descriptor codes; narrower terms match too */
+                mesh?: string[] | null;
+                /** @description Intervention names */
+                interventions?: string[] | null;
+                /** @description DRUG, DEVICE, ... */
+                intervention_types?: string[] | null;
+                /** @description Lead or collaborator names */
+                sponsors?: string[] | null;
+                /** @description The lead sponsor's class: INDUSTRY, NIH, ... */
+                sponsor_class?: string[] | null;
+                /** @description ISO 3166-1 alpha-2 codes */
+                countries?: string[] | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                start?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                completion?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                first_posted?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                last_update?: string | null;
+                /** @description `from..to`, either end open: `100..500`, `1000..` */
+                enrollment?: string | null;
+                has_results?: boolean | null;
+                /** @description Full-text: every word must match; or trial IDs, which find those */
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                kind: "condition" | "intervention";
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermRelatedOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description There's no data yet. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    getTermPipeline: {
+        parameters: {
+            query?: {
+                /** @description Overall status codes: RECRUITING, ... */
+                status?: string[] | null;
+                /** @description PHASE1, PHASE2_PHASE3, NA, ... */
+                phase?: string[] | null;
+                /** @description INTERVENTIONAL, ... */
+                study_type?: string[] | null;
+                /** @description Condition names */
+                conditions?: string[] | null;
+                /** @description MeSH descriptor codes; narrower terms match too */
+                mesh?: string[] | null;
+                /** @description Intervention names */
+                interventions?: string[] | null;
+                /** @description DRUG, DEVICE, ... */
+                intervention_types?: string[] | null;
+                /** @description Lead or collaborator names */
+                sponsors?: string[] | null;
+                /** @description The lead sponsor's class: INDUSTRY, NIH, ... */
+                sponsor_class?: string[] | null;
+                /** @description ISO 3166-1 alpha-2 codes */
+                countries?: string[] | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                start?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                completion?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                first_posted?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                last_update?: string | null;
+                /** @description `from..to`, either end open: `100..500`, `1000..` */
+                enrollment?: string | null;
+                has_results?: boolean | null;
+                /** @description Full-text: every word must match; or trial IDs, which find those */
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                kind: "condition" | "intervention";
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermPipelineOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description There's no data yet. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    getTermAttrition: {
+        parameters: {
+            query?: {
+                /** @description Overall status codes: RECRUITING, ... */
+                status?: string[] | null;
+                /** @description PHASE1, PHASE2_PHASE3, NA, ... */
+                phase?: string[] | null;
+                /** @description INTERVENTIONAL, ... */
+                study_type?: string[] | null;
+                /** @description Condition names */
+                conditions?: string[] | null;
+                /** @description MeSH descriptor codes; narrower terms match too */
+                mesh?: string[] | null;
+                /** @description Intervention names */
+                interventions?: string[] | null;
+                /** @description DRUG, DEVICE, ... */
+                intervention_types?: string[] | null;
+                /** @description Lead or collaborator names */
+                sponsors?: string[] | null;
+                /** @description The lead sponsor's class: INDUSTRY, NIH, ... */
+                sponsor_class?: string[] | null;
+                /** @description ISO 3166-1 alpha-2 codes */
+                countries?: string[] | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                start?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                completion?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                first_posted?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                last_update?: string | null;
+                /** @description `from..to`, either end open: `100..500`, `1000..` */
+                enrollment?: string | null;
+                has_results?: boolean | null;
+                /** @description Full-text: every word must match; or trial IDs, which find those */
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                kind: "condition" | "intervention";
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermAttritionOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description There's no data yet. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    getTermDurations: {
+        parameters: {
+            query?: {
+                /** @description Overall status codes: RECRUITING, ... */
+                status?: string[] | null;
+                /** @description PHASE1, PHASE2_PHASE3, NA, ... */
+                phase?: string[] | null;
+                /** @description INTERVENTIONAL, ... */
+                study_type?: string[] | null;
+                /** @description Condition names */
+                conditions?: string[] | null;
+                /** @description MeSH descriptor codes; narrower terms match too */
+                mesh?: string[] | null;
+                /** @description Intervention names */
+                interventions?: string[] | null;
+                /** @description DRUG, DEVICE, ... */
+                intervention_types?: string[] | null;
+                /** @description Lead or collaborator names */
+                sponsors?: string[] | null;
+                /** @description The lead sponsor's class: INDUSTRY, NIH, ... */
+                sponsor_class?: string[] | null;
+                /** @description ISO 3166-1 alpha-2 codes */
+                countries?: string[] | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                start?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                completion?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                first_posted?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                last_update?: string | null;
+                /** @description `from..to`, either end open: `100..500`, `1000..` */
+                enrollment?: string | null;
+                has_results?: boolean | null;
+                /** @description Full-text: every word must match; or trial IDs, which find those */
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                kind: "condition" | "intervention";
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermDurationsOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description There's no data yet. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    getTermProfile: {
+        parameters: {
+            query?: {
+                /** @description Overall status codes: RECRUITING, ... */
+                status?: string[] | null;
+                /** @description PHASE1, PHASE2_PHASE3, NA, ... */
+                phase?: string[] | null;
+                /** @description INTERVENTIONAL, ... */
+                study_type?: string[] | null;
+                /** @description Condition names */
+                conditions?: string[] | null;
+                /** @description MeSH descriptor codes; narrower terms match too */
+                mesh?: string[] | null;
+                /** @description Intervention names */
+                interventions?: string[] | null;
+                /** @description DRUG, DEVICE, ... */
+                intervention_types?: string[] | null;
+                /** @description Lead or collaborator names */
+                sponsors?: string[] | null;
+                /** @description The lead sponsor's class: INDUSTRY, NIH, ... */
+                sponsor_class?: string[] | null;
+                /** @description ISO 3166-1 alpha-2 codes */
+                countries?: string[] | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                start?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                completion?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                first_posted?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                last_update?: string | null;
+                /** @description `from..to`, either end open: `100..500`, `1000..` */
+                enrollment?: string | null;
+                has_results?: boolean | null;
+                /** @description Full-text: every word must match; or trial IDs, which find those */
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                kind: "condition" | "intervention";
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermProfileOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description There's no data yet. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    getTermThemes: {
+        parameters: {
+            query?: {
+                /** @description Overall status codes: RECRUITING, ... */
+                status?: string[] | null;
+                /** @description PHASE1, PHASE2_PHASE3, NA, ... */
+                phase?: string[] | null;
+                /** @description INTERVENTIONAL, ... */
+                study_type?: string[] | null;
+                /** @description Condition names */
+                conditions?: string[] | null;
+                /** @description MeSH descriptor codes; narrower terms match too */
+                mesh?: string[] | null;
+                /** @description Intervention names */
+                interventions?: string[] | null;
+                /** @description DRUG, DEVICE, ... */
+                intervention_types?: string[] | null;
+                /** @description Lead or collaborator names */
+                sponsors?: string[] | null;
+                /** @description The lead sponsor's class: INDUSTRY, NIH, ... */
+                sponsor_class?: string[] | null;
+                /** @description ISO 3166-1 alpha-2 codes */
+                countries?: string[] | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                start?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                completion?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                first_posted?: string | null;
+                /** @description `from..to`, either end open: `2020..2023`, `2024-06..` */
+                last_update?: string | null;
+                /** @description `from..to`, either end open: `100..500`, `1000..` */
+                enrollment?: string | null;
+                has_results?: boolean | null;
+                /** @description Full-text: every word must match; or trial IDs, which find those */
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                kind: "condition" | "intervention";
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermThemesOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description There's no data yet. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    getTermSimilar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "condition" | "intervention";
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermSimilarOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description There's no data yet. */

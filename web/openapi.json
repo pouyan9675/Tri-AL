@@ -2793,6 +2793,3862 @@
         }
       }
     },
+    "/api/terms": {
+      "get": {
+        "tags": [
+          "terms"
+        ],
+        "summary": "Findterms",
+        "description": "MeSH terms of one kind whose name contains ``q`` (or whose code is ``q``), best first:\nthe exact name, then names starting with it, then a word starting with it, each by\ntrials. Without ``q``, the terms most trials are tagged with.",
+        "operationId": "findTerms",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "condition",
+                "intervention"
+              ],
+              "type": "string",
+              "description": "condition or intervention",
+              "title": "Kind"
+            },
+            "description": "condition or intervention"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Part of a name, or a code",
+              "title": "Q"
+            },
+            "description": "Part of a name, or a code"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermsOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "There's no data yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/terms/{kind}/{code}": {
+      "get": {
+        "tags": [
+          "terms"
+        ],
+        "summary": "Getterm",
+        "description": "The term in brief: its trials, narrower terms, statuses, sponsors and reach.",
+        "operationId": "getTerm",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "condition",
+                "intervention"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Overall status codes: RECRUITING, ...",
+              "title": "Status"
+            },
+            "description": "Overall status codes: RECRUITING, ..."
+          },
+          {
+            "name": "phase",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "PHASE1, PHASE2_PHASE3, NA, ...",
+              "title": "Phase"
+            },
+            "description": "PHASE1, PHASE2_PHASE3, NA, ..."
+          },
+          {
+            "name": "study_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "INTERVENTIONAL, ...",
+              "title": "Study Type"
+            },
+            "description": "INTERVENTIONAL, ..."
+          },
+          {
+            "name": "conditions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Condition names",
+              "title": "Conditions"
+            },
+            "description": "Condition names"
+          },
+          {
+            "name": "mesh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "MeSH descriptor codes; narrower terms match too",
+              "title": "Mesh"
+            },
+            "description": "MeSH descriptor codes; narrower terms match too"
+          },
+          {
+            "name": "interventions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Intervention names",
+              "title": "Interventions"
+            },
+            "description": "Intervention names"
+          },
+          {
+            "name": "intervention_types",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "DRUG, DEVICE, ...",
+              "title": "Intervention Types"
+            },
+            "description": "DRUG, DEVICE, ..."
+          },
+          {
+            "name": "sponsors",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Lead or collaborator names",
+              "title": "Sponsors"
+            },
+            "description": "Lead or collaborator names"
+          },
+          {
+            "name": "sponsor_class",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The lead sponsor's class: INDUSTRY, NIH, ...",
+              "title": "Sponsor Class"
+            },
+            "description": "The lead sponsor's class: INDUSTRY, NIH, ..."
+          },
+          {
+            "name": "countries",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO 3166-1 alpha-2 codes",
+              "title": "Countries"
+            },
+            "description": "ISO 3166-1 alpha-2 codes"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Start"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "completion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Completion"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "first_posted",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "First Posted"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "last_update",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Last Update"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "enrollment",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `100..500`, `1000..`",
+              "title": "Enrollment"
+            },
+            "description": "`from..to`, either end open: `100..500`, `1000..`"
+          },
+          {
+            "name": "has_results",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Results"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Full-text: every word must match; or trial IDs, which find those",
+              "title": "Q"
+            },
+            "description": "Full-text: every word must match; or trial IDs, which find those"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermOverviewOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "There's no data yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/terms/{kind}/{code}/timeline": {
+      "get": {
+        "tags": [
+          "terms"
+        ],
+        "summary": "Gettermtimeline",
+        "description": "Trials started per year by phase group, the term's share of all trials started, lead\nsponsors new to it, and its momentum: its share of newly posted trials in the last 3, 6\nand 12 months against the 12 months before each (a two-sided exact binomial test).",
+        "operationId": "getTermTimeline",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "condition",
+                "intervention"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Overall status codes: RECRUITING, ...",
+              "title": "Status"
+            },
+            "description": "Overall status codes: RECRUITING, ..."
+          },
+          {
+            "name": "phase",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "PHASE1, PHASE2_PHASE3, NA, ...",
+              "title": "Phase"
+            },
+            "description": "PHASE1, PHASE2_PHASE3, NA, ..."
+          },
+          {
+            "name": "study_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "INTERVENTIONAL, ...",
+              "title": "Study Type"
+            },
+            "description": "INTERVENTIONAL, ..."
+          },
+          {
+            "name": "conditions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Condition names",
+              "title": "Conditions"
+            },
+            "description": "Condition names"
+          },
+          {
+            "name": "mesh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "MeSH descriptor codes; narrower terms match too",
+              "title": "Mesh"
+            },
+            "description": "MeSH descriptor codes; narrower terms match too"
+          },
+          {
+            "name": "interventions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Intervention names",
+              "title": "Interventions"
+            },
+            "description": "Intervention names"
+          },
+          {
+            "name": "intervention_types",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "DRUG, DEVICE, ...",
+              "title": "Intervention Types"
+            },
+            "description": "DRUG, DEVICE, ..."
+          },
+          {
+            "name": "sponsors",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Lead or collaborator names",
+              "title": "Sponsors"
+            },
+            "description": "Lead or collaborator names"
+          },
+          {
+            "name": "sponsor_class",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The lead sponsor's class: INDUSTRY, NIH, ...",
+              "title": "Sponsor Class"
+            },
+            "description": "The lead sponsor's class: INDUSTRY, NIH, ..."
+          },
+          {
+            "name": "countries",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO 3166-1 alpha-2 codes",
+              "title": "Countries"
+            },
+            "description": "ISO 3166-1 alpha-2 codes"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Start"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "completion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Completion"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "first_posted",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "First Posted"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "last_update",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Last Update"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "enrollment",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `100..500`, `1000..`",
+              "title": "Enrollment"
+            },
+            "description": "`from..to`, either end open: `100..500`, `1000..`"
+          },
+          {
+            "name": "has_results",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Results"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Full-text: every word must match; or trial IDs, which find those",
+              "title": "Q"
+            },
+            "description": "Full-text: every word must match; or trial IDs, which find those"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermTimelineOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "There's no data yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/terms/{kind}/{code}/readouts": {
+      "get": {
+        "tags": [
+          "terms"
+        ],
+        "summary": "Gettermreadouts",
+        "description": "Active trials by when their primary completion is due over the next 24 months: when\ntheir main results come.",
+        "operationId": "getTermReadouts",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "condition",
+                "intervention"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Overall status codes: RECRUITING, ...",
+              "title": "Status"
+            },
+            "description": "Overall status codes: RECRUITING, ..."
+          },
+          {
+            "name": "phase",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "PHASE1, PHASE2_PHASE3, NA, ...",
+              "title": "Phase"
+            },
+            "description": "PHASE1, PHASE2_PHASE3, NA, ..."
+          },
+          {
+            "name": "study_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "INTERVENTIONAL, ...",
+              "title": "Study Type"
+            },
+            "description": "INTERVENTIONAL, ..."
+          },
+          {
+            "name": "conditions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Condition names",
+              "title": "Conditions"
+            },
+            "description": "Condition names"
+          },
+          {
+            "name": "mesh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "MeSH descriptor codes; narrower terms match too",
+              "title": "Mesh"
+            },
+            "description": "MeSH descriptor codes; narrower terms match too"
+          },
+          {
+            "name": "interventions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Intervention names",
+              "title": "Interventions"
+            },
+            "description": "Intervention names"
+          },
+          {
+            "name": "intervention_types",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "DRUG, DEVICE, ...",
+              "title": "Intervention Types"
+            },
+            "description": "DRUG, DEVICE, ..."
+          },
+          {
+            "name": "sponsors",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Lead or collaborator names",
+              "title": "Sponsors"
+            },
+            "description": "Lead or collaborator names"
+          },
+          {
+            "name": "sponsor_class",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The lead sponsor's class: INDUSTRY, NIH, ...",
+              "title": "Sponsor Class"
+            },
+            "description": "The lead sponsor's class: INDUSTRY, NIH, ..."
+          },
+          {
+            "name": "countries",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO 3166-1 alpha-2 codes",
+              "title": "Countries"
+            },
+            "description": "ISO 3166-1 alpha-2 codes"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Start"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "completion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Completion"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "first_posted",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "First Posted"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "last_update",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Last Update"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "enrollment",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `100..500`, `1000..`",
+              "title": "Enrollment"
+            },
+            "description": "`from..to`, either end open: `100..500`, `1000..`"
+          },
+          {
+            "name": "has_results",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Results"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Full-text: every word must match; or trial IDs, which find those",
+              "title": "Q"
+            },
+            "description": "Full-text: every word must match; or trial IDs, which find those"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermReadoutsOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "There's no data yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/terms/{kind}/{code}/related": {
+      "get": {
+        "tags": [
+          "terms"
+        ],
+        "summary": "Gettermrelated",
+        "description": "Conditions and interventions tagged with the term's trials more often than with the\nfilter's other trials: lift (smoothed), and an exact test corrected for the terms tested.\nThe network links the most related terms by the trials they share, in communities.",
+        "operationId": "getTermRelated",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "condition",
+                "intervention"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Overall status codes: RECRUITING, ...",
+              "title": "Status"
+            },
+            "description": "Overall status codes: RECRUITING, ..."
+          },
+          {
+            "name": "phase",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "PHASE1, PHASE2_PHASE3, NA, ...",
+              "title": "Phase"
+            },
+            "description": "PHASE1, PHASE2_PHASE3, NA, ..."
+          },
+          {
+            "name": "study_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "INTERVENTIONAL, ...",
+              "title": "Study Type"
+            },
+            "description": "INTERVENTIONAL, ..."
+          },
+          {
+            "name": "conditions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Condition names",
+              "title": "Conditions"
+            },
+            "description": "Condition names"
+          },
+          {
+            "name": "mesh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "MeSH descriptor codes; narrower terms match too",
+              "title": "Mesh"
+            },
+            "description": "MeSH descriptor codes; narrower terms match too"
+          },
+          {
+            "name": "interventions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Intervention names",
+              "title": "Interventions"
+            },
+            "description": "Intervention names"
+          },
+          {
+            "name": "intervention_types",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "DRUG, DEVICE, ...",
+              "title": "Intervention Types"
+            },
+            "description": "DRUG, DEVICE, ..."
+          },
+          {
+            "name": "sponsors",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Lead or collaborator names",
+              "title": "Sponsors"
+            },
+            "description": "Lead or collaborator names"
+          },
+          {
+            "name": "sponsor_class",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The lead sponsor's class: INDUSTRY, NIH, ...",
+              "title": "Sponsor Class"
+            },
+            "description": "The lead sponsor's class: INDUSTRY, NIH, ..."
+          },
+          {
+            "name": "countries",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO 3166-1 alpha-2 codes",
+              "title": "Countries"
+            },
+            "description": "ISO 3166-1 alpha-2 codes"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Start"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "completion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Completion"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "first_posted",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "First Posted"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "last_update",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Last Update"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "enrollment",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `100..500`, `1000..`",
+              "title": "Enrollment"
+            },
+            "description": "`from..to`, either end open: `100..500`, `1000..`"
+          },
+          {
+            "name": "has_results",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Results"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Full-text: every word must match; or trial IDs, which find those",
+              "title": "Q"
+            },
+            "description": "Full-text: every word must match; or trial IDs, which find those"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermRelatedOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "There's no data yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/terms/{kind}/{code}/pipeline": {
+      "get": {
+        "tags": [
+          "terms"
+        ],
+        "summary": "Gettermpipeline",
+        "description": "The other kind's terms in the term's trials by phase (a condition's interventions, an\nintervention's conditions), and the term's trials by phase and status.",
+        "operationId": "getTermPipeline",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "condition",
+                "intervention"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Overall status codes: RECRUITING, ...",
+              "title": "Status"
+            },
+            "description": "Overall status codes: RECRUITING, ..."
+          },
+          {
+            "name": "phase",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "PHASE1, PHASE2_PHASE3, NA, ...",
+              "title": "Phase"
+            },
+            "description": "PHASE1, PHASE2_PHASE3, NA, ..."
+          },
+          {
+            "name": "study_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "INTERVENTIONAL, ...",
+              "title": "Study Type"
+            },
+            "description": "INTERVENTIONAL, ..."
+          },
+          {
+            "name": "conditions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Condition names",
+              "title": "Conditions"
+            },
+            "description": "Condition names"
+          },
+          {
+            "name": "mesh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "MeSH descriptor codes; narrower terms match too",
+              "title": "Mesh"
+            },
+            "description": "MeSH descriptor codes; narrower terms match too"
+          },
+          {
+            "name": "interventions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Intervention names",
+              "title": "Interventions"
+            },
+            "description": "Intervention names"
+          },
+          {
+            "name": "intervention_types",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "DRUG, DEVICE, ...",
+              "title": "Intervention Types"
+            },
+            "description": "DRUG, DEVICE, ..."
+          },
+          {
+            "name": "sponsors",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Lead or collaborator names",
+              "title": "Sponsors"
+            },
+            "description": "Lead or collaborator names"
+          },
+          {
+            "name": "sponsor_class",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The lead sponsor's class: INDUSTRY, NIH, ...",
+              "title": "Sponsor Class"
+            },
+            "description": "The lead sponsor's class: INDUSTRY, NIH, ..."
+          },
+          {
+            "name": "countries",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO 3166-1 alpha-2 codes",
+              "title": "Countries"
+            },
+            "description": "ISO 3166-1 alpha-2 codes"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Start"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "completion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Completion"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "first_posted",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "First Posted"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "last_update",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Last Update"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "enrollment",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `100..500`, `1000..`",
+              "title": "Enrollment"
+            },
+            "description": "`from..to`, either end open: `100..500`, `1000..`"
+          },
+          {
+            "name": "has_results",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Results"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Full-text: every word must match; or trial IDs, which find those",
+              "title": "Q"
+            },
+            "description": "Full-text: every word must match; or trial IDs, which find those"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermPipelineOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "There's no data yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/terms/{kind}/{code}/attrition": {
+      "get": {
+        "tags": [
+          "terms"
+        ],
+        "summary": "Gettermattrition",
+        "description": "How often the term's trials stop early against the filter's others, phase by phase,\nand the reasons they give, sorted into kinds by their words.",
+        "operationId": "getTermAttrition",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "condition",
+                "intervention"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Overall status codes: RECRUITING, ...",
+              "title": "Status"
+            },
+            "description": "Overall status codes: RECRUITING, ..."
+          },
+          {
+            "name": "phase",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "PHASE1, PHASE2_PHASE3, NA, ...",
+              "title": "Phase"
+            },
+            "description": "PHASE1, PHASE2_PHASE3, NA, ..."
+          },
+          {
+            "name": "study_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "INTERVENTIONAL, ...",
+              "title": "Study Type"
+            },
+            "description": "INTERVENTIONAL, ..."
+          },
+          {
+            "name": "conditions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Condition names",
+              "title": "Conditions"
+            },
+            "description": "Condition names"
+          },
+          {
+            "name": "mesh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "MeSH descriptor codes; narrower terms match too",
+              "title": "Mesh"
+            },
+            "description": "MeSH descriptor codes; narrower terms match too"
+          },
+          {
+            "name": "interventions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Intervention names",
+              "title": "Interventions"
+            },
+            "description": "Intervention names"
+          },
+          {
+            "name": "intervention_types",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "DRUG, DEVICE, ...",
+              "title": "Intervention Types"
+            },
+            "description": "DRUG, DEVICE, ..."
+          },
+          {
+            "name": "sponsors",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Lead or collaborator names",
+              "title": "Sponsors"
+            },
+            "description": "Lead or collaborator names"
+          },
+          {
+            "name": "sponsor_class",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The lead sponsor's class: INDUSTRY, NIH, ...",
+              "title": "Sponsor Class"
+            },
+            "description": "The lead sponsor's class: INDUSTRY, NIH, ..."
+          },
+          {
+            "name": "countries",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO 3166-1 alpha-2 codes",
+              "title": "Countries"
+            },
+            "description": "ISO 3166-1 alpha-2 codes"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Start"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "completion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Completion"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "first_posted",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "First Posted"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "last_update",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Last Update"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "enrollment",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `100..500`, `1000..`",
+              "title": "Enrollment"
+            },
+            "description": "`from..to`, either end open: `100..500`, `1000..`"
+          },
+          {
+            "name": "has_results",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Results"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Full-text: every word must match; or trial IDs, which find those",
+              "title": "Q"
+            },
+            "description": "Full-text: every word must match; or trial IDs, which find those"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermAttritionOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "There's no data yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/terms/{kind}/{code}/durations": {
+      "get": {
+        "tags": [
+          "terms"
+        ],
+        "summary": "Gettermdurations",
+        "description": "Kaplan-Meier curves: months from start to primary completion by phase group, and from\ncompletion to posted results, for the term's trials and the filter's others.",
+        "operationId": "getTermDurations",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "condition",
+                "intervention"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Overall status codes: RECRUITING, ...",
+              "title": "Status"
+            },
+            "description": "Overall status codes: RECRUITING, ..."
+          },
+          {
+            "name": "phase",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "PHASE1, PHASE2_PHASE3, NA, ...",
+              "title": "Phase"
+            },
+            "description": "PHASE1, PHASE2_PHASE3, NA, ..."
+          },
+          {
+            "name": "study_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "INTERVENTIONAL, ...",
+              "title": "Study Type"
+            },
+            "description": "INTERVENTIONAL, ..."
+          },
+          {
+            "name": "conditions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Condition names",
+              "title": "Conditions"
+            },
+            "description": "Condition names"
+          },
+          {
+            "name": "mesh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "MeSH descriptor codes; narrower terms match too",
+              "title": "Mesh"
+            },
+            "description": "MeSH descriptor codes; narrower terms match too"
+          },
+          {
+            "name": "interventions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Intervention names",
+              "title": "Interventions"
+            },
+            "description": "Intervention names"
+          },
+          {
+            "name": "intervention_types",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "DRUG, DEVICE, ...",
+              "title": "Intervention Types"
+            },
+            "description": "DRUG, DEVICE, ..."
+          },
+          {
+            "name": "sponsors",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Lead or collaborator names",
+              "title": "Sponsors"
+            },
+            "description": "Lead or collaborator names"
+          },
+          {
+            "name": "sponsor_class",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The lead sponsor's class: INDUSTRY, NIH, ...",
+              "title": "Sponsor Class"
+            },
+            "description": "The lead sponsor's class: INDUSTRY, NIH, ..."
+          },
+          {
+            "name": "countries",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO 3166-1 alpha-2 codes",
+              "title": "Countries"
+            },
+            "description": "ISO 3166-1 alpha-2 codes"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Start"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "completion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Completion"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "first_posted",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "First Posted"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "last_update",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Last Update"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "enrollment",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `100..500`, `1000..`",
+              "title": "Enrollment"
+            },
+            "description": "`from..to`, either end open: `100..500`, `1000..`"
+          },
+          {
+            "name": "has_results",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Results"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Full-text: every word must match; or trial IDs, which find those",
+              "title": "Q"
+            },
+            "description": "Full-text: every word must match; or trial IDs, which find those"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermDurationsOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "There's no data yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/terms/{kind}/{code}/profile": {
+      "get": {
+        "tags": [
+          "terms"
+        ],
+        "summary": "Gettermprofile",
+        "description": "Design, population and scale against the filter's other trials, with the baseline\nweighted to the term's mix of phases, and standardized differences.",
+        "operationId": "getTermProfile",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "condition",
+                "intervention"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Overall status codes: RECRUITING, ...",
+              "title": "Status"
+            },
+            "description": "Overall status codes: RECRUITING, ..."
+          },
+          {
+            "name": "phase",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "PHASE1, PHASE2_PHASE3, NA, ...",
+              "title": "Phase"
+            },
+            "description": "PHASE1, PHASE2_PHASE3, NA, ..."
+          },
+          {
+            "name": "study_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "INTERVENTIONAL, ...",
+              "title": "Study Type"
+            },
+            "description": "INTERVENTIONAL, ..."
+          },
+          {
+            "name": "conditions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Condition names",
+              "title": "Conditions"
+            },
+            "description": "Condition names"
+          },
+          {
+            "name": "mesh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "MeSH descriptor codes; narrower terms match too",
+              "title": "Mesh"
+            },
+            "description": "MeSH descriptor codes; narrower terms match too"
+          },
+          {
+            "name": "interventions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Intervention names",
+              "title": "Interventions"
+            },
+            "description": "Intervention names"
+          },
+          {
+            "name": "intervention_types",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "DRUG, DEVICE, ...",
+              "title": "Intervention Types"
+            },
+            "description": "DRUG, DEVICE, ..."
+          },
+          {
+            "name": "sponsors",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Lead or collaborator names",
+              "title": "Sponsors"
+            },
+            "description": "Lead or collaborator names"
+          },
+          {
+            "name": "sponsor_class",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The lead sponsor's class: INDUSTRY, NIH, ...",
+              "title": "Sponsor Class"
+            },
+            "description": "The lead sponsor's class: INDUSTRY, NIH, ..."
+          },
+          {
+            "name": "countries",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO 3166-1 alpha-2 codes",
+              "title": "Countries"
+            },
+            "description": "ISO 3166-1 alpha-2 codes"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Start"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "completion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Completion"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "first_posted",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "First Posted"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "last_update",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Last Update"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "enrollment",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `100..500`, `1000..`",
+              "title": "Enrollment"
+            },
+            "description": "`from..to`, either end open: `100..500`, `1000..`"
+          },
+          {
+            "name": "has_results",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Results"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Full-text: every word must match; or trial IDs, which find those",
+              "title": "Q"
+            },
+            "description": "Full-text: every word must match; or trial IDs, which find those"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermProfileOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "There's no data yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/terms/{kind}/{code}/themes": {
+      "get": {
+        "tags": [
+          "terms"
+        ],
+        "summary": "Gettermthemes",
+        "description": "Sub-themes: the term's trials (up to 4,000) clustered by their vectors, laid out in\ntwo dimensions and named by their titles' distinctive words.",
+        "operationId": "getTermThemes",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "condition",
+                "intervention"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Overall status codes: RECRUITING, ...",
+              "title": "Status"
+            },
+            "description": "Overall status codes: RECRUITING, ..."
+          },
+          {
+            "name": "phase",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "PHASE1, PHASE2_PHASE3, NA, ...",
+              "title": "Phase"
+            },
+            "description": "PHASE1, PHASE2_PHASE3, NA, ..."
+          },
+          {
+            "name": "study_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "INTERVENTIONAL, ...",
+              "title": "Study Type"
+            },
+            "description": "INTERVENTIONAL, ..."
+          },
+          {
+            "name": "conditions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Condition names",
+              "title": "Conditions"
+            },
+            "description": "Condition names"
+          },
+          {
+            "name": "mesh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "MeSH descriptor codes; narrower terms match too",
+              "title": "Mesh"
+            },
+            "description": "MeSH descriptor codes; narrower terms match too"
+          },
+          {
+            "name": "interventions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Intervention names",
+              "title": "Interventions"
+            },
+            "description": "Intervention names"
+          },
+          {
+            "name": "intervention_types",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "DRUG, DEVICE, ...",
+              "title": "Intervention Types"
+            },
+            "description": "DRUG, DEVICE, ..."
+          },
+          {
+            "name": "sponsors",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Lead or collaborator names",
+              "title": "Sponsors"
+            },
+            "description": "Lead or collaborator names"
+          },
+          {
+            "name": "sponsor_class",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The lead sponsor's class: INDUSTRY, NIH, ...",
+              "title": "Sponsor Class"
+            },
+            "description": "The lead sponsor's class: INDUSTRY, NIH, ..."
+          },
+          {
+            "name": "countries",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO 3166-1 alpha-2 codes",
+              "title": "Countries"
+            },
+            "description": "ISO 3166-1 alpha-2 codes"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Start"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "completion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Completion"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "first_posted",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "First Posted"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "last_update",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `2020..2023`, `2024-06..`",
+              "title": "Last Update"
+            },
+            "description": "`from..to`, either end open: `2020..2023`, `2024-06..`"
+          },
+          {
+            "name": "enrollment",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`from..to`, either end open: `100..500`, `1000..`",
+              "title": "Enrollment"
+            },
+            "description": "`from..to`, either end open: `100..500`, `1000..`"
+          },
+          {
+            "name": "has_results",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Has Results"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Full-text: every word must match; or trial IDs, which find those",
+              "title": "Q"
+            },
+            "description": "Full-text: every word must match; or trial IDs, which find those"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermThemesOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "There's no data yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/terms/{kind}/{code}/similar": {
+      "get": {
+        "tags": [
+          "terms"
+        ],
+        "summary": "Gettermsimilar",
+        "description": "Terms whose trials read most like the term's: the nearest average trial vectors,\nacross the whole registry (there's no filter). The first request after a new data\nversion builds every term's average, which takes a few seconds.",
+        "operationId": "getTermSimilar",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "condition",
+                "intervention"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TermSimilarOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "There's no data yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/events": {
       "get": {
         "tags": [
@@ -3467,6 +7323,84 @@
         ],
         "title": "ArmOut"
       },
+      "BenchmarkOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "section": {
+            "type": "string",
+            "title": "Section"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "share",
+              "years",
+              "participants",
+              "sites"
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "baseline": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseline",
+            "description": "The filter's other trials, with its phase mix."
+          },
+          "difference": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference",
+            "description": "Standardized: 0.2 small, 0.5 medium, 0.8 large."
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "section",
+          "unit",
+          "value",
+          "baseline",
+          "difference",
+          "trials"
+        ],
+        "title": "BenchmarkOut"
+      },
       "ChangeOut": {
         "properties": {
           "run_id": {
@@ -3629,6 +7563,59 @@
         ],
         "title": "ChartSpecOut"
       },
+      "CurveOut": {
+        "properties": {
+          "group": {
+            "type": "string",
+            "title": "Group"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials"
+          },
+          "events": {
+            "type": "integer",
+            "title": "Events"
+          },
+          "median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median",
+            "description": "Months."
+          },
+          "months": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Months"
+          },
+          "values": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Values"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "group",
+          "trials",
+          "events",
+          "median",
+          "months",
+          "values"
+        ],
+        "title": "CurveOut"
+      },
       "DashboardOut": {
         "properties": {
           "data_version": {
@@ -3658,6 +7645,42 @@
           "facets"
         ],
         "title": "DashboardOut"
+      },
+      "EnrollmentBinOut": {
+        "properties": {
+          "low": {
+            "type": "integer",
+            "title": "Low"
+          },
+          "high": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High"
+          },
+          "share": {
+            "type": "number",
+            "title": "Share"
+          },
+          "baseline": {
+            "type": "number",
+            "title": "Baseline"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "low",
+          "high",
+          "share",
+          "baseline"
+        ],
+        "title": "EnrollmentBinOut"
       },
       "ErrorOut": {
         "properties": {
@@ -3759,6 +7782,57 @@
           "facets"
         ],
         "title": "FacetsOut"
+      },
+      "FunnelRowOut": {
+        "properties": {
+          "phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials"
+          },
+          "active": {
+            "type": "integer",
+            "title": "Active"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed"
+          },
+          "stopped": {
+            "type": "integer",
+            "title": "Stopped"
+          },
+          "unknown": {
+            "type": "integer",
+            "title": "Unknown"
+          },
+          "other": {
+            "type": "integer",
+            "title": "Other"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "phase",
+          "trials",
+          "active",
+          "completed",
+          "stopped",
+          "unknown",
+          "other"
+        ],
+        "title": "FunnelRowOut"
       },
       "HTTPValidationError": {
         "properties": {
@@ -4337,7 +8411,7 @@
             },
             "type": "object",
             "title": "Labels",
-            "description": "Display names of coded fields: status, phase, study_type, sponsor_class, intervention_type, primary_purpose, arm_type, allocation, intervention_model, observational_model, time_perspective, masking and masked_role. A code without one is shown as itself."
+            "description": "Display names of coded fields: status, phase, study_type, sponsor_class, intervention_type, primary_purpose, arm_type, allocation, intervention_model, observational_model, time_perspective, masking, masked_role and phase_group (the phase groups term analyses count by, in order). A code without one is shown as itself."
           }
         },
         "additionalProperties": false,
@@ -4375,6 +8449,92 @@
         ],
         "title": "ModelBackendOut"
       },
+      "MomentumOut": {
+        "properties": {
+          "months": {
+            "type": "integer",
+            "title": "Months"
+          },
+          "since": {
+            "type": "string",
+            "format": "date",
+            "title": "Since"
+          },
+          "until": {
+            "type": "string",
+            "format": "date",
+            "title": "Until"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials",
+            "description": "First posted in the window."
+          },
+          "baseline": {
+            "type": "integer",
+            "title": "Baseline",
+            "description": "First posted in the 12 months before."
+          },
+          "expected": {
+            "type": "number",
+            "title": "Expected"
+          },
+          "growth": {
+            "type": "number",
+            "title": "Growth",
+            "description": "Its share in the window over its share before, smoothed."
+          },
+          "raw_growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Growth"
+          },
+          "p": {
+            "type": "number",
+            "title": "P"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "rising",
+              "falling",
+              "steady"
+            ],
+            "title": "Direction"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "months",
+          "since",
+          "until",
+          "trials",
+          "baseline",
+          "expected",
+          "growth",
+          "raw_growth",
+          "p",
+          "confidence",
+          "direction"
+        ],
+        "title": "MomentumOut"
+      },
       "NameHitOut": {
         "properties": {
           "kind": {
@@ -4403,6 +8563,92 @@
           "name"
         ],
         "title": "NameHitOut"
+      },
+      "NetworkEdgeOut": {
+        "properties": {
+          "source": {
+            "type": "integer",
+            "title": "Source",
+            "description": "Index into nodes."
+          },
+          "target": {
+            "type": "integer",
+            "title": "Target"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials"
+          },
+          "jaccard": {
+            "type": "number",
+            "title": "Jaccard"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "target",
+          "trials",
+          "jaccard"
+        ],
+        "title": "NetworkEdgeOut"
+      },
+      "NetworkNodeOut": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "term": {
+            "type": "string",
+            "title": "Term"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "condition",
+              "intervention"
+            ],
+            "title": "Kind"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials"
+          },
+          "lift": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lift"
+          },
+          "group": {
+            "type": "integer",
+            "title": "Group",
+            "description": "Its community; -1 for the term itself."
+          },
+          "center": {
+            "type": "boolean",
+            "title": "Center"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "term",
+          "kind",
+          "trials",
+          "lift",
+          "group",
+          "center"
+        ],
+        "title": "NetworkNodeOut"
       },
       "OutcomeOut": {
         "properties": {
@@ -4482,6 +8728,78 @@
           "trials"
         ],
         "title": "PhaseGroupOut"
+      },
+      "PipelineRowOut": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "term": {
+            "type": "string",
+            "title": "Term"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "condition",
+              "intervention"
+            ],
+            "title": "Kind"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials"
+          },
+          "phases": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Phases",
+            "description": "Trials in each of `phases`."
+          },
+          "active": {
+            "type": "integer",
+            "title": "Active"
+          },
+          "highest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Highest"
+          },
+          "last_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Start"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "term",
+          "kind",
+          "trials",
+          "phases",
+          "active",
+          "highest",
+          "last_start"
+        ],
+        "title": "PipelineRowOut"
       },
       "PluginChangedOut": {
         "properties": {
@@ -4610,6 +8928,191 @@
           "plugins"
         ],
         "title": "PluginsOut"
+      },
+      "QuarterCountOut": {
+        "properties": {
+          "quarter": {
+            "type": "string",
+            "title": "Quarter"
+          },
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials"
+          },
+          "phases": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Phases"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "quarter",
+          "start",
+          "trials",
+          "phases"
+        ],
+        "title": "QuarterCountOut"
+      },
+      "ReadoutOut": {
+        "properties": {
+          "trial": {
+            "$ref": "#/components/schemas/TrialSummaryOut"
+          },
+          "primary_completion": {
+            "type": "string",
+            "format": "date",
+            "title": "Primary Completion"
+          },
+          "estimated": {
+            "type": "boolean",
+            "title": "Estimated"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "trial",
+          "primary_completion",
+          "estimated"
+        ],
+        "title": "ReadoutOut"
+      },
+      "ReasonExampleOut": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_id",
+          "reason"
+        ],
+        "title": "ReasonExampleOut"
+      },
+      "RelatedTermOut": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "term": {
+            "type": "string",
+            "title": "Term"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "condition",
+              "intervention"
+            ],
+            "title": "Kind"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials"
+          },
+          "share": {
+            "type": "number",
+            "title": "Share"
+          },
+          "elsewhere": {
+            "type": "number",
+            "title": "Elsewhere",
+            "description": "Share of the filter's other trials tagged with it."
+          },
+          "lift": {
+            "type": "number",
+            "title": "Lift",
+            "description": "How many times more common with the term, smoothed."
+          },
+          "p": {
+            "type": "number",
+            "title": "P"
+          },
+          "q": {
+            "type": "number",
+            "title": "Q",
+            "description": "p corrected for every term tested (Benjamini-Hochberg)."
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "term",
+          "kind",
+          "trials",
+          "share",
+          "elsewhere",
+          "lift",
+          "p",
+          "q",
+          "confidence"
+        ],
+        "title": "RelatedTermOut"
+      },
+      "ResultsShareOut": {
+        "properties": {
+          "months": {
+            "type": "integer",
+            "title": "Months"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share"
+          },
+          "baseline": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseline"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "months",
+          "share",
+          "baseline"
+        ],
+        "title": "ResultsShareOut"
       },
       "RunOut": {
         "properties": {
@@ -4823,6 +9326,50 @@
         ],
         "title": "SeriesOut"
       },
+      "SimilarTermOut": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "term": {
+            "type": "string",
+            "title": "Term"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "condition",
+              "intervention"
+            ],
+            "title": "Kind"
+          },
+          "similarity": {
+            "type": "number",
+            "title": "Similarity"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials"
+          },
+          "shared": {
+            "type": "integer",
+            "title": "Shared",
+            "description": "Trials tagged with both; 0: never tagged together."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "term",
+          "kind",
+          "similarity",
+          "trials",
+          "shared"
+        ],
+        "title": "SimilarTermOut"
+      },
       "SnippetPartOut": {
         "properties": {
           "text": {
@@ -4905,6 +9452,932 @@
           "rows"
         ],
         "title": "StatsOut"
+      },
+      "StopRateOut": {
+        "properties": {
+          "group": {
+            "type": "string",
+            "title": "Group"
+          },
+          "closed": {
+            "type": "integer",
+            "title": "Closed"
+          },
+          "stopped": {
+            "type": "integer",
+            "title": "Stopped"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate"
+          },
+          "baseline_closed": {
+            "type": "integer",
+            "title": "Baseline Closed"
+          },
+          "baseline_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseline Rate"
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ratio"
+          },
+          "p": {
+            "type": "number",
+            "title": "P"
+          },
+          "q": {
+            "type": "number",
+            "title": "Q"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "group",
+          "closed",
+          "stopped",
+          "rate",
+          "baseline_closed",
+          "baseline_rate",
+          "ratio",
+          "p",
+          "q",
+          "confidence"
+        ],
+        "title": "StopRateOut"
+      },
+      "StopReasonOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials"
+          },
+          "examples": {
+            "items": {
+              "$ref": "#/components/schemas/ReasonExampleOut"
+            },
+            "type": "array",
+            "title": "Examples"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "trials",
+          "examples"
+        ],
+        "title": "StopReasonOut"
+      },
+      "TermAttritionOut": {
+        "properties": {
+          "data_version": {
+            "type": "integer",
+            "title": "Data Version"
+          },
+          "phases": {
+            "items": {
+              "$ref": "#/components/schemas/StopRateOut"
+            },
+            "type": "array",
+            "title": "Phases"
+          },
+          "observed": {
+            "type": "integer",
+            "title": "Observed"
+          },
+          "expected": {
+            "type": "number",
+            "title": "Expected",
+            "description": "Stopped trials at the baseline's rates, by phase."
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ratio"
+          },
+          "p": {
+            "type": "number",
+            "title": "P"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence"
+          },
+          "stopped": {
+            "type": "integer",
+            "title": "Stopped"
+          },
+          "read": {
+            "type": "integer",
+            "title": "Read",
+            "description": "Stopped trials whose reasons were read (at most 2,000)."
+          },
+          "stated": {
+            "type": "integer",
+            "title": "Stated"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/StopReasonOut"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data_version",
+          "phases",
+          "observed",
+          "expected",
+          "ratio",
+          "p",
+          "confidence",
+          "stopped",
+          "read",
+          "stated",
+          "reasons"
+        ],
+        "title": "TermAttritionOut"
+      },
+      "TermCountOut": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "term": {
+            "type": "string",
+            "title": "Term"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "term",
+          "trials"
+        ],
+        "title": "TermCountOut"
+      },
+      "TermDurationsOut": {
+        "properties": {
+          "data_version": {
+            "type": "integer",
+            "title": "Data Version"
+          },
+          "completion": {
+            "items": {
+              "$ref": "#/components/schemas/CurveOut"
+            },
+            "type": "array",
+            "title": "Completion",
+            "description": "Share still running by months since start, by phase group, then all."
+          },
+          "completion_baseline": {
+            "items": {
+              "$ref": "#/components/schemas/CurveOut"
+            },
+            "type": "array",
+            "title": "Completion Baseline"
+          },
+          "results": {
+            "$ref": "#/components/schemas/CurveOut",
+            "description": "Share with results by months since completion."
+          },
+          "results_baseline": {
+            "$ref": "#/components/schemas/CurveOut"
+          },
+          "results_at": {
+            "items": {
+              "$ref": "#/components/schemas/ResultsShareOut"
+            },
+            "type": "array",
+            "title": "Results At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data_version",
+          "completion",
+          "completion_baseline",
+          "results",
+          "results_baseline",
+          "results_at"
+        ],
+        "title": "TermDurationsOut"
+      },
+      "TermOverviewOut": {
+        "properties": {
+          "data_version": {
+            "type": "integer",
+            "title": "Data Version"
+          },
+          "term": {
+            "$ref": "#/components/schemas/TermRefOut"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials",
+            "description": "The term's trials within the filter."
+          },
+          "registry_trials": {
+            "type": "integer",
+            "title": "Registry Trials",
+            "description": "The term's trials without the filter."
+          },
+          "within": {
+            "type": "integer",
+            "title": "Within",
+            "description": "Trials within the filter."
+          },
+          "direct": {
+            "type": "integer",
+            "title": "Direct",
+            "description": "The term's trials tagged with it, not only a narrower term."
+          },
+          "narrower": {
+            "items": {
+              "$ref": "#/components/schemas/TermCountOut"
+            },
+            "type": "array",
+            "title": "Narrower",
+            "description": "Narrower terms, with trials in the filter."
+          },
+          "active": {
+            "type": "integer",
+            "title": "Active"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed"
+          },
+          "stopped": {
+            "type": "integer",
+            "title": "Stopped"
+          },
+          "with_results": {
+            "type": "integer",
+            "title": "With Results"
+          },
+          "lead_sponsors": {
+            "type": "integer",
+            "title": "Lead Sponsors"
+          },
+          "industry": {
+            "type": "integer",
+            "title": "Industry",
+            "description": "Trials with an industry lead sponsor."
+          },
+          "countries": {
+            "type": "integer",
+            "title": "Countries"
+          },
+          "first_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Start"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of",
+            "description": "The latest update of any trial: the data's today."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data_version",
+          "term",
+          "trials",
+          "registry_trials",
+          "within",
+          "direct",
+          "narrower",
+          "active",
+          "completed",
+          "stopped",
+          "with_results",
+          "lead_sponsors",
+          "industry",
+          "countries",
+          "first_start",
+          "as_of"
+        ],
+        "title": "TermOverviewOut"
+      },
+      "TermPipelineOut": {
+        "properties": {
+          "data_version": {
+            "type": "integer",
+            "title": "Data Version"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "condition",
+              "intervention"
+            ],
+            "title": "Kind",
+            "description": "The rows' kind: the other kind than the term's."
+          },
+          "phases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Phases"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineRowOut"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "funnel": {
+            "items": {
+              "$ref": "#/components/schemas/FunnelRowOut"
+            },
+            "type": "array",
+            "title": "Funnel"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data_version",
+          "kind",
+          "phases",
+          "rows",
+          "funnel"
+        ],
+        "title": "TermPipelineOut"
+      },
+      "TermProfileOut": {
+        "properties": {
+          "data_version": {
+            "type": "integer",
+            "title": "Data Version"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials"
+          },
+          "baseline_trials": {
+            "type": "integer",
+            "title": "Baseline Trials"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkOut"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "enrollment": {
+            "items": {
+              "$ref": "#/components/schemas/EnrollmentBinOut"
+            },
+            "type": "array",
+            "title": "Enrollment"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data_version",
+          "trials",
+          "baseline_trials",
+          "rows",
+          "enrollment"
+        ],
+        "title": "TermProfileOut"
+      },
+      "TermReadoutsOut": {
+        "properties": {
+          "data_version": {
+            "type": "integer",
+            "title": "Data Version"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "until": {
+            "type": "string",
+            "format": "date",
+            "title": "Until"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Active trials whose primary completion is due by `until`."
+          },
+          "overdue": {
+            "type": "integer",
+            "title": "Overdue",
+            "description": "Active trials whose primary completion date has passed."
+          },
+          "quarters": {
+            "items": {
+              "$ref": "#/components/schemas/QuarterCountOut"
+            },
+            "type": "array",
+            "title": "Quarters"
+          },
+          "trials": {
+            "items": {
+              "$ref": "#/components/schemas/ReadoutOut"
+            },
+            "type": "array",
+            "title": "Trials",
+            "description": "The soonest 200."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data_version",
+          "as_of",
+          "until",
+          "total",
+          "overdue",
+          "quarters",
+          "trials"
+        ],
+        "title": "TermReadoutsOut"
+      },
+      "TermRefOut": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "MeSH descriptor or supplementary concept code."
+          },
+          "term": {
+            "type": "string",
+            "title": "Term"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "condition",
+              "intervention"
+            ],
+            "title": "Kind"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "term",
+          "kind"
+        ],
+        "title": "TermRefOut"
+      },
+      "TermRelatedOut": {
+        "properties": {
+          "data_version": {
+            "type": "integer",
+            "title": "Data Version"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials"
+          },
+          "others": {
+            "type": "integer",
+            "title": "Others",
+            "description": "The filter's other trials, the baseline."
+          },
+          "tested": {
+            "type": "integer",
+            "title": "Tested"
+          },
+          "conditions": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedTermOut"
+            },
+            "type": "array",
+            "title": "Conditions"
+          },
+          "interventions": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedTermOut"
+            },
+            "type": "array",
+            "title": "Interventions"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/NetworkNodeOut"
+            },
+            "type": "array",
+            "title": "Nodes",
+            "description": "The term first."
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/NetworkEdgeOut"
+            },
+            "type": "array",
+            "title": "Edges"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data_version",
+          "trials",
+          "others",
+          "tested",
+          "conditions",
+          "interventions",
+          "nodes",
+          "edges"
+        ],
+        "title": "TermRelatedOut"
+      },
+      "TermSimilarOut": {
+        "properties": {
+          "data_version": {
+            "type": "integer",
+            "title": "Data Version"
+          },
+          "embedded": {
+            "type": "integer",
+            "title": "Embedded"
+          },
+          "same": {
+            "items": {
+              "$ref": "#/components/schemas/SimilarTermOut"
+            },
+            "type": "array",
+            "title": "Same"
+          },
+          "other": {
+            "items": {
+              "$ref": "#/components/schemas/SimilarTermOut"
+            },
+            "type": "array",
+            "title": "Other"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data_version",
+          "embedded",
+          "same",
+          "other"
+        ],
+        "title": "TermSimilarOut"
+      },
+      "TermThemesOut": {
+        "properties": {
+          "data_version": {
+            "type": "integer",
+            "title": "Data Version"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials"
+          },
+          "embedded": {
+            "type": "integer",
+            "title": "Embedded"
+          },
+          "sampled": {
+            "type": "integer",
+            "title": "Sampled"
+          },
+          "silhouette": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Silhouette"
+          },
+          "themes": {
+            "items": {
+              "$ref": "#/components/schemas/ThemeOut"
+            },
+            "type": "array",
+            "title": "Themes",
+            "description": "Largest first; empty under 30 trials with vectors."
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/ThemePointOut"
+            },
+            "type": "array",
+            "title": "Points"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data_version",
+          "trials",
+          "embedded",
+          "sampled",
+          "silhouette",
+          "themes",
+          "points"
+        ],
+        "title": "TermThemesOut"
+      },
+      "TermTimelineOut": {
+        "properties": {
+          "data_version": {
+            "type": "integer",
+            "title": "Data Version"
+          },
+          "years": {
+            "items": {
+              "$ref": "#/components/schemas/YearCountOut"
+            },
+            "type": "array",
+            "title": "Years"
+          },
+          "partial": {
+            "type": "boolean",
+            "title": "Partial",
+            "description": "Whether the last year isn't over."
+          },
+          "momentum": {
+            "items": {
+              "$ref": "#/components/schemas/MomentumOut"
+            },
+            "type": "array",
+            "title": "Momentum"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data_version",
+          "years",
+          "partial",
+          "momentum"
+        ],
+        "title": "TermTimelineOut"
+      },
+      "TermsOut": {
+        "properties": {
+          "data_version": {
+            "type": "integer",
+            "title": "Data Version"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "condition",
+              "intervention"
+            ],
+            "title": "Kind"
+          },
+          "terms": {
+            "items": {
+              "$ref": "#/components/schemas/TermCountOut"
+            },
+            "type": "array",
+            "title": "Terms",
+            "description": "Trials count those tagged with a narrower term too, in the whole registry."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data_version",
+          "kind",
+          "terms"
+        ],
+        "title": "TermsOut"
+      },
+      "ThemeOut": {
+        "properties": {
+          "cluster": {
+            "type": "integer",
+            "title": "Cluster"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "words": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Words"
+          },
+          "terms": {
+            "items": {
+              "$ref": "#/components/schemas/ThemeTermOut"
+            },
+            "type": "array",
+            "title": "Terms"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "share": {
+            "type": "number",
+            "title": "Share"
+          },
+          "growth": {
+            "type": "number",
+            "title": "Growth",
+            "description": "Its share of trials started in 3 years over before."
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence"
+          },
+          "examples": {
+            "items": {
+              "$ref": "#/components/schemas/ThemeTrialOut"
+            },
+            "type": "array",
+            "title": "Examples"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "cluster",
+          "label",
+          "words",
+          "terms",
+          "size",
+          "share",
+          "growth",
+          "confidence",
+          "examples"
+        ],
+        "title": "ThemeOut"
+      },
+      "ThemePointOut": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "title": "X"
+          },
+          "y": {
+            "type": "number",
+            "title": "Y"
+          },
+          "cluster": {
+            "type": "integer",
+            "title": "Cluster"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "x",
+          "y",
+          "cluster",
+          "source_id",
+          "title"
+        ],
+        "title": "ThemePointOut"
+      },
+      "ThemeTermOut": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "term": {
+            "type": "string",
+            "title": "Term"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "condition",
+              "intervention"
+            ],
+            "title": "Kind"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "term",
+          "kind"
+        ],
+        "title": "ThemeTermOut"
+      },
+      "ThemeTrialOut": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_id",
+          "title"
+        ],
+        "title": "ThemeTrialOut"
       },
       "TrialDetailOut": {
         "properties": {
@@ -5677,6 +11150,47 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "YearCountOut": {
+        "properties": {
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "trials": {
+            "type": "integer",
+            "title": "Trials",
+            "description": "Started that year."
+          },
+          "phases": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Phases",
+            "description": "By phase group, in the order of meta labels."
+          },
+          "share": {
+            "type": "number",
+            "title": "Share",
+            "description": "Of the filter's trials started that year."
+          },
+          "new_sponsors": {
+            "type": "integer",
+            "title": "New Sponsors",
+            "description": "Lead sponsors whose first trial of it started then."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "year",
+          "trials",
+          "phases",
+          "share",
+          "new_sponsors"
+        ],
+        "title": "YearCountOut"
       }
     }
   }

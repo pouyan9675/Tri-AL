@@ -36,8 +36,9 @@ class MetaOut(_Out):
     labels: dict[str, dict[str, str]] = Field(
         description="Display names of coded fields: status, phase, study_type, sponsor_class, "
         "intervention_type, primary_purpose, arm_type, allocation, intervention_model, "
-        "observational_model, time_perspective, masking and masked_role. A code without one "
-        "is shown as itself."
+        "observational_model, time_perspective, masking, masked_role and phase_group (the "
+        "phase groups term analyses count by, in order). A code without one is shown as "
+        "itself."
     )
 
 
@@ -493,3 +494,318 @@ class AnnotationEvent(
     ]
 ):
     """One line of an annotation stream."""
+
+
+# --- term analyses ------------------------------------------------------------------------
+
+TermKind = Literal["condition", "intervention"]
+Confidence = Literal["high", "medium", "low"]
+
+
+class TermRefOut(_Out):
+    code: str = Field(description="MeSH descriptor or supplementary concept code.")
+    term: str
+    kind: TermKind
+
+
+class TermCountOut(_Out):
+    code: str
+    term: str
+    trials: int
+
+
+class TermsOut(_Out):
+    data_version: int
+    kind: TermKind
+    terms: list[TermCountOut] = Field(
+        description="Trials count those tagged with a narrower term too, in the whole registry."
+    )
+
+
+class TermOverviewOut(_Out):
+    data_version: int
+    term: TermRefOut
+    trials: int = Field(description="The term's trials within the filter.")
+    registry_trials: int = Field(description="The term's trials without the filter.")
+    within: int = Field(description="Trials within the filter.")
+    direct: int = Field(description="The term's trials tagged with it, not only a narrower term.")
+    narrower: list[TermCountOut] = Field(description="Narrower terms, with trials in the filter.")
+    active: int
+    completed: int
+    stopped: int
+    with_results: int
+    lead_sponsors: int
+    industry: int = Field(description="Trials with an industry lead sponsor.")
+    countries: int
+    first_start: date | None
+    as_of: date = Field(description="The latest update of any trial: the data's today.")
+
+
+class YearCountOut(_Out):
+    year: int
+    trials: int = Field(description="Started that year.")
+    phases: list[int] = Field(description="By phase group, in the order of meta labels.")
+    share: float = Field(description="Of the filter's trials started that year.")
+    new_sponsors: int = Field(description="Lead sponsors whose first trial of it started then.")
+
+
+class MomentumOut(_Out):
+    months: int
+    since: date
+    until: date
+    trials: int = Field(description="First posted in the window.")
+    baseline: int = Field(description="First posted in the 12 months before.")
+    expected: float
+    growth: float = Field(description="Its share in the window over its share before, smoothed.")
+    raw_growth: float | None
+    p: float
+    confidence: Confidence
+    direction: Literal["rising", "falling", "steady"]
+
+
+class TermTimelineOut(_Out):
+    data_version: int
+    years: list[YearCountOut]
+    partial: bool = Field(description="Whether the last year isn't over.")
+    momentum: list[MomentumOut]
+
+
+class ReadoutOut(_Out):
+    trial: TrialSummaryOut
+    primary_completion: date
+    estimated: bool
+
+
+class QuarterCountOut(_Out):
+    quarter: str
+    start: date
+    trials: int
+    phases: list[int]
+
+
+class TermReadoutsOut(_Out):
+    data_version: int
+    as_of: date
+    until: date
+    total: int = Field(description="Active trials whose primary completion is due by `until`.")
+    overdue: int = Field(description="Active trials whose primary completion date has passed.")
+    quarters: list[QuarterCountOut]
+    trials: list[ReadoutOut] = Field(description="The soonest 200.")
+
+
+class RelatedTermOut(_Out):
+    code: str
+    term: str
+    kind: TermKind
+    trials: int
+    share: float
+    elsewhere: float = Field(description="Share of the filter's other trials tagged with it.")
+    lift: float = Field(description="How many times more common with the term, smoothed.")
+    p: float
+    q: float = Field(description="p corrected for every term tested (Benjamini-Hochberg).")
+    confidence: Confidence
+
+
+class NetworkNodeOut(_Out):
+    code: str
+    term: str
+    kind: TermKind
+    trials: int
+    lift: float | None
+    group: int = Field(description="Its community; -1 for the term itself.")
+    center: bool
+
+
+class NetworkEdgeOut(_Out):
+    source: int = Field(description="Index into nodes.")
+    target: int
+    trials: int
+    jaccard: float
+
+
+class TermRelatedOut(_Out):
+    data_version: int
+    trials: int
+    others: int = Field(description="The filter's other trials, the baseline.")
+    tested: int
+    conditions: list[RelatedTermOut]
+    interventions: list[RelatedTermOut]
+    nodes: list[NetworkNodeOut] = Field(description="The term first.")
+    edges: list[NetworkEdgeOut]
+
+
+class PipelineRowOut(_Out):
+    code: str
+    term: str
+    kind: TermKind
+    trials: int
+    phases: list[int] = Field(description="Trials in each of `phases`.")
+    active: int
+    highest: str | None
+    last_start: date | None
+
+
+class FunnelRowOut(_Out):
+    phase: str | None
+    trials: int
+    active: int
+    completed: int
+    stopped: int
+    unknown: int
+    other: int
+
+
+class TermPipelineOut(_Out):
+    data_version: int
+    kind: TermKind = Field(description="The rows' kind: the other kind than the term's.")
+    phases: list[str]
+    rows: list[PipelineRowOut]
+    funnel: list[FunnelRowOut]
+
+
+class StopRateOut(_Out):
+    group: str
+    closed: int
+    stopped: int
+    rate: float | None
+    baseline_closed: int
+    baseline_rate: float | None
+    ratio: float | None
+    p: float
+    q: float
+    confidence: Confidence
+
+
+class ReasonExampleOut(_Out):
+    source_id: str
+    reason: str
+
+
+class StopReasonOut(_Out):
+    key: str
+    label: str
+    trials: int
+    examples: list[ReasonExampleOut]
+
+
+class TermAttritionOut(_Out):
+    data_version: int
+    phases: list[StopRateOut]
+    observed: int
+    expected: float = Field(description="Stopped trials at the baseline's rates, by phase.")
+    ratio: float | None
+    p: float
+    confidence: Confidence
+    stopped: int
+    read: int = Field(description="Stopped trials whose reasons were read (at most 2,000).")
+    stated: int
+    reasons: list[StopReasonOut]
+
+
+class CurveOut(_Out):
+    group: str
+    trials: int
+    events: int
+    median: float | None = Field(description="Months.")
+    months: list[float]
+    values: list[float]
+
+
+class ResultsShareOut(_Out):
+    months: int
+    share: float | None
+    baseline: float | None
+
+
+class TermDurationsOut(_Out):
+    data_version: int
+    completion: list[CurveOut] = Field(
+        description="Share still running by months since start, by phase group, then all."
+    )
+    completion_baseline: list[CurveOut]
+    results: CurveOut = Field(description="Share with results by months since completion.")
+    results_baseline: CurveOut
+    results_at: list[ResultsShareOut]
+
+
+class BenchmarkOut(_Out):
+    key: str
+    label: str
+    section: str
+    unit: Literal["share", "years", "participants", "sites"]
+    value: float | None
+    baseline: float | None = Field(description="The filter's other trials, with its phase mix.")
+    difference: float | None = Field(description="Standardized: 0.2 small, 0.5 medium, 0.8 large.")
+    trials: int
+
+
+class EnrollmentBinOut(_Out):
+    low: int
+    high: int | None
+    share: float
+    baseline: float
+
+
+class TermProfileOut(_Out):
+    data_version: int
+    trials: int
+    baseline_trials: int
+    rows: list[BenchmarkOut]
+    enrollment: list[EnrollmentBinOut]
+
+
+class ThemeTrialOut(_Out):
+    source_id: str
+    title: str
+
+
+class ThemeTermOut(_Out):
+    code: str
+    term: str
+    kind: TermKind
+
+
+class ThemeOut(_Out):
+    cluster: int
+    label: str
+    words: list[str]
+    terms: list[ThemeTermOut]
+    size: int
+    share: float
+    growth: float = Field(description="Its share of trials started in 3 years over before.")
+    confidence: Confidence
+    examples: list[ThemeTrialOut]
+
+
+class ThemePointOut(_Out):
+    x: float
+    y: float
+    cluster: int
+    source_id: str
+    title: str
+
+
+class TermThemesOut(_Out):
+    data_version: int
+    trials: int
+    embedded: int
+    sampled: int
+    silhouette: float | None
+    themes: list[ThemeOut] = Field(description="Largest first; empty under 30 trials with vectors.")
+    points: list[ThemePointOut]
+
+
+class SimilarTermOut(_Out):
+    code: str
+    term: str
+    kind: TermKind
+    similarity: float
+    trials: int
+    shared: int = Field(description="Trials tagged with both; 0: never tagged together.")
+
+
+class TermSimilarOut(_Out):
+    data_version: int
+    embedded: int
+    same: list[SimilarTermOut]
+    other: list[SimilarTermOut]

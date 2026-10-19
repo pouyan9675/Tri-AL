@@ -38,6 +38,7 @@ from tri_al.search import merge
 from tri_al.stats import UnknownChart
 from tri_al.storage import SEARCH_CANDIDATES, Sort, SQLiteReader
 from tri_al.storage import tables as t
+from tri_al.terms.scope import PHASE_GROUPS
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require(READ))])
 
@@ -57,6 +58,7 @@ LABELS: dict[str, dict[str, str]] = {
     "time_perspective": dict(labels.TIME_PERSPECTIVE),
     "masking": dict(labels.MASKING),
     "masked_role": dict(labels.MASKED_ROLE),
+    "phase_group": dict(PHASE_GROUPS),
 }
 """Sent with the meta, so the front end shows codes as ClinicalTrials.gov does, with no copy."""
 

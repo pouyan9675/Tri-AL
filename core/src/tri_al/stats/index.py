@@ -2,10 +2,10 @@
 
 SQLite answers a narrow filter quickly, but a broad one (every completed trial, say) makes
 it visit hundreds of thousands of rows per chart: "top conditions among completed trials"
-takes about 450 ms. Each API worker therefore keeps the columns that filters, facets and
-charts use in numpy arrays, about 50 MB at 607k trials, built in a few seconds from one
-snapshot of ``trials.db``. A filter becomes a boolean mask over trial ids, and each count is
-one vectorized pass: the same question takes about 6 ms.
+takes about 450 ms. Each API worker therefore keeps the columns that filters, facets,
+charts and the term analyses (``tri_al.terms``) use in numpy arrays, built in a few seconds
+from one snapshot of ``trials.db``. A filter becomes a boolean mask over trial ids, and each
+count is one vectorized pass: the same question takes about 6 ms.
 
 The index belongs to one ``data_version``; the stats engine builds a new one in the
 background after an update and asks SQLite meanwhile.
@@ -44,13 +44,36 @@ NULL_DAY = np.iinfo(np.int32).min
 """A missing date in a date column (days since 1970-01-01)."""
 
 NULL_NUMBER = -1
-"""A missing enrollment."""
+"""A missing number: enrollment, an age."""
 
 NO_SPONSOR = -1
 """A trial without a lead sponsor."""
 
 _EPOCH = date(1970, 1, 1)
 _CHUNK = 65_536
+
+CODED_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("status", "status"),
+    ("phase", "phase"),
+    ("study_type", "study_type"),
+    ("sponsor_class", "lead_sponsor_class"),
+    ("has_results", "has_results"),
+    ("start_date_type", "start_date_type"),
+    ("primary_completion_date_type", "primary_completion_date_type"),
+    ("allocation", "allocation"),
+    ("masking", "masking"),
+    ("sex", "sex"),
+    ("healthy_volunteers", "healthy_volunteers"),
+)
+"""Coded columns the index keeps: its name for each, and the ``trials`` column."""
+
+INDEX_DATES: tuple[str, ...] = (*DATE_COLUMNS, "primary_completion_date", "results_first_posted")
+"""Date columns the index keeps: the ones ``Counts`` asks about, and two for analyses."""
+
+NUMBERS: tuple[str, ...] = ("enrollment", "min_age_days", "max_age_days", "num_sites")
+"""Number columns the index keeps; a missing one is ``NULL_NUMBER``."""
+
+_BOOLEANS = ("has_results", "healthy_volunteers")
 
 _DATE_FILTERS: dict[str, DateField] = {
     "start": "start_date",
@@ -69,7 +92,9 @@ def from_day_number(number: int) -> date:
 
 
 @dataclass(frozen=True, slots=True)
-class _Coded:
+class CodedColumn:
+    """A coded ``trials`` column: each trial's value as an index into ``codes``."""
+
     values: npt.NDArray[np.int16]  # by trial id: an index into codes, or -1 for NULL
     codes: tuple[Any, ...]
 
@@ -81,7 +106,9 @@ class _Coded:
 
 
 @dataclass(frozen=True, slots=True)
-class _Linked:
+class LinkColumn:
+    """A link table (conditions, MeSH terms, countries, ...): one entry per link row."""
+
     trial: Ids  # one entry per link row
     value: Ids  # the entity id (or country index) of each row
     size: int  # max value + 1
@@ -94,22 +121,24 @@ class TrialIndex:
         self,
         data_version: int,
         present: Mask,
-        coded: dict[str, _Coded],
+        coded: dict[str, CodedColumn],
         dates: dict[str, npt.NDArray[np.int32]],
-        enrollment: npt.NDArray[np.int64],
+        numbers: dict[str, npt.NDArray[np.int32]],
         lead_sponsors: Ids,
-        links: dict[str, _Linked],
+        links: dict[str, LinkColumn],
         countries: tuple[str, ...],
-        intervention_types: _Linked,
+        intervention_types: LinkColumn,
         drug_links: Mask,
         type_codes: tuple[str | None, ...],
+        placebo: Mask,
     ) -> None:
         self.data_version = data_version
         self.present = present
         self.size = len(present)
         self._coded = coded
         self._dates = dates
-        self._enrollment = enrollment
+        self._numbers = numbers
+        self._enrollment = numbers["enrollment"]
         self._lead_sponsors = lead_sponsors
         self._links = links
         self._countries = countries
@@ -117,6 +146,7 @@ class TrialIndex:
         self._types = intervention_types
         self._type_codes = type_codes
         self._drug_links = drug_links
+        self._placebo = placebo
         self._orders: dict[str, tuple[Ids, npt.NDArray[np.int64]]] = {}
 
     @property
@@ -128,16 +158,44 @@ class TrialIndex:
         """Memory the arrays use."""
         arrays: list[npt.NDArray[Any]] = [
             self.present,
-            self._enrollment,
             self._lead_sponsors,
             self._drug_links,
+            self._placebo,
         ]
         arrays += [c.values for c in self._coded.values()]
         arrays += list(self._dates.values())
+        arrays += list(self._numbers.values())
         arrays += [
             a for link in (*self._links.values(), self._types) for a in (link.trial, link.value)
         ]
         return sum(a.nbytes for a in arrays)
+
+    # --- columns, for analyses -------------------------------------------------------------
+
+    def coded(self, name: str) -> CodedColumn:
+        """A coded column by its name in ``CODED_COLUMNS``: status, phase, sex, ..."""
+        return self._coded[name]
+
+    def dates(self, name: str) -> npt.NDArray[np.int32]:
+        """A date column (``INDEX_DATES``) as days since 1970, ``NULL_DAY`` when missing."""
+        return self._dates[name]
+
+    def numbers(self, name: str) -> npt.NDArray[np.int32]:
+        """A number column (``NUMBERS``), ``NULL_NUMBER`` when missing."""
+        return self._numbers[name]
+
+    def link(self, dimension: LinkDimension) -> LinkColumn:
+        return self._links[dimension]
+
+    @property
+    def lead_sponsors(self) -> Ids:
+        """Each trial's lead sponsor id, ``NO_SPONSOR`` for none."""
+        return self._lead_sponsors
+
+    @property
+    def placebo(self) -> Mask:
+        """Trials with an intervention whose name says placebo."""
+        return self._placebo
 
     # --- building ---------------------------------------------------------------------------
 
@@ -147,45 +205,50 @@ class TrialIndex:
         raw = conn.connection.driver_connection
         size = int(conn.execute(select(func.coalesce(func.max(t.trials.c.id), 0))).scalar_one()) + 1
         present = np.zeros(size, np.bool_)
-        coded_columns = ("status", "phase", "study_type", "lead_sponsor_class", "has_results")
-        codes: list[dict[Any, int]] = [{} for _ in coded_columns]
-        coded = [np.full(size, -1, np.int16) for _ in coded_columns]
+        columns_ = [column_ for _, column_ in CODED_COLUMNS]
+        codes: list[dict[Any, int]] = [{} for _ in CODED_COLUMNS]
+        coded = [np.full(size, -1, np.int16) for _ in CODED_COLUMNS]
         dates: dict[str, npt.NDArray[np.int32]] = {
-            name: np.full(size, NULL_DAY, np.int32) for name in DATE_COLUMNS
+            name: np.full(size, NULL_DAY, np.int32) for name in INDEX_DATES
         }
-        enrollment = np.full(size, NULL_NUMBER, np.int64)
+        numbers = {name: np.full(size, NULL_NUMBER, np.int32) for name in NUMBERS}
         lead_sponsors = np.full(size, NO_SPONSOR, np.int32)
         day = "coalesce(CAST(julianday({0}) - 2440587.5 AS INTEGER), {1})"
         cursor = raw.execute(  # type: ignore[union-attr]
-            f"SELECT id, {', '.join(coded_columns)}, "
-            + ", ".join(day.format(name, NULL_DAY) for name in DATE_COLUMNS)
-            + f", coalesce(enrollment, {NULL_NUMBER}), coalesce(lead_sponsor_id, {NO_SPONSOR})"
+            f"SELECT id, {', '.join(columns_)}, "
+            + ", ".join(day.format(name, NULL_DAY) for name in INDEX_DATES)
+            + ", "
+            + ", ".join(f"coalesce({name}, {NULL_NUMBER})" for name in NUMBERS)
+            + f", coalesce(lead_sponsor_id, {NO_SPONSOR})"
             + " FROM trials"
         )
         while rows := cursor.fetchmany(_CHUNK):
             columns = list(zip(*rows, strict=True))
             ids = np.fromiter(columns[0], np.int32, len(rows))
             present[ids] = True
-            for i, values in enumerate(columns[1 : 1 + len(coded_columns)]):
+            for i, values in enumerate(columns[1 : 1 + len(CODED_COLUMNS)]):
                 mapping = codes[i]
                 coded[i][ids] = [
                     -1 if value is None else mapping.setdefault(value, len(mapping))
                     for value in values
                 ]
-            offset = 1 + len(coded_columns)
-            for j, name in enumerate(DATE_COLUMNS):
+            offset = 1 + len(CODED_COLUMNS)
+            for j, name in enumerate(INDEX_DATES):
                 dates[name][ids] = np.fromiter(columns[offset + j], np.int32, len(rows))
-            enrollment[ids] = np.fromiter(columns[-2], np.int64, len(rows))
+            offset += len(INDEX_DATES)
+            for j, name in enumerate(NUMBERS):
+                numbers[name][ids] = np.fromiter(columns[offset + j], np.int32, len(rows))
             lead_sponsors[ids] = np.fromiter(columns[-1], np.int32, len(rows))
-        names = ("status", "phase", "study_type", "sponsor_class", "has_results")
         coded_by_name = {
-            name: _Coded(values, tuple(sorted(mapping, key=mapping.__getitem__)))
-            for name, values, mapping in zip(names, coded, codes, strict=True)
+            name: CodedColumn(
+                values,
+                tuple(
+                    bool(code) if name in _BOOLEANS else code
+                    for code in sorted(mapping, key=mapping.__getitem__)
+                ),
+            )
+            for (name, _), values, mapping in zip(CODED_COLUMNS, coded, codes, strict=True)
         }
-        coded_by_name["has_results"] = _Coded(
-            coded_by_name["has_results"].values,
-            tuple(bool(v) for v in coded_by_name["has_results"].codes),
-        )
 
         links = {
             name: _read_pairs(raw, f"SELECT trial_id, {key} FROM {table}")
@@ -209,7 +272,7 @@ class TrialIndex:
         )
         for dimension, is_condition in (("mesh_conditions", 1), ("mesh_interventions", 0)):
             rows = triples[triples[:, 2] == is_condition]
-            links[dimension] = _Linked(
+            links[dimension] = LinkColumn(
                 rows[:, 0].copy(), rows[:, 1].copy(), int(rows[:, 1].max()) + 1 if len(rows) else 0
             )
         type_codes: dict[str | None, int] = {}
@@ -220,7 +283,7 @@ class TrialIndex:
         )
         trial_arr, type_arr = triples[:, 0].copy(), triples[:, 2].copy()
         intervention_arr = triples[:, 1].copy()
-        links["interventions"] = _Linked(
+        links["interventions"] = LinkColumn(
             trial_arr, intervention_arr, int(intervention_arr.max()) + 1 if len(triples) else 0
         )
         type_list = tuple(sorted(type_codes, key=type_codes.__getitem__))
@@ -228,21 +291,31 @@ class TrialIndex:
         # One row per (trial, type), so a trial with two drugs counts once for DRUG.
         typed = type_arr != type_codes.get(None, -1)
         pairs = np.unique(trial_arr[typed].astype(np.int64) * 64 + type_arr[typed])
-        intervention_types = _Linked(
+        intervention_types = LinkColumn(
             (pairs // 64).astype(np.int32), (pairs % 64).astype(np.int32), len(type_list)
         )
+        # Trials with a placebo: an intervention named so ("Placebo", "Placebo oral tablet").
+        placebos = [
+            key
+            for (key,) in raw.execute(  # type: ignore[union-attr]
+                "SELECT id FROM interventions WHERE name LIKE '%placebo%'"
+            )
+        ]
+        placebo = np.zeros(size, np.bool_)
+        placebo[trial_arr[np.isin(intervention_arr, placebos)]] = True
         return cls(
             data_version,
             present,
             coded_by_name,
             dates,
-            enrollment,
+            numbers,
             lead_sponsors,
             links,
             countries,
             intervention_types,
             type_arr == drug,
             type_list,
+            placebo,
         )
 
     # --- filters ----------------------------------------------------------------------------
@@ -309,7 +382,7 @@ class TrialIndex:
         wanted = [code for value in values if (code := column_.code_of(value)) is not None]
         return np.isin(column_.values, wanted)
 
-    def _linked_mask(self, link: _Linked, wanted: Sequence[int]) -> Mask:
+    def _linked_mask(self, link: LinkColumn, wanted: Sequence[int]) -> Mask:
         mask = np.zeros(self.size, np.bool_)
         if wanted:
             mask[link.trial[np.isin(link.value, wanted)]] = True
@@ -325,7 +398,7 @@ class TrialIndex:
 
     def _mesh(self, conn: Connection, codes: Sequence[str]) -> Mask:
         # Straight from the link table's (mesh_term_id, kind, trial_id) index.
-        return self._raw_ids(
+        return self.select_mask(
             conn,
             "SELECT trial_id FROM trial_mesh WHERE mesh_term_id IN "
             "(SELECT id FROM mesh_terms WHERE code IN (SELECT value FROM json_each(?)))",
@@ -336,12 +409,12 @@ class TrialIndex:
         query = text_query(q)
         if query is None:
             return self.present
-        return self._raw_ids(conn, *query)
+        return self.select_mask(conn, *query)
 
-    def _raw_ids(
+    def select_mask(
         self, conn: Connection, sql: str, params: tuple[Any, ...] | Mapping[str, Any]
     ) -> Mask:
-        """A mask of the ids ``sql`` selects, read on the sqlite3 cursor in bulk.
+        """A mask of the trial ids ``sql`` selects, read on the sqlite3 cursor in bulk.
 
         A broad text query finds over half a million trials; SQLAlchemy's per-row work
         would cost more than the query.
@@ -464,7 +537,7 @@ class IndexCounts:
                 result[code] = int(count)
         return result
 
-    def _link_counts(self, link: _Linked, rows: Mask | None = None) -> npt.NDArray[np.int64]:
+    def _link_counts(self, link: LinkColumn, rows: Mask | None = None) -> npt.NDArray[np.int64]:
         selected = self._mask[link.trial]
         if rows is not None:
             selected &= rows
@@ -631,7 +704,7 @@ def _read_triples(
     return np.concatenate(chunks) if chunks else np.zeros((0, 3), np.int32)
 
 
-def _read_pairs(raw: Any, sql: str, convert: Callable[[Any], int] | None = None) -> _Linked:
+def _read_pairs(raw: Any, sql: str, convert: Callable[[Any], int] | None = None) -> LinkColumn:
     cursor = raw.execute(sql)
     trials: list[npt.NDArray[np.int32]] = []
     values: list[npt.NDArray[np.int32]] = []
@@ -644,4 +717,4 @@ def _read_pairs(raw: Any, sql: str, convert: Callable[[Any], int] | None = None)
         values.append(pairs[:, 1])
     trial = np.concatenate(trials) if trials else np.zeros(0, np.int32)
     value = np.concatenate(values) if values else np.zeros(0, np.int32)
-    return _Linked(trial, value, int(value.max()) + 1 if len(value) else 0)
+    return LinkColumn(trial, value, int(value.max()) + 1 if len(value) else 0)

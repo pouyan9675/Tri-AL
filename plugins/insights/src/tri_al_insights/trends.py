@@ -30,25 +30,24 @@ confidence is high. It is ``new`` when its first trial under the filter was post
 window.
 """
 
-import calendar
-import math
 from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, timedelta
-from typing import Any, Literal
+from datetime import timedelta
+from typing import Any
 
 from tri_al.filters import EVERY_TRIAL, TrialFilter
 from tri_al.stats import ChartContext, LinkDimension, Rows, Timeline
+from tri_al.stats.methods import HIGH as HIGH
+from tri_al.stats.methods import MEDIUM as MEDIUM
+from tri_al.stats.methods import Confidence as Confidence
+from tri_al.stats.methods import confidence as confidence
+from tri_al.stats.methods import excess_p
+from tri_al.stats.methods import false_discovery as false_discovery
+from tri_al.stats.methods import months_before as months_before
 
 PRIOR = 10.0
 """Trials added to each term for its growth, split between window and baseline as usual."""
-
-HIGH = 0.05
-"""The false discovery rate (``q``) under which confidence is high."""
-
-MEDIUM = 0.25
-"""The false discovery rate under which confidence is medium."""
 
 MIN_GROWTH = 1.2
 """Growth an entry needs to be listed, unless its confidence is high."""
@@ -58,7 +57,6 @@ GROUPS: tuple[tuple[str, LinkDimension], ...] = (
     ("Interventions", "mesh_interventions"),
 )
 
-type Confidence = Literal["high", "medium", "low"]
 _ORDER: dict[str, int] = {"high": 0, "medium": 1, "low": 2}
 
 
@@ -69,13 +67,6 @@ class Options:
     top: int = 10  # entries per group and window
     min_trials: int = 3
     min_sponsors: int = 2
-
-
-def months_before(day: date, months: int) -> date:
-    """The same day ``months`` months earlier, or the last day of a shorter month."""
-    index = day.year * 12 + day.month - 1 - months
-    year, month = divmod(index, 12)
-    return date(year, month + 1, min(day.day, calendar.monthrange(year, month + 1)[1]))
 
 
 def growths(
@@ -91,44 +82,10 @@ def growths(
 def rise_p(recent: int, trials: int, usual: float) -> float:
     """The chance of ``recent`` or more of ``trials`` in the window if each has ``usual``.
 
-    The upper tail of a binomial distribution. A term with no more than its usual share
-    can't be rising, so it gets 1.
+    The upper tail of a binomial distribution (``excess_p``). A term with no more than its
+    usual share can't be rising, so it gets 1.
     """
-    if recent <= trials * usual or usual <= 0:
-        return 1.0
-    if usual >= 1 or recent > trials:
-        return 0.0
-    log_term = (
-        math.lgamma(trials + 1)
-        - math.lgamma(recent + 1)
-        - math.lgamma(trials - recent + 1)
-        + recent * math.log(usual)
-        + (trials - recent) * math.log1p(-usual)
-    )
-    term = math.exp(log_term)
-    total = term
-    # Past the mean the terms only shrink, so stop once they no longer count.
-    for k in range(recent, trials):
-        term *= (trials - k) / (k + 1) * usual / (1 - usual)
-        total += term
-        if term < total * 1e-12:
-            break
-    return min(1.0, total)
-
-
-def false_discovery(ps: Sequence[float]) -> list[float]:
-    """Benjamini-Hochberg q-values, in the order of ``ps``."""
-    m = len(ps)
-    q = [1.0] * m
-    smallest = 1.0
-    for rank, i in reversed(list(enumerate(sorted(range(m), key=ps.__getitem__), start=1))):
-        smallest = min(smallest, ps[i] * m / rank)
-        q[i] = smallest
-    return q
-
-
-def confidence(q: float) -> Confidence:
-    return "high" if q < HIGH else "medium" if q < MEDIUM else "low"
+    return excess_p(recent, trials, usual)
 
 
 def emerging(ctx: ChartContext, filter: TrialFilter, options: Options) -> Rows:

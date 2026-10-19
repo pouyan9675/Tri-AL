@@ -318,7 +318,7 @@ function Details({
 const low = (item: Item) => item.confidence === "low";
 
 /** Confidence as one to three rising bars and its word. */
-function Meter({ confidence }: { confidence: Confidence }) {
+export function Meter({ confidence }: { confidence: Confidence }) {
   const { label, steps, color } = CONFIDENCE[confidence];
   return (
     <span className="flex items-center justify-end gap-1.5 text-[0.7rem]">

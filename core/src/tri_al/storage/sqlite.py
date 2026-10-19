@@ -410,6 +410,10 @@ class SQLiteReader:
         """List rows for ``ids``, in that order; ids that aren't stored are left out."""
         return _summaries(self._conn, ids)
 
+    def texts(self, ids: Sequence[int]) -> dict[int, docs.TrialText]:
+        """The long text of each of ``ids`` that's stored: summary, ..., why it stopped."""
+        return _texts(self._conn, ids, self._decoder)
+
     def count_trials(self, filter: TrialFilter = EVERY_TRIAL) -> int:
         stmt = select(func.count()).select_from(t.trials).where(*where(filter))
         count: int = self._conn.execute(stmt).scalar_one()

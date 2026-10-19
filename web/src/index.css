@@ -64,6 +64,8 @@
  * Chart colors are the dataviz reference palette (validated for colour-vision deficiency in
  * this order, light and dark stepped separately); --seq-* is its blue sequential ramp, for
  * the map. Status colors are kept apart from the series colors and always come with a label.
+ * --phase-* is an ordinal ramp for phase groups (phases 1 to 4, then a grey for the rest):
+ * four steps of the blue ramp, validated as ordinal against each theme's surface.
  */
 :root {
   --background: oklch(0.985 0.0015 247);
@@ -108,6 +110,11 @@
   --seq-500: #256abf;
   --seq-600: #184f95;
   --seq-700: #0d366b;
+  --phase-1: var(--seq-300);
+  --phase-2: var(--seq-400);
+  --phase-3: var(--seq-600);
+  --phase-4: var(--seq-700);
+  --phase-other: oklch(0.82 0.004 255);
   --radius: 0.7rem;
   --sidebar: oklch(0.975 0.002 247);
   --sidebar-foreground: oklch(0.2 0.006 255);
@@ -158,6 +165,11 @@
   --seq-500: #3987e5;
   --seq-600: #6da7ec;
   --seq-700: #b7d3f6;
+  --phase-1: var(--seq-300);
+  --phase-2: var(--seq-500);
+  --phase-3: var(--seq-600);
+  --phase-4: var(--seq-700);
+  --phase-other: oklch(0.4 0.005 255);
   --sidebar: oklch(0.175 0.005 255);
   --sidebar-foreground: oklch(0.96 0.002 247);
   --sidebar-primary: oklch(0.62 0.15 254);

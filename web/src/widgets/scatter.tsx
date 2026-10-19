@@ -356,3 +356,6 @@ export function legendOf(points: Point[]) {
   colored.sort((a, b) => a.color - b.color);
   return { colored, other, unclustered };
 }
+
+/** The canvas plot and its points, for other maps of trials (a term's sub-themes). */
+export { Plot as LandscapePlot, type Point as LandscapePoint };

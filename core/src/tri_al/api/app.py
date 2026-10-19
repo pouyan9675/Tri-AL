@@ -24,7 +24,7 @@ from tri_al.access import READ, require
 from tri_al.access.browser import BrowserProtection
 from tri_al.api.events import EventHub, stream
 from tri_al.api.http import NO_STORE, JSONBytes
-from tri_al.api.routes import ai, data, jobs, plugins
+from tri_al.api.routes import ai, data, jobs, plugins, terms
 from tri_al.api.state import ApiState
 from tri_al.api.web import add_web
 from tri_al.config import Config, config_path, load_config
@@ -91,6 +91,7 @@ def create_app(
     app.include_router(jobs.router)
     app.include_router(plugins.router)
     app.include_router(ai.router)
+    app.include_router(terms.router)
 
     @app.get(
         "/api/events",

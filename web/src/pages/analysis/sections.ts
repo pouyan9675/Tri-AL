@@ -38,13 +38,13 @@ export const ANALYSIS_SECTIONS: readonly AnalysisSection[] = [
   {
     to: "/analysis/conditions",
     label: "Conditions",
-    description: "The conditions trials study, across the registry.",
+    description: "One condition in depth: its trials over time, what goes with it, how they end.",
     icon: HeartPulse,
   },
   {
     to: "/analysis/interventions",
     label: "Interventions",
-    description: "The drugs, devices and other interventions trials test.",
+    description: "One drug, device or other intervention in depth: where and how it's tested.",
     icon: Pill,
   },
 ];
@@ -66,4 +66,12 @@ export function parseLinkingSearch(search: Record<string, unknown>): LinkingSear
   const values = Array.isArray(search.terms) ? search.terms : [search.terms];
   const terms = values.filter((code): code is string => typeof code === "string" && !!code);
   return { ...(trial && { trial }), ...(terms.length > 0 && { terms }) };
+}
+
+export type TermSearch = { term?: string };
+
+/** The Conditions and Interventions sections' own search param: the MeSH code (`term`). */
+export function parseTermSearch(search: Record<string, unknown>): TermSearch {
+  const term = typeof search.term === "string" ? search.term.trim().toUpperCase() : "";
+  return term ? { term } : {};
 }
