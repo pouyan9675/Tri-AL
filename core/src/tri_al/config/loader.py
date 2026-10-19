@@ -2,7 +2,7 @@
 
 import os
 import tomllib
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -54,22 +54,62 @@ def set_plugin_enabled(path: Path, name: str, enabled: bool) -> None:
 
 def edit_plugin_section(path: Path, name: str, changes: Mapping[str, Any]) -> None:
     """Set keys in ``[plugins.<name>]`` (None removes one), keeping comments and layout."""
-    try:
-        text = path.read_text(encoding="utf-8") if path.exists() else ""
-        doc = tomlkit.parse(text)
-    except (OSError, tomlkit.exceptions.ParseError) as exc:
-        raise ConfigError(f"{path}: {exc}") from None
+    doc = _parse(path)
     plugins = doc.setdefault("plugins", tomlkit.table(is_super_table=True))
     if not isinstance(plugins, dict):
         raise ConfigError(f"{path}: 'plugins' must be a table")
     section = plugins.setdefault(name, tomlkit.table())
     if not isinstance(section, dict):
         raise ConfigError(f"{path}: 'plugins.{name}' must be a table")
+    _set(section, changes)
+    _write(path, doc)
+
+
+def edit_ai_section(
+    path: Path,
+    changes: Mapping[str, Any],
+    labels: Sequence[Mapping[str, Any]] | None = None,
+) -> None:
+    """Set keys in ``[ai]`` (None removes one) and, if given, replace the annotation labels.
+
+    Labels are written as ``[[ai.annotation.labels]]`` tables, one per label, so the file
+    stays easy to edit by hand. Comments and layout elsewhere are kept.
+    """
+    doc = _parse(path)
+    section = doc.setdefault("ai", tomlkit.table())
+    if not isinstance(section, dict):
+        raise ConfigError(f"{path}: 'ai' must be a table")
+    _set(section, changes)
+    if labels is not None:
+        annotation = section.setdefault("annotation", tomlkit.table())
+        if not isinstance(annotation, dict):
+            raise ConfigError(f"{path}: 'ai.annotation' must be a table")
+        tables = tomlkit.aot()
+        for label in labels:
+            table = tomlkit.table()
+            _set(table, {key: value for key, value in label.items() if value not in ("", [])})
+            tables.append(table)
+        annotation["labels"] = tables
+    _write(path, doc)
+
+
+def _parse(path: Path) -> tomlkit.TOMLDocument:
+    try:
+        text = path.read_text(encoding="utf-8") if path.exists() else ""
+        return tomlkit.parse(text)
+    except (OSError, tomlkit.exceptions.ParseError) as exc:
+        raise ConfigError(f"{path}: {exc}") from None
+
+
+def _set(section: dict[str, Any], changes: Mapping[str, Any]) -> None:
     for key, value in changes.items():
         if value is None:
             section.pop(key, None)
         else:
             section[key] = value
+
+
+def _write(path: Path, doc: tomlkit.TOMLDocument) -> None:
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(tomlkit.dumps(doc), encoding="utf-8")
     tmp.replace(path)

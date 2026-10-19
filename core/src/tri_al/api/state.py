@@ -12,6 +12,7 @@ from sqlalchemy import Engine
 
 from tri_al import __version__
 from tri_al.access import AccessPolicy, AllowAll
+from tri_al.ai import AiService
 from tri_al.api.http import etag_for
 from tri_al.config import Config
 from tri_al.filters import FilterField
@@ -35,6 +36,7 @@ class ApiState:
     providers: dict[str, SearchProvider]
     filter_fields: dict[str, FilterField]
     access_policy: AccessPolicy
+    ai: AiService
     use_index: bool = True
     build: str = ""
     _storage: SQLiteStorage | None = None
@@ -73,6 +75,7 @@ class ApiState:
             providers={"fts": FullTextProvider(), **contributions.search_providers},
             filter_fields=dict(contributions.filter_fields),
             access_policy=AllowAll() if policy is None else policy[1],
+            ai=AiService(config.ai, config_path, contributions.model_backends),
             use_index=use_index,
             build=build,
         )
@@ -121,6 +124,7 @@ class ApiState:
                 self._storage.close()
                 self._storage = None
                 self._stats = None
+        self.ai.close()
         self.app_db.dispose()
 
 

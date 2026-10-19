@@ -27,7 +27,7 @@ from tri_al.plugins import API_VERSION, LoadedPlugins, Plugin, Registry
 from tri_al.plugins.registry import Contributions
 from tri_al.stats import Chart, ChartContext, Rows
 from tri_al.storage import SQLiteStorage, open_app_db
-from tri_al.testing import FakeSource, fake_study
+from tri_al.testing import FakeChatModel, FakeModelBackend, FakeSource, fake_study
 
 HEADERS = {"X-Tri-AL": "1"}
 BASE_URL = "http://127.0.0.1:8000"
@@ -41,6 +41,7 @@ STUDIES = (
         conditions=["Alzheimer Disease"],
         countries=["US"],
         enrollment=120,
+        summary="Donepezil for people with mild dementia.\r\n\r\nDementia gets worse.",
     ),
     fake_study(
         "F2",
@@ -380,6 +381,10 @@ def test_the_openapi_schema_names_every_operation(client: TestClient) -> None:
         "cancelJob",
         "listPlugins",
         "updatePlugin",
+        "getAiSettings",
+        "updateAiSettings",
+        "listAiModels",
+        "annotateTrial",
     }
     assert "TrialPageOut" in schema["components"]["schemas"]
     params = {p["name"] for p in schema["paths"]["/api/trials"]["get"]["parameters"]}
@@ -688,3 +693,195 @@ def test_reads_after_a_direct_write(client: TestClient, served: Served) -> None:
         conn.execute(text("UPDATE meta SET value = '7' WHERE key = 'data_version'"))
 
     assert body(client.get("/api/trials"), m.TrialPageOut).data_version == 7
+
+
+# --- AI -----------------------------------------------------------------------------------
+
+
+def with_models(tmp_path: Path, backend: FakeModelBackend) -> Served:
+    """A server whose AI settings use ``backend``."""
+
+    def register(registry: Registry) -> None:
+        registry.add_model_backend(backend)
+
+    plugin = Plugin(name="local", version="1", api_version=API_VERSION, register=register)
+    served = Served(tmp_path, extra=(plugin,))
+    response = TestClient(served.app, base_url=BASE_URL).patch(
+        "/api/ai", json={"backend": "fake"}, headers=HEADERS
+    )
+    assert response.status_code == 200, response.text
+    return served
+
+
+def events(response: httpx.Response) -> list[dict[str, Any]]:
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"] == "application/x-ndjson"
+    lines = [orjson.loads(line) for line in response.text.splitlines()]
+    for line in lines:
+        m.AnnotationEvent.model_validate(line)
+    return lines
+
+
+def test_ai_settings(client: TestClient, served: Served) -> None:
+    settings = body(client.get("/api/ai"), m.AiSettingsOut)
+    assert (settings.enabled, settings.backend, settings.model) == (True, "openai", "")
+    assert settings.server == "http://127.0.0.1:1234/v1"
+    assert [label.name for label in settings.labels][:2] == ["Condition", "Intervention"]
+    assert [b.name for b in settings.backends] == ["openai"]
+    assert settings.locked == []
+
+    labels = [
+        {"name": "Drug", "examples": ["donepezil", " "], "color": "pink"},
+        {"name": "Disease", "description": "Diseases"},
+    ]
+    changed = body(
+        client.patch("/api/ai", json={"model": "small", "labels": labels}, headers=HEADERS),
+        m.AiSettingsOut,
+    )
+    assert changed.model == "small"
+    assert [(lb.name, lb.examples, lb.color) for lb in changed.labels] == [
+        ("Drug", ["donepezil"], "pink"),
+        ("Disease", [], "blue"),
+    ]
+    written = served.config_file.read_text()
+    assert 'model = "small"' in written
+    assert "[[ai.annotation.labels]]" in written
+    assert body(client.get("/api/ai"), m.AiSettingsOut) == changed
+
+    automatic = body(client.patch("/api/ai", json={"model": ""}, headers=HEADERS), m.AiSettingsOut)
+    assert automatic.model == ""
+    assert "model" not in served.config_file.read_text()
+
+
+@pytest.mark.parametrize(
+    ("patch", "problem"),
+    [
+        ({"server": "ftp://x"}, "http:// or https://"),
+        ({"labels": [{"name": "A"}, {"name": "A"}]}, "must differ"),
+        ({"labels": [{"name": "A", "color": "mauve"}]}, ""),
+        ({"backend": "nope"}, "no model backend named 'nope'"),
+        ({"temperature": 1}, ""),
+    ],
+)
+def test_ai_settings_are_checked(
+    client: TestClient, served: Served, patch: dict[str, Any], problem: str
+) -> None:
+    response = client.patch("/api/ai", json=patch, headers=HEADERS)
+
+    assert response.status_code == 422, response.text
+    assert problem in response.text
+    assert not served.config_file.exists()
+
+
+def test_ai_settings_set_by_the_environment_are_locked(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TRI_AL_AI__MODEL", "small")
+    monkeypatch.setenv("TRI_AL_AI__ANNOTATION__LABELS", "[]")
+    assert body(client.get("/api/ai"), m.AiSettingsOut).locked == ["labels", "model"]
+
+
+def test_changing_ai_settings_is_protected(client: TestClient) -> None:
+    assert client.patch("/api/ai", json={"model": "x"}).status_code == 403
+    assert client.post("/api/ai/models").status_code == 403
+    response = client.post("/api/trials/F1/annotate", json={"field": "brief_summary"})
+    assert response.status_code == 403
+
+
+def test_list_ai_models(tmp_path: Path) -> None:
+    served = with_models(tmp_path, FakeModelBackend())
+    with TestClient(served.app, base_url=BASE_URL) as client:
+        listed = body(client.post("/api/ai/models", headers=HEADERS), m.AiModelsOut)
+        assert (listed.backend, listed.error) == ("fake", None)
+        assert [(model.id, model.loaded) for model in listed.models] == [("fake-model", True)]
+
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]  # closed again: nothing listens there
+        server = f"http://127.0.0.1:{port}/v1"
+        tried = body(
+            client.post(
+                "/api/ai/models", json={"backend": "openai", "server": server}, headers=HEADERS
+            ),
+            m.AiModelsOut,
+        )
+        assert (tried.server, tried.models) == (server, [])
+        assert tried.error == f"can't reach the model server at {server}; is it running?"
+        bad = client.post("/api/ai/models", json={"server": "nowhere"}, headers=HEADERS)
+        assert bad.status_code == 422
+
+
+def test_annotate_a_trial(tmp_path: Path) -> None:
+    model = FakeChatModel({"donepezil": "Intervention", "dementia": "Condition"})
+    served = with_models(tmp_path, FakeModelBackend(model))
+    with TestClient(served.app, base_url=BASE_URL) as client:
+        streamed = events(
+            client.post("/api/trials/f1/annotate", json={"field": "brief_summary"}, headers=HEADERS)
+        )
+        again = events(
+            client.post("/api/trials/F1/annotate", json={"field": "brief_summary"}, headers=HEADERS)
+        )
+
+    text = "Donepezil for people with mild dementia.\n\nDementia gets worse."
+    start, spans, done = streamed
+    assert (start["type"], start["model"], start["length"], start["cached"]) == (
+        "start",
+        "fake-model",
+        len(text),
+        False,
+    )
+    assert [(text[s["start"] : s["end"]], s["label"]) for s in spans["spans"]] == [
+        ("Donepezil", "Intervention"),
+        ("dementia", "Condition"),
+        ("Dementia", "Condition"),
+    ]
+    assert done == {"type": "done", "spans": 3, "seconds": done["seconds"]}
+    assert again[0]["cached"] is True
+    assert len(model.calls) == 1
+
+
+def test_annotate_refusals(tmp_path: Path) -> None:
+    backend = FakeModelBackend()
+    served = with_models(tmp_path, backend)
+    with TestClient(served.app, base_url=BASE_URL) as client:
+
+        def annotate(source_id: str, field: str = "brief_summary") -> httpx.Response:
+            url = f"/api/trials/{source_id}/annotate"
+            return client.post(url, json={"field": field}, headers=HEADERS)
+
+        assert annotate("NOPE").status_code == 404
+        assert annotate("F1", "title").status_code == 422
+        no_text = annotate("F2")
+        assert (no_text.status_code, no_text.json()) == (
+            422,
+            {"detail": "the trial has no brief_summary"},
+        )
+
+        backend.error = "can't reach the model server"
+        unreachable = annotate("F1")
+        assert (unreachable.status_code, unreachable.json()["detail"]) == (
+            502,
+            "can't reach the model server",
+        )
+
+        client.patch("/api/ai", json={"labels": []}, headers=HEADERS)
+        assert annotate("F1").status_code == 422
+        client.patch("/api/ai", json={"enabled": False}, headers=HEADERS)
+        off = annotate("F1")
+        assert (off.status_code, off.json()["detail"]) == (409, "AI is turned off in Settings")
+
+
+def test_annotation_streams_as_the_model_answers(tmp_path: Path) -> None:
+    model = FakeChatModel(error="the model crashed")
+    served = with_models(tmp_path, FakeModelBackend(model))
+    with (
+        running(served.app) as url,
+        httpx.Client(base_url=url, timeout=10) as client,
+        client.stream(
+            "POST", "/api/trials/F1/annotate", json={"field": "brief_summary"}, headers=HEADERS
+        ) as stream,
+    ):
+        lines = [orjson.loads(line) for line in stream.iter_lines() if line]
+
+    assert [line["type"] for line in lines] == ["start", "error"]
+    assert lines[-1]["message"] == "the model crashed"

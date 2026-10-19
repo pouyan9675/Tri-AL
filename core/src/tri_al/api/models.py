@@ -5,9 +5,9 @@ tests check that responses validate against them, so the schema stays true.
 """
 
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 
 class _Out(BaseModel):
@@ -338,3 +338,131 @@ class PluginChangedOut(_Out):
 
 class ErrorOut(_Out):
     detail: str
+
+
+# --- AI -----------------------------------------------------------------------------------
+
+LabelColor = Literal["blue", "orange", "teal", "amber", "pink", "green", "violet", "red"]
+AnnotatedField = Literal["brief_summary", "description", "eligibility_criteria"]
+
+
+class AnnotationLabelOut(_Out):
+    name: str
+    description: str
+    examples: list[str]
+    color: LabelColor = Field(description="Its own colour, or one given by its position.")
+
+
+class AnnotationLabelIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    description: str = ""
+    examples: list[str] = Field(default_factory=list)
+    color: LabelColor | Literal[""] = Field(default="", description="Empty: by position.")
+
+
+class ModelBackendOut(_Out):
+    name: str
+    title: str
+
+
+class AiSettingsOut(_Out):
+    enabled: bool
+    backend: str
+    backends: list[ModelBackendOut]
+    server: str
+    model: str = Field(description="Empty: the first model the server has loaded.")
+    labels: list[AnnotationLabelOut]
+    colors: list[LabelColor] = Field(description="The colours a label can take, in order.")
+    locked: list[str] = Field(
+        description="Settings a TRI_AL_AI__* variable sets; changing them in the file does "
+        "nothing while it's set."
+    )
+
+
+class AiSettingsPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool | None = None
+    backend: str | None = None
+    server: str | None = None
+    model: str | None = Field(default=None, description="Empty: the first loaded model.")
+    labels: list[AnnotationLabelIn] | None = Field(
+        default=None, description="Replaces every label."
+    )
+
+
+class AiModelsIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    backend: str | None = Field(default=None, description="Default: the saved one.")
+    server: str | None = Field(default=None, description="Default: the saved one.")
+
+
+class AiModelOut(_Out):
+    id: str
+    kind: str | None = Field(description="llm, vlm or embeddings, when the server says.")
+    loaded: bool | None = Field(description="In memory now, when the server says.")
+    detail: str | None
+
+
+class AiModelsOut(_Out):
+    backend: str
+    server: str
+    models: list[AiModelOut]
+    error: str | None = Field(description="Why the models couldn't be listed.")
+
+
+class AnnotateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    field: AnnotatedField
+
+
+class AnnotationSpanOut(_Out):
+    start: int = Field(description="Offsets in the field's text, with line breaks as \\n.")
+    end: int
+    label: str
+
+
+class AnnotationLabelRefOut(_Out):
+    name: str
+    color: LabelColor
+
+
+class AnnotationStartOut(_Out):
+    type: Literal["start"]
+    model: str
+    length: int = Field(description="Characters in the text the offsets refer to.")
+    chunks: int = Field(description="Pieces the text was cut into, each its own request.")
+    cached: bool
+    labels: list[AnnotationLabelRefOut]
+
+
+class AnnotationSpansOut(_Out):
+    type: Literal["spans"]
+    chunk: int
+    spans: list[AnnotationSpanOut]
+
+
+class AnnotationDoneOut(_Out):
+    type: Literal["done"]
+    spans: int
+    seconds: float
+
+
+class AnnotationErrorOut(_Out):
+    type: Literal["error"]
+    message: str
+
+
+class AnnotationEvent(
+    RootModel[
+        Annotated[
+            AnnotationStartOut | AnnotationSpansOut | AnnotationDoneOut | AnnotationErrorOut,
+            Field(discriminator="type"),
+        ]
+    ]
+):
+    """One line of an annotation stream."""

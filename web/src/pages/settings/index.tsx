@@ -50,6 +50,7 @@ import { notify } from "@/lib/notify";
 import { type Theme, useTheme } from "@/lib/theme";
 import { useNow } from "@/lib/use-now";
 import { cn } from "@/lib/utils";
+import { AiCard } from "./ai";
 import { JobProgress } from "./job-progress";
 
 export function SettingsPage() {
@@ -61,6 +62,7 @@ export function SettingsPage() {
       <div className="grid gap-4 xl:grid-cols-2">
         <DataCard />
         <PluginsCard />
+        <AiCard />
         <JobsCard />
         <AppearanceCard />
       </div>

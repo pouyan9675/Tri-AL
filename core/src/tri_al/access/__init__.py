@@ -17,8 +17,11 @@ READ = "read"
 START_UPDATE = "jobs.update"
 CANCEL_JOB = "jobs.cancel"
 EDIT_PLUGINS = "plugins.edit"
+USE_AI = "ai.use"
+"""Running a model (annotating text) or asking a model server what it has."""
+EDIT_AI = "ai.edit"
 
-ACTIONS = (READ, START_UPDATE, CANCEL_JOB, EDIT_PLUGINS)
+ACTIONS = (READ, START_UPDATE, CANCEL_JOB, EDIT_PLUGINS, USE_AI, EDIT_AI)
 """The actions core routes require; plugin routes may require their own."""
 
 
@@ -54,9 +57,11 @@ def require(action: str) -> Callable[[Request], None]:
 __all__ = [
     "ACTIONS",
     "CANCEL_JOB",
+    "EDIT_AI",
     "EDIT_PLUGINS",
     "READ",
     "START_UPDATE",
+    "USE_AI",
     "AccessPolicy",
     "AllowAll",
     "require",

@@ -23,6 +23,16 @@ export type SearchHit = Schemas["SearchHitOut"];
 export type NameHit = Schemas["NameHitOut"];
 export type Job = Schemas["JobOut"];
 export type Plugin = Schemas["PluginOut"];
+export type AiSettings = Schemas["AiSettingsOut"];
+export type AiModels = Schemas["AiModelsOut"];
+export type AiModel = Schemas["AiModelOut"];
+export type AnnotationLabel = Schemas["AnnotationLabelOut"];
+export type LabelColor = AnnotationLabel["color"];
+export type AiSettingsPatch = Schemas["AiSettingsPatch"];
+export type AnnotatedField = Schemas["AnnotateIn"]["field"];
+export type AnnotationEvent = Schemas["AnnotationEvent"];
+export type AnnotationSpan = Schemas["AnnotationSpanOut"];
+export type AnnotationLabelRef = Schemas["AnnotationLabelRefOut"];
 export type ListTrialsQuery = NonNullable<paths["/api/trials"]["get"]["parameters"]["query"]>;
 export type SortKey = NonNullable<ListTrialsQuery["sort"]>;
 
@@ -55,7 +65,7 @@ export class ApiError extends Error {
   }
 }
 
-function detail(error: unknown, status: number): string {
+export function detail(error: unknown, status: number): string {
   if (error && typeof error === "object" && "detail" in error) {
     const value = (error as { detail: unknown }).detail;
     if (typeof value === "string") return value;

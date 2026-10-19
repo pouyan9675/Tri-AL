@@ -10,6 +10,7 @@ import typer
 from pydantic import BaseModel
 
 from tri_al.access import AccessPolicy
+from tri_al.ai.models import ModelBackend
 from tri_al.filters import FilterField, TrialFilter
 from tri_al.jobs.worker import JobType
 from tri_al.pipeline.events import EVENTS, Handler, Subscription
@@ -56,6 +57,8 @@ class Contributions:
     routes: dict[str, "APIRouter"] = field(default_factory=dict)
     # by job type
     jobs: dict[str, JobType] = field(default_factory=dict)
+    # by backend name
+    model_backends: dict[str, ModelBackend] = field(default_factory=dict)
     # (plugin, policy), if a plugin set one
     access_policy: tuple[str, AccessPolicy] | None = None
 
@@ -210,6 +213,21 @@ class Registry:
         if job.name in CORE_JOBS or job.name in self._contributions.jobs:
             raise PluginError(f"a job type named {job.name!r} already exists")
         self._contributions.jobs[job.name] = dataclasses.replace(job, plugin=self._plugin)
+
+    def add_model_backend(self, backend: ModelBackend) -> None:
+        """Another way to reach models, which ``[ai] backend`` can name (``tri_al.ai``).
+
+        A fine-tuned model run in this process is one: its ``open()`` returns a
+        ``ChatModel``, and every AI task can then use it.
+        """
+        if not isinstance(backend, ModelBackend):
+            raise PluginError(
+                f"{type(backend).__name__} isn't a model backend: it needs name, title, "
+                "models, open and close (see tri_al.ai.ModelBackend)"
+            )
+        if backend.name == "openai" or backend.name in self._contributions.model_backends:
+            raise PluginError(f"a model backend named {backend.name!r} was already added")
+        self._contributions.model_backends[backend.name] = backend
 
     def set_access_policy(self, policy: AccessPolicy) -> None:
         """Replace the core's allow-everything policy, as an ``auth`` plugin would (§5.8)."""

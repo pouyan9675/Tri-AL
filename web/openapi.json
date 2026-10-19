@@ -2120,6 +2120,229 @@
         }
       }
     },
+    "/api/ai": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Getaisettings",
+        "description": "The AI engine's settings: the model server, the model and the annotation labels.",
+        "operationId": "getAiSettings",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiSettingsOut"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Updateaisettings",
+        "description": "Change the AI settings in ``tri-al.toml``. They apply at once.\n\nEverything is checked before anything is written; ``labels`` replaces every label.",
+        "operationId": "updateAiSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiSettingsPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiSettingsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/models": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Listaimodels",
+        "description": "The models a server offers: the saved one, or one being tried before it's saved.\n\nA POST, though it changes nothing, because it makes this server reach the address the\nrequest names: the browser protections then keep other websites from making it do so.",
+        "operationId": "listAiModels",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AiModelsIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiModelsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trials/{source_id}/annotate": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Annotatetrial",
+        "description": "Mark the terms of each annotation label in one of the trial's texts, as it runs.\n\nNothing is stored: a text seen before with the same model and labels comes back at once\nfrom memory.",
+        "operationId": "annotateTrial",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The registry, if the id is in several",
+              "title": "Source"
+            },
+            "description": "The registry, if the id is in several"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotateIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Newline-delimited JSON, one event a line: start, then spans for each piece of text as the model finishes it, then done (or error).",
+            "content": {
+              "application/x-ndjson": {
+                "schema": {
+                  "type": "string",
+                  "$ref": "#/components/schemas/AnnotationEvent"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such trial.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "AI is turned off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "No labels, or no text to annotate.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The model couldn't be reached.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "There's no data yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/events": {
       "get": {
         "tags": [
@@ -2172,6 +2395,581 @@
   },
   "components": {
     "schemas": {
+      "AiModelOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind",
+            "description": "llm, vlm or embeddings, when the server says."
+          },
+          "loaded": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loaded",
+            "description": "In memory now, when the server says."
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "loaded",
+          "detail"
+        ],
+        "title": "AiModelOut"
+      },
+      "AiModelsIn": {
+        "properties": {
+          "backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend",
+            "description": "Default: the saved one."
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server",
+            "description": "Default: the saved one."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AiModelsIn"
+      },
+      "AiModelsOut": {
+        "properties": {
+          "backend": {
+            "type": "string",
+            "title": "Backend"
+          },
+          "server": {
+            "type": "string",
+            "title": "Server"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/AiModelOut"
+            },
+            "type": "array",
+            "title": "Models"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Why the models couldn't be listed."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "backend",
+          "server",
+          "models",
+          "error"
+        ],
+        "title": "AiModelsOut"
+      },
+      "AiSettingsOut": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "backend": {
+            "type": "string",
+            "title": "Backend"
+          },
+          "backends": {
+            "items": {
+              "$ref": "#/components/schemas/ModelBackendOut"
+            },
+            "type": "array",
+            "title": "Backends"
+          },
+          "server": {
+            "type": "string",
+            "title": "Server"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "Empty: the first model the server has loaded."
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationLabelOut"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "colors": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "blue",
+                "orange",
+                "teal",
+                "amber",
+                "pink",
+                "green",
+                "violet",
+                "red"
+              ]
+            },
+            "type": "array",
+            "title": "Colors",
+            "description": "The colours a label can take, in order."
+          },
+          "locked": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Locked",
+            "description": "Settings a TRI_AL_AI__* variable sets; changing them in the file does nothing while it's set."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "enabled",
+          "backend",
+          "backends",
+          "server",
+          "model",
+          "labels",
+          "colors",
+          "locked"
+        ],
+        "title": "AiSettingsOut"
+      },
+      "AiSettingsPatch": {
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "Empty: the first loaded model."
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AnnotationLabelIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Labels",
+            "description": "Replaces every label."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AiSettingsPatch"
+      },
+      "AnnotateIn": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "brief_summary",
+              "description",
+              "eligibility_criteria"
+            ],
+            "title": "Field"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "field"
+        ],
+        "title": "AnnotateIn"
+      },
+      "AnnotationDoneOut": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "done",
+            "title": "Type"
+          },
+          "spans": {
+            "type": "integer",
+            "title": "Spans"
+          },
+          "seconds": {
+            "type": "number",
+            "title": "Seconds"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "spans",
+          "seconds"
+        ],
+        "title": "AnnotationDoneOut"
+      },
+      "AnnotationErrorOut": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "error",
+            "title": "Type"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "message"
+        ],
+        "title": "AnnotationErrorOut"
+      },
+      "AnnotationEvent": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AnnotationStartOut"
+          },
+          {
+            "$ref": "#/components/schemas/AnnotationSpansOut"
+          },
+          {
+            "$ref": "#/components/schemas/AnnotationDoneOut"
+          },
+          {
+            "$ref": "#/components/schemas/AnnotationErrorOut"
+          }
+        ],
+        "title": "AnnotationEvent",
+        "description": "One line of an annotation stream.",
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "done": "#/components/schemas/AnnotationDoneOut",
+            "error": "#/components/schemas/AnnotationErrorOut",
+            "spans": "#/components/schemas/AnnotationSpansOut",
+            "start": "#/components/schemas/AnnotationStartOut"
+          }
+        }
+      },
+      "AnnotationLabelIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "examples": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Examples"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "blue",
+                  "orange",
+                  "teal",
+                  "amber",
+                  "pink",
+                  "green",
+                  "violet",
+                  "red"
+                ]
+              },
+              {
+                "type": "string",
+                "const": ""
+              }
+            ],
+            "title": "Color",
+            "description": "Empty: by position.",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "AnnotationLabelIn"
+      },
+      "AnnotationLabelOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "examples": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Examples"
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "blue",
+              "orange",
+              "teal",
+              "amber",
+              "pink",
+              "green",
+              "violet",
+              "red"
+            ],
+            "title": "Color",
+            "description": "Its own colour, or one given by its position."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "examples",
+          "color"
+        ],
+        "title": "AnnotationLabelOut"
+      },
+      "AnnotationLabelRefOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "blue",
+              "orange",
+              "teal",
+              "amber",
+              "pink",
+              "green",
+              "violet",
+              "red"
+            ],
+            "title": "Color"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "color"
+        ],
+        "title": "AnnotationLabelRefOut"
+      },
+      "AnnotationSpanOut": {
+        "properties": {
+          "start": {
+            "type": "integer",
+            "title": "Start",
+            "description": "Offsets in the field's text, with line breaks as \\n."
+          },
+          "end": {
+            "type": "integer",
+            "title": "End"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "label"
+        ],
+        "title": "AnnotationSpanOut"
+      },
+      "AnnotationSpansOut": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "spans",
+            "title": "Type"
+          },
+          "chunk": {
+            "type": "integer",
+            "title": "Chunk"
+          },
+          "spans": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationSpanOut"
+            },
+            "type": "array",
+            "title": "Spans"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "chunk",
+          "spans"
+        ],
+        "title": "AnnotationSpansOut"
+      },
+      "AnnotationStartOut": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "start",
+            "title": "Type"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "length": {
+            "type": "integer",
+            "title": "Length",
+            "description": "Characters in the text the offsets refer to."
+          },
+          "chunks": {
+            "type": "integer",
+            "title": "Chunks",
+            "description": "Pieces the text was cut into, each its own request."
+          },
+          "cached": {
+            "type": "boolean",
+            "title": "Cached"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationLabelRefOut"
+            },
+            "type": "array",
+            "title": "Labels"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "model",
+          "length",
+          "chunks",
+          "cached",
+          "labels"
+        ],
+        "title": "AnnotationStartOut"
+      },
       "ArmOut": {
         "properties": {
           "label": {
@@ -3003,6 +3801,25 @@
           "labels"
         ],
         "title": "MetaOut"
+      },
+      "ModelBackendOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "title"
+        ],
+        "title": "ModelBackendOut"
       },
       "NameHitOut": {
         "properties": {

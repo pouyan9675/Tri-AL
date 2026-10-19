@@ -295,6 +295,78 @@ export interface paths {
         patch: operations["updatePlugin"];
         trace?: never;
     };
+    "/api/ai": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Getaisettings
+         * @description The AI engine's settings: the model server, the model and the annotation labels.
+         */
+        get: operations["getAiSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Updateaisettings
+         * @description Change the AI settings in ``tri-al.toml``. They apply at once.
+         *
+         *     Everything is checked before anything is written; ``labels`` replaces every label.
+         */
+        patch: operations["updateAiSettings"];
+        trace?: never;
+    };
+    "/api/ai/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Listaimodels
+         * @description The models a server offers: the saved one, or one being tried before it's saved.
+         *
+         *     A POST, though it changes nothing, because it makes this server reach the address the
+         *     request names: the browser protections then keep other websites from making it do so.
+         */
+        post: operations["listAiModels"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trials/{source_id}/annotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Annotatetrial
+         * @description Mark the terms of each annotation label in one of the trial's texts, as it runs.
+         *
+         *     Nothing is stored: a text seen before with the same model and labels comes back at once
+         *     from memory.
+         */
+        post: operations["annotateTrial"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events": {
         parameters: {
             query?: never;
@@ -319,6 +391,223 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AiModelOut */
+        AiModelOut: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @description llm, vlm or embeddings, when the server says.
+             */
+            kind: string | null;
+            /**
+             * Loaded
+             * @description In memory now, when the server says.
+             */
+            loaded: boolean | null;
+            /** Detail */
+            detail: string | null;
+        };
+        /** AiModelsIn */
+        AiModelsIn: {
+            /**
+             * Backend
+             * @description Default: the saved one.
+             */
+            backend?: string | null;
+            /**
+             * Server
+             * @description Default: the saved one.
+             */
+            server?: string | null;
+        };
+        /** AiModelsOut */
+        AiModelsOut: {
+            /** Backend */
+            backend: string;
+            /** Server */
+            server: string;
+            /** Models */
+            models: components["schemas"]["AiModelOut"][];
+            /**
+             * Error
+             * @description Why the models couldn't be listed.
+             */
+            error: string | null;
+        };
+        /** AiSettingsOut */
+        AiSettingsOut: {
+            /** Enabled */
+            enabled: boolean;
+            /** Backend */
+            backend: string;
+            /** Backends */
+            backends: components["schemas"]["ModelBackendOut"][];
+            /** Server */
+            server: string;
+            /**
+             * Model
+             * @description Empty: the first model the server has loaded.
+             */
+            model: string;
+            /** Labels */
+            labels: components["schemas"]["AnnotationLabelOut"][];
+            /**
+             * Colors
+             * @description The colours a label can take, in order.
+             */
+            colors: ("blue" | "orange" | "teal" | "amber" | "pink" | "green" | "violet" | "red")[];
+            /**
+             * Locked
+             * @description Settings a TRI_AL_AI__* variable sets; changing them in the file does nothing while it's set.
+             */
+            locked: string[];
+        };
+        /** AiSettingsPatch */
+        AiSettingsPatch: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Backend */
+            backend?: string | null;
+            /** Server */
+            server?: string | null;
+            /**
+             * Model
+             * @description Empty: the first loaded model.
+             */
+            model?: string | null;
+            /**
+             * Labels
+             * @description Replaces every label.
+             */
+            labels?: components["schemas"]["AnnotationLabelIn"][] | null;
+        };
+        /** AnnotateIn */
+        AnnotateIn: {
+            /**
+             * Field
+             * @enum {string}
+             */
+            field: "brief_summary" | "description" | "eligibility_criteria";
+        };
+        /** AnnotationDoneOut */
+        AnnotationDoneOut: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "done";
+            /** Spans */
+            spans: number;
+            /** Seconds */
+            seconds: number;
+        };
+        /** AnnotationErrorOut */
+        AnnotationErrorOut: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "error";
+            /** Message */
+            message: string;
+        };
+        /**
+         * AnnotationEvent
+         * @description One line of an annotation stream.
+         */
+        AnnotationEvent: components["schemas"]["AnnotationStartOut"] | components["schemas"]["AnnotationSpansOut"] | components["schemas"]["AnnotationDoneOut"] | components["schemas"]["AnnotationErrorOut"];
+        /** AnnotationLabelIn */
+        AnnotationLabelIn: {
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Examples */
+            examples?: string[];
+            /**
+             * Color
+             * @description Empty: by position.
+             * @default
+             */
+            color: ("blue" | "orange" | "teal" | "amber" | "pink" | "green" | "violet" | "red") | "";
+        };
+        /** AnnotationLabelOut */
+        AnnotationLabelOut: {
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Examples */
+            examples: string[];
+            /**
+             * Color
+             * @description Its own colour, or one given by its position.
+             * @enum {string}
+             */
+            color: "blue" | "orange" | "teal" | "amber" | "pink" | "green" | "violet" | "red";
+        };
+        /** AnnotationLabelRefOut */
+        AnnotationLabelRefOut: {
+            /** Name */
+            name: string;
+            /**
+             * Color
+             * @enum {string}
+             */
+            color: "blue" | "orange" | "teal" | "amber" | "pink" | "green" | "violet" | "red";
+        };
+        /** AnnotationSpanOut */
+        AnnotationSpanOut: {
+            /**
+             * Start
+             * @description Offsets in the field's text, with line breaks as \n.
+             */
+            start: number;
+            /** End */
+            end: number;
+            /** Label */
+            label: string;
+        };
+        /** AnnotationSpansOut */
+        AnnotationSpansOut: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "spans";
+            /** Chunk */
+            chunk: number;
+            /** Spans */
+            spans: components["schemas"]["AnnotationSpanOut"][];
+        };
+        /** AnnotationStartOut */
+        AnnotationStartOut: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "start";
+            /** Model */
+            model: string;
+            /**
+             * Length
+             * @description Characters in the text the offsets refer to.
+             */
+            length: number;
+            /**
+             * Chunks
+             * @description Pieces the text was cut into, each its own request.
+             */
+            chunks: number;
+            /** Cached */
+            cached: boolean;
+            /** Labels */
+            labels: components["schemas"]["AnnotationLabelRefOut"][];
+        };
         /** ArmOut */
         ArmOut: {
             /** Label */
@@ -589,6 +878,13 @@ export interface components {
                     [key: string]: string;
                 };
             };
+        };
+        /** ModelBackendOut */
+        ModelBackendOut: {
+            /** Name */
+            name: string;
+            /** Title */
+            title: string;
         };
         /** NameHitOut */
         NameHitOut: {
@@ -1608,6 +1904,166 @@ export interface operations {
             };
             /** @description Unprocessable Content */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    getAiSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiSettingsOut"];
+                };
+            };
+        };
+    };
+    updateAiSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiSettingsPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiSettingsOut"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    listAiModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AiModelsIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiModelsOut"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    annotateTrial: {
+        parameters: {
+            query?: {
+                /** @description The registry, if the id is in several */
+                source?: string | null;
+            };
+            header?: never;
+            path: {
+                source_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnnotateIn"];
+            };
+        };
+        responses: {
+            /** @description Newline-delimited JSON, one event a line: start, then spans for each piece of text as the model finishes it, then done (or error). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/x-ndjson": components["schemas"]["AnnotationEvent"];
+                };
+            };
+            /** @description No such trial. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description AI is turned off. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description No labels, or no text to annotate. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description The model couldn't be reached. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+            /** @description There's no data yet. */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

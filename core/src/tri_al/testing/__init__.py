@@ -3,13 +3,16 @@
 Importing this package needs pytest: install ``tri-al[testing]``.
 """
 
+from tri_al.testing.ai import FakeChatModel, FakeModelBackend
 from tri_al.testing.embeddings import FakeEmbeddingEngine
 from tri_al.testing.source import SourceContract
 from tri_al.testing.sources import FakeSource, fake_study
 from tri_al.testing.storage import StorageContract
 
 __all__ = [
+    "FakeChatModel",
     "FakeEmbeddingEngine",
+    "FakeModelBackend",
     "FakeSource",
     "SourceContract",
     "StorageContract",

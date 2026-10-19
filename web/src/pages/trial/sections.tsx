@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatAge, humanize } from "@/lib/format";
 import { useLabels } from "@/lib/labels";
 import { cn } from "@/lib/utils";
+import { AnnotateButton, AnnotationLegend, useAnnotation } from "./annotate";
 import { ArmCards, InterventionList, StudyFocus } from "./study";
 import { TextBlocks } from "./text";
 
@@ -62,7 +63,10 @@ const SCOPES: Record<string, string> = {
 export function OverviewTab({ trial }: { trial: TrialDetail }) {
   const label = useLabels();
   const [full, setFull] = useState(false);
+  const summary = useAnnotation(trial, "brief_summary");
+  const described = useAnnotation(trial, "description");
   const description = trial.description ?? "";
+  const collapsed = !full && !described.shown && description.length > LONG;
   const conditionTerms = trial.mesh_terms.filter((t) => !t.ancestor && t.kind === "condition");
   const interventionTerms = trial.mesh_terms.filter(
     (t) => !t.ancestor && t.kind === "intervention",
@@ -77,8 +81,9 @@ export function OverviewTab({ trial }: { trial: TrialDetail }) {
       <StudyFocus trial={trial} />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-4">
-          <Panel title="Summary">
-            <TextBlocks text={trial.brief_summary} />
+          <Panel title="Summary" action={<AnnotateButton view={summary} />}>
+            <AnnotationLegend view={summary} />
+            <TextBlocks text={trial.brief_summary} marks={summary.marks} />
           </Panel>
           {trial.arms.length > 0 && (
             <Panel
@@ -97,26 +102,25 @@ export function OverviewTab({ trial }: { trial: TrialDetail }) {
             <Panel
               title="Description"
               action={
-                description.length > LONG && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="-my-1"
-                    onClick={() => setFull(!full)}
-                  >
-                    {full ? "Show less" : "Show all"}
-                  </Button>
-                )
+                <div className="flex items-center gap-1">
+                  <AnnotateButton view={described} />
+                  {description.length > LONG && !described.shown && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-my-1"
+                      onClick={() => setFull(!full)}
+                    >
+                      {full ? "Show less" : "Show all"}
+                    </Button>
+                  )}
+                </div>
               }
             >
-              <div
-                className={cn(
-                  "relative",
-                  !full && description.length > LONG && "max-h-80 overflow-hidden",
-                )}
-              >
-                <TextBlocks text={description} />
-                {!full && description.length > LONG && (
+              <AnnotationLegend view={described} />
+              <div className={cn("relative", collapsed && "max-h-80 overflow-hidden")}>
+                <TextBlocks text={description} marks={described.marks} />
+                {collapsed && (
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-card" />
                 )}
               </div>
@@ -267,6 +271,7 @@ function Count({ value }: { value: number }) {
 }
 
 export function EligibilityTab({ trial }: { trial: TrialDetail }) {
+  const criteria = useAnnotation(trial, "eligibility_criteria");
   const min = formatAge(trial.min_age_days);
   const max = formatAge(trial.max_age_days);
   const ages =
@@ -276,8 +281,13 @@ export function EligibilityTab({ trial }: { trial: TrialDetail }) {
     : "—";
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-      <Panel title="Criteria" className="min-w-0">
-        <TextBlocks text={trial.eligibility_criteria} className="max-w-3xl" />
+      <Panel title="Criteria" className="min-w-0" action={<AnnotateButton view={criteria} />}>
+        <AnnotationLegend view={criteria} />
+        <TextBlocks
+          text={trial.eligibility_criteria}
+          className="max-w-3xl"
+          marks={criteria.marks}
+        />
       </Panel>
       <Panel title="Who can take part" className="h-fit">
         <Facts
