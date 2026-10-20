@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Tri-AL mirrors ClinicalTrials.gov into SQLite and lets you explore it in a local dashboard; the domain focus is Alzheimer's trials. The repository holds two versions:
 
 - **v2** (branch `v2`, in progress): a rewrite as a uv workspace in `core/` and `plugins/`, with a FastAPI API and a React front end in `web/`. **[docs/design.md](docs/design.md) is the source of truth:** decisions in §15, milestones in §14, speed targets in §10. Milestones 1 (skeleton), 2 (schema and storage), 3 (ClinicalTrials.gov plugin and pipeline), 4 (jobs, stats and API) and 5 (front end) are built; 6 (install end to end and hardening) waits for the first stable release. AI features have started with the AI engine and trial-text annotation (§12, decision 27). The analysis page's Conditions and Interventions sections analyse one MeSH term in depth (decision 28), and its Advanced search section finds trials by field (decision 29). The `results` plugin reads posted results: the analysis page's Results section (who took part, safety, did it work, who finished) and a Results tab on the trial page (decision 30).
-- **v1** (`main`, and still at the repository root on `v2`): the Django 3.2 app described [below](#v1-django). Don't delete or move v1 files; v2 tooling ignores them.
+- **v1** (the Django 3.2 app) is only on `main`; its files were removed from `v2`.
 
 ## v2: setup and commands
 
@@ -55,7 +55,7 @@ pytest runs with `filterwarnings = error` and `--import-mode=importlib`: an uncl
 
 ## v2 architecture
 
-**Layout.** `core/` is the `tri-al` package (`core/src/tri_al/`): `schema` (`TrialRecord`, `labels`), `filters.py` (`TrialFilter`), `storage`, `pipeline`, `jobs`, `stats`, `search.py`, `linking.py`, `terms`, `advanced`, `ai`, `access`, `api`, `plugins`, `config`, `cli`, `doctor.py`, and `testing` (contract suites and `FakeSource`, which plugins reuse). `plugins/ctgov/` is the ClinicalTrials.gov source; `plugins/charts/` holds the default dashboard charts (specs only; the front end draws them); `plugins/insights/` is the dashboard's Research Intelligence section (emerging research trends, method in `trends.py`; a map of recent trials laid out once per data version, `clusters.py`, also in 3-D for the analysis page); `plugins/results/` reads results posted to ClinicalTrials.gov (below); `plugins/sample/` is an example plugin. `web/` is the front end (below). `bench/` holds benchmarks. The root `pyproject.toml` is a virtual workspace and holds the ruff, mypy and pytest config; ruff excludes `docs/` and the v1 paths.
+**Layout.** `core/` is the `tri-al` package (`core/src/tri_al/`): `schema` (`TrialRecord`, `labels`), `filters.py` (`TrialFilter`), `storage`, `pipeline`, `jobs`, `stats`, `search.py`, `linking.py`, `terms`, `advanced`, `ai`, `access`, `api`, `plugins`, `config`, `cli`, `doctor.py`, and `testing` (contract suites and `FakeSource`, which plugins reuse). `plugins/ctgov/` is the ClinicalTrials.gov source; `plugins/charts/` holds the default dashboard charts (specs only; the front end draws them); `plugins/insights/` is the dashboard's Research Intelligence section (emerging research trends, method in `trends.py`; a map of recent trials laid out once per data version, `clusters.py`, also in 3-D for the analysis page); `plugins/results/` reads results posted to ClinicalTrials.gov (below); `plugins/sample/` is an example plugin. `web/` is the front end (below). `bench/` holds benchmarks. The root `pyproject.toml` is a virtual workspace and holds the ruff, mypy and pytest config; ruff excludes `docs/`.
 
 **Plugins** (`tri_al.plugins`). Each plugin is a package with an entry point in the `tri_al.plugins` group that points at a `Plugin` instance. Its `register(registry)` gets a per-plugin `Registry`. Implemented: `add_cli`, `add_sqlite_extension`, `add_migrations`, `add_source`, `on` (pipeline events), `add_chart`, `add_filter_field`, `add_search_provider`, `add_routes` (mounted at `/api/x/<plugin>/`), `add_job`, `add_model_backend` and `set_access_policy`; `add_enricher` raises `NotImplementedError` until enrichers exist. Installed plugins are enabled by default. Enabled state and settings live in `tri-al.toml`, never in a database.
 
@@ -108,23 +108,3 @@ pytest runs with `filterwarnings = error` and `--import-mode=importlib`: an uncl
 - **Tests:** Vitest in jsdom (`src/test/setup.ts` stubs ResizeObserver, canvas and friends; `src/test/api.ts` `mockApi` answers `fetch`); Playwright in `web/e2e/` starts `tri-al serve --port 8765 --no-job-worker` and drives the installed Google Chrome (`channel: "chrome"`), so there's no browser download.
 
 **`doctor`** (`tri_al/doctor.py`) checks the Python and SQLite versions (SQLite ≥ 3.45), FTS5, extension loading, config, plugins, plugin extensions, whether the server listens beyond this machine without an access plugin, and database state. When a fix is needed, it suggests `uv python install`.
-
-## v1 (Django)
-
-Django 3.2 on `main`: it mirrors ClinicalTrials.gov into `db.sqlite3` and shows it in a customized Django admin with Plotly charts. A REST API under `/api/` served a separate front end (`alzwb-front-end`, listed in `.gitmodules` but never committed).
-
-- **Setup:** `visual/settings.py` reads `visual/config.yml` at import, so every command fails until you run `cp visual/sample-config.yml visual/config.yml` and `mkdir -p data/cache/plot staticfiles`. Use Python 3.9 or 3.10 (`import imp`, pinned numpy/pandas). Install with `pip install -r requirements.txt`.
-- **Commands:** `python manage.py runserver` (dashboard at `/admin`) and `python manage.py test` (`panels/tests.py` is empty). `./initdb.sh` is destructive: it regenerates migrations and runs `createsuperuser`. On an existing checkout, use `manage.py migrate` and `loaddata panels/fixtures/Country.json`. `data_manager.py` actions: `import -i data/AllPublicXML`, `update`, `export`, `cleardata`, `terminal`, `manual`.
-- **Ingestion:**
-  - Bulk XML import goes through `XMLFastParser`, then `processor.build_columns`, then `processor.data_mapper`.
-  - Incremental updates go through `downloader`, then `processor.generate_data` (20 threads, `FullStudyParser`), then `build_objects`. That step sends new trials to `data_mapper` and existing ones to `TrialComparator`.
-  - All parsers return one nested dict shape that `data_mapper` and `TrialComparator` index into directly.
-  - **`update` is broken:** its ClinicalTrials.gov endpoints are retired (checked 2026-10-17). Bulk import still works through `/api/legacy/public-xml`.
-- **Code:**
-  - `panels/` is the only app.
-  - Choice fields store short codes; map them with `Trial.get_char`, `get_display` and `Agent.get_type_choice`.
-  - The admin is `my_site` (`MyAdminSite` in `panels/admin.py`), not `admin.site`.
-  - Charts are pickled to `data/cache/plot/`, and the admin index crashes if that directory is missing.
-  - `panels/utils/customize.py` `@column` functions inject fields into `Trial`.
-  - `/api/publication/` raises `NameError`.
-- **Deploy:** `.github/workflows/deploy.yml` runs on a self-hosted runner for pushes and PRs to `main`: pip install, collectstatic, makemigrations, migrate, test. Cron runs `schedulers/update-db.sh`.

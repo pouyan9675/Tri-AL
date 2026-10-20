@@ -1,6 +1,6 @@
 name: v2 CI
 
-# Tri-AL v2 (uv workspace in core/ and plugins/, front end in web/). v1's Django CI is deploy.yml.
+# Tri-AL v2 (uv workspace in core/ and plugins/, front end in web/).
 
 on:
   push:

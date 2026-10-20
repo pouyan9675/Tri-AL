@@ -1,53 +1,25 @@
 # Tri-AL: VisuAL ClinicAL TriALs
 
-![Screenshot of platform](screenshot.jpeg)
+Tri-AL keeps a local copy of every study on [ClinicalTrials.gov](https://clinicaltrials.gov) (about 607,000) in SQLite. You explore it in your browser with a dashboard, a trial explorer, full-text and field-by-field search, analyses of conditions, interventions and posted results, and AI annotation of trial text using a model you run yourself. It's built for Alzheimer's research, but it works for any condition.
 
-[Clinicaltrials.gov](https://clinicaltrials.gov) is a website that people all around the world submit the progress and the information of the medical trials on it. Tir-AL is a visualization platform to keep track of clinicaltrials.gov data along with more valuable tools. Tri-AL allows clinicaltrials researchers explore the database in a novel way. It can be used as both standalone project and a baseline for further improvement. It is still under development and we are trying to make it as perfect as possible. 
+This is v2, a rewrite that is still in progress. v1, the Django app, is on the `main` branch.
 
-Setup
-------
-1. Activate environment and install all requirements using pip command and requirements.txt file.
-```console
-pip install -r requirements.txt
+## Run it from a checkout
+
+You need [uv](https://docs.astral.sh/uv/) (it installs Python 3.13 for you) and Node 22 to build the front end. Run everything from the repository root:
+
+```bash
+uv sync
+npm --prefix web ci
+npm --prefix web run build
+uv run tri-al install             # downloads about 2.8 GB and builds data/trials.db (about 15 min)
+uv run tri-al embeddings generate # trial vectors for the cluster map and analyses (a few minutes)
+uv run tri-al serve               # http://127.0.0.1:8000
 ```
 
-2. Intialize database and setting up project.
-```console
-chmod +x initdb.sh
-./initdb.sh
-```
+The server keeps the data current with a daily update, and **Settings → Update** runs one at any time. AI annotation is optional: point it at an OpenAI-compatible server such as LM Studio under **Settings → AI**.
 
-3. Download the concent of clinicaltrials.gov from [here](https://clinicaltrials.gov/AllPublicXML.zip) as a zip file to initialize database.
+## Documentation
 
-4. Unzip the `AllPublicXML.zip` and place the content under `data` directory in the project root. For example `data/AllPublicXML/`.
-
-5. Import all the XML files to the database.
-```console
-python3 data_manager.py import -i data/AllPublicXML
-```
-
-6. Update config file by using sample cofing file. The config file is located in `visual/sample-config.yml`. Name config to `config.yml` in the same directoy. It can be done as following as well:
-```console
-cp visual/sample-config.yml visual/config.yml
-# EDIT config.yml WITH ANY EDITOR
-```
-
-7. Start project using Django and access it through [browser](http://localhost:8000/admin)!
-```console
-python3 manage.py runserver
-```
-
-Project Structure
-------
-
-    .
-    ├── panels                  # Internal app for tri-al project that contains core of the server
-    │   ├── api                 # Files that are responsible for REST-API to communicate with front-end
-    │   └── utils               # Scripts to download and parse clinicaltrials.gov data and insert them into database
-    ├── visual                  # Configuration files for Django app
-    ├── schedulers              # bash scripts for scheduling tasks such as, updating database
-    ├── initdb.sh               # Script to reset the database and make a new one with default values
-    ├── httpd.conf              # Backup file of apache configuration for app
-    ├── data_manager.py         # Main script to maintain database and download and fill database
-    ├── manage.py               # Django script to perform different actions for app
-    └── .gitignore
+- [docs/design.md](docs/design.md): the design and the decisions behind it.
+- [CLAUDE.md](CLAUDE.md): commands, tests and architecture for development.

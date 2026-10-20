@@ -1,8 +1,8 @@
 """Countries that migrations seed into ``countries`` (docs/design.md §6).
 
-``COUNTRIES`` is ISO 3166-1, copied from v1's ``panels/fixtures/Country.json`` (migration 1);
-``EXTRA_COUNTRIES`` came with migration 2. Migrations are frozen once released: add or rename
-countries in a new migration and a new tuple here, never by editing these.
+``COUNTRIES`` is ISO 3166-1, copied from v1's ``panels/fixtures/Country.json`` on ``main``
+(migration 1); ``EXTRA_COUNTRIES`` came with migration 2. Migrations are frozen once released:
+add or rename countries in a new migration and a new tuple here, never by editing these.
 """
 
 COUNTRIES: tuple[tuple[str, str, str], ...] = (
