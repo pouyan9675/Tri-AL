@@ -30,12 +30,16 @@ export function formatNumber(value: number | null | undefined): string {
 }
 
 const percent = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 1 });
+const smallPercent = new Intl.NumberFormat("en-US", {
+  style: "percent",
+  maximumSignificantDigits: 2,
+});
 
-/** A fraction as a percentage: 0.124 is "12.4%"; a little above zero is "<0.1%", not "0%". */
+/** A fraction as a percentage: 0.124 is "12.4%", and below 1% two digits show, so 0.00016
+ * is "0.016%" rather than "0%". */
 export function formatPercent(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
-  if (value > 0 && value < 0.0005) return "<0.1%";
-  return percent.format(value);
+  return value > 0 && value < 0.01 ? smallPercent.format(value) : percent.format(value);
 }
 
 /** How a chart's numbers read (a chart spec's `format`). */

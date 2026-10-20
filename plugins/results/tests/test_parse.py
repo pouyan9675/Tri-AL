@@ -6,9 +6,13 @@ import pytest
 
 from tri_al_results.parse import (
     EventSum,
+    analyses,
     dropout_kind,
+    estimate_key,
     ethnicity_key,
+    hypothesis_key,
     organ_key,
+    p_value,
     parse,
     race_key,
     summary,
@@ -215,3 +219,18 @@ def test_counts_as_text_or_numbers() -> None:
     assert results.adverse_events is not None
     parsed = results.adverse_events.groups[0]
     assert (parsed.serious_at_risk, parsed.serious_affected, parsed.deaths) == (1234, 12, None)
+
+
+def test_outcome_analyses() -> None:
+    (first, *_) = analyses(study("NCT04102579"))
+    assert (first.kind, first.p, first.p_bound) == ("PRIMARY", 0.0001, "<")
+    assert (first.estimate_type, first.estimate) == ("mean_difference", -3.16)
+    assert (first.ci_lower, first.ci_upper) == (-4.37, -1.95)
+    assert p_value("= .05") == (0.05, None)
+    assert p_value(">0.99") == (0.99, ">")
+    assert p_value("NA") == (None, None)
+    assert p_value("1.5") == (None, None)
+    assert estimate_key("Hazard Ratio (HR)") == "hazard_ratio"
+    assert estimate_key("Spearman Correlation") == "other"
+    assert hypothesis_key("NON_INFERIORITY_OR_EQUIVALENCE_LEGACY") == "non_inferiority"
+    assert hypothesis_key(None) is None

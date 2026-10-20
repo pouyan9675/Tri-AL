@@ -74,6 +74,21 @@ export const analysisLandscapeRoute = createRoute({
   component: lazyRouteComponent(() => import("@/pages/analysis"), "LandscapeSection"),
 });
 
+// Posted results (the results plugin's charts, `page: "results"`), drawn like the landscape.
+export const analysisResultsRoute = createRoute({
+  getParentRoute: () => analysisRoute,
+  path: "/results",
+  staticData: { title: "Results" },
+  loaderDeps: ({ search }) => search,
+  loader: async ({ context: { queryClient }, deps }) => {
+    const dashboard = await queryClient.ensureQueryData(dashboardQuery()).catch(() => null);
+    for (const chart of onPage(dashboard?.charts, "results")) {
+      void queryClient.prefetchQuery(chartQuery(chart.id, deps));
+    }
+  },
+  component: lazyRouteComponent(() => import("@/pages/analysis"), "ResultsSection"),
+});
+
 export const analysisLinkingRoute = createRoute({
   getParentRoute: () => analysisRoute,
   path: "linking",
@@ -170,6 +185,7 @@ const routeTree = rootRoute.addChildren([
   dashboardRoute,
   analysisRoute.addChildren([
     analysisLandscapeRoute,
+    analysisResultsRoute,
     analysisLinkingRoute,
     analysisSearchRoute,
     analysisConditionsRoute,

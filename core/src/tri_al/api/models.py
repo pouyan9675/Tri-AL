@@ -288,8 +288,9 @@ class ChartSpecOut(_Out):
     ]
     description: str
     section: str = Field(description="The page section; empty for the first, untitled one.")
-    page: Literal["dashboard", "analysis"] = Field(
-        description="Where the chart is shown: the dashboard or the analysis page."
+    page: Literal["dashboard", "analysis", "results"] = Field(
+        description="Where the chart is shown: the dashboard, the analysis page's Landscape "
+        "(`analysis`), or its Results section (`results`)."
     )
     x: str
     y: str

@@ -8530,10 +8530,11 @@
             "type": "string",
             "enum": [
               "dashboard",
-              "analysis"
+              "analysis",
+              "results"
             ],
             "title": "Page",
-            "description": "Where the chart is shown: the dashboard or the analysis page."
+            "description": "Where the chart is shown: the dashboard, the analysis page's Landscape (`analysis`), or its Results section (`results`)."
           },
           "x": {
             "type": "string",

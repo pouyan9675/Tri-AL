@@ -1049,10 +1049,10 @@ export interface components {
             section: string;
             /**
              * Page
-             * @description Where the chart is shown: the dashboard or the analysis page.
+             * @description Where the chart is shown: the dashboard, the analysis page's Landscape (`analysis`), or its Results section (`results`).
              * @enum {string}
              */
-            page: "dashboard" | "analysis";
+            page: "dashboard" | "analysis" | "results";
             /** X */
             x: string;
             /** Y */

@@ -33,8 +33,8 @@ A chart's ``format`` says how its numbers read: ``number``, or ``percent`` for f
 is 25%). A series can have its own, and a ``stat`` row its own ``format`` key; ``bar`` and
 ``table`` take ``series`` too, for bars side by side and the table's number columns.
 
-A chart's ``page`` says where it's shown: the dashboard, or the analysis page for larger,
-interactive views.
+A chart's ``page`` says where it's shown: the dashboard, the analysis page's Landscape for
+larger, interactive views (``analysis``), or its Results section (``results``).
 
 Charts marked ``precompute`` are computed with no filter in the same transaction as each
 update and stored in ``stats``; filtered views are computed on request and cached.
@@ -82,8 +82,8 @@ SERIES_WIDGETS: tuple[Widget, ...] = ("line", "area", "bar", "table", "stacked",
 type Format = Literal["number", "percent"]
 FORMATS: tuple[Format, ...] = ("number", "percent")
 
-type Page = Literal["dashboard", "analysis"]
-PAGES: tuple[Page, ...] = ("dashboard", "analysis")
+type Page = Literal["dashboard", "analysis", "results"]
+PAGES: tuple[Page, ...] = ("dashboard", "analysis", "results")
 
 type Rows = list[dict[str, Any]]
 

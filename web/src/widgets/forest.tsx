@@ -68,8 +68,8 @@ export function ForestWidget({ spec, rows, height }: WidgetProps) {
         <thead className="text-muted-foreground">
           <tr>
             <th />
-            <th className="px-2 pb-1.5 text-center font-normal">Risk ratio, log scale</th>
-            <th className="px-2 pb-1.5 text-right font-normal">Ratio (95% CI)</th>
+            <th className="px-2 pb-1.5 text-center font-normal">Log scale, 1 is no difference</th>
+            <th className="px-2 pb-1.5 text-right font-normal">Estimate (95% CI)</th>
             {columns.map((column) => (
               <th key={column.key} className="pb-1.5 pl-2 text-right font-normal">
                 {column.label}

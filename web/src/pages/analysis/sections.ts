@@ -2,11 +2,20 @@
  * The analysis page's sections, each its own route under `/analysis`. The sidebar and the
  * router use this module, so it stays small: it's in the first chunk.
  */
-import { ChartScatter, HeartPulse, type LucideIcon, Network, Pill, ScanSearch } from "lucide-react";
+import {
+  ChartScatter,
+  ClipboardCheck,
+  HeartPulse,
+  type LucideIcon,
+  Network,
+  Pill,
+  ScanSearch,
+} from "lucide-react";
 
 export type AnalysisSection = {
   to:
     | "/analysis"
+    | "/analysis/results"
     | "/analysis/linking"
     | "/analysis/search"
     | "/analysis/conditions"
@@ -22,6 +31,12 @@ export const ANALYSIS_SECTIONS: readonly AnalysisSection[] = [
     label: "Landscape",
     description: "The trials seen through their text: where they sit by what they're about.",
     icon: ChartScatter,
+  },
+  {
+    to: "/analysis/results",
+    label: "Results",
+    description: "What posted results say: who took part, safety, whether it worked, who finished.",
+    icon: ClipboardCheck,
   },
   {
     to: "/analysis/linking",

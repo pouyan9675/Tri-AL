@@ -116,12 +116,15 @@ def test_the_install_built_the_charts(client: TestClient) -> None:
     dashboard = m.DashboardOut.model_validate(client.get("/api/dashboard").json())
     specs = {chart.id: chart for chart in dashboard.charts}
     assert specs["results_race"].format == "percent"
-    assert specs["results_race"].page == "analysis"
+    assert specs["results_race"].page == "results"
     assert specs["results_signals"].widget == "forest"
-    assert {chart.section for chart in dashboard.charts} == {
-        "Results: who took part",
-        "Results: safety",
-    }
+    sections = [chart.section for chart in dashboard.charts if chart.plugin == "results"]
+    assert list(dict.fromkeys(sections)) == [
+        "Who took part",
+        "Safety",
+        "Did it work",
+        "Who finished",
+    ]
 
     people = m.StatsOut.model_validate(client.get("/api/stats/results_people").json())
     tiles = {row["key"]: row["value"] for row in people.rows}

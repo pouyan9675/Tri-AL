@@ -12,7 +12,7 @@ import { parseFilter } from "@/lib/filters";
 import { parseSearch, stringifySearch } from "@/lib/search-params";
 import { META, mockApi } from "@/test/api";
 import { renderWithProviders } from "@/test/render";
-import { AnalysisPage, LandscapeSection } from ".";
+import { AnalysisPage, LandscapeSection, ResultsSection } from ".";
 import { ANALYSIS_SECTIONS, analysisSection } from "./sections";
 
 async function show(path: string) {
@@ -39,6 +39,7 @@ async function show(path: string) {
   const routeTree = root.addChildren([
     analysis.addChildren([
       createRoute({ getParentRoute: () => analysis, path: "/", component: LandscapeSection }),
+      createRoute({ getParentRoute: () => analysis, path: "results", component: ResultsSection }),
       ...empty,
     ]),
     createRoute({ getParentRoute: () => root, path: "/trials", component: () => null }),
@@ -62,13 +63,29 @@ describe("the analysis page", () => {
       within(nav)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Landscape", "Trial linking", "Advanced search", "Conditions", "Interventions"]);
+    ).toEqual([
+      "Landscape",
+      "Results",
+      "Trial linking",
+      "Advanced search",
+      "Conditions",
+      "Interventions",
+    ]);
     expect(within(nav).getByRole("link", { name: "Landscape" })).toHaveAttribute(
       "aria-current",
       "page",
     );
     expect(screen.getByText(ANALYSIS_SECTIONS[0]?.description ?? "")).toBeInTheDocument();
     expect(await screen.findByText("No analyses yet")).toBeInTheDocument();
+  });
+
+  it("has a Results section for the results plugin's charts", async () => {
+    const { nav } = await show("/analysis/results");
+    expect(within(nav).getByRole("link", { name: "Results" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(await screen.findByText("No results analyses")).toBeInTheDocument();
   });
 
   it("keeps the filter from section to section", async () => {

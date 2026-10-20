@@ -8,7 +8,9 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { getRouteApi, Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { ArrowRight, Orbit } from "lucide-react";
+import { ArrowRight, ClipboardCheck, Orbit } from "lucide-react";
+import type { ReactNode } from "react";
+import type { ChartSpec } from "@/api/client";
 import { dashboardQuery, facetsQuery, metaQuery, onPage } from "@/api/queries";
 import { ChartSections } from "@/components/chart-sections";
 import { FilterChips } from "@/components/filter-chips";
@@ -114,24 +116,55 @@ function SectionNav({ filter }: { filter: TrialFilter }) {
 
 /** The trials as a whole: the chart specs for the analysis page. */
 export function LandscapeSection() {
+  return <ChartsOn page="analysis" empty={<NoAnalyses />} />;
+}
+
+/** What posted results say: the results plugin's chart specs. */
+export function ResultsSection() {
+  return <ChartsOn page="results" empty={<NoResults />} />;
+}
+
+/** The chart specs for one page, in their sections, under the page's filter. */
+function ChartsOn({ page, empty }: { page: ChartSpec["page"]; empty: ReactNode }) {
   const filter = route.useSearch();
   const dashboard = useQuery(dashboardQuery());
 
   if (dashboard.isError) {
     return <ErrorState error={dashboard.error} onRetry={() => void dashboard.refetch()} />;
   }
-  const charts = onPage(dashboard.data?.charts, "analysis");
+  const charts = onPage(dashboard.data?.charts, page);
 
   return (
-    <div className="@container flex flex-col gap-10" data-testid="analysis">
+    <div className="@container flex flex-col gap-10" data-testid={page}>
       {!dashboard.data ? (
         <Skeleton className="w-full rounded-xl" style={{ height: 3 * ROW_HEIGHT }} />
       ) : charts.length > 0 ? (
         <ChartSections charts={charts} filter={filter} />
       ) : (
-        <NoAnalyses />
+        empty
       )}
     </div>
+  );
+}
+
+function NoResults() {
+  return (
+    <Empty className="rounded-xl border border-dashed py-16">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <ClipboardCheck />
+        </EmptyMedia>
+        <EmptyTitle>No results analyses</EmptyTitle>
+        <EmptyDescription>
+          Turn on the results plugin to analyse the results posted to ClinicalTrials.gov.
+        </EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button asChild variant="outline" size="sm">
+          <Link to="/settings">Open Settings</Link>
+        </Button>
+      </EmptyContent>
+    </Empty>
   );
 }
 

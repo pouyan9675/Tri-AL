@@ -17,9 +17,16 @@ from tri_al.storage import SQLiteStorage
 from tri_al_results import store
 from tri_al_results.charts import (
     charts,
+    completion_by_phase,
     composition,
     dropouts,
+    effects,
+    efficacy,
+    flow,
+    hypotheses,
+    left_by_phase,
     organ_systems,
+    p_values,
     people,
     race_by_phase,
     race_by_year,
@@ -28,6 +35,9 @@ from tri_al_results.charts import (
     safety,
     serious_by_phase,
     signals,
+    success_by_phase,
+    success_by_sponsor,
+    success_by_year,
     top_serious,
 )
 from tri_al_results.parse import ETHNICITY, RACE
@@ -57,6 +67,7 @@ def study(
     started: int = 100,
     completed: int = 90,
     left: dict[str, int] | None = None,
+    p: str | None = "0.01",
 ) -> dict[str, Any]:
     """A ClinicalTrials.gov study with results: a drug arm, and a placebo arm unless None."""
 
@@ -102,6 +113,27 @@ def study(
             }
         },
         "resultsSection": {
+            "outcomeMeasuresModule": {
+                "outcomeMeasures": [
+                    {
+                        "type": "PRIMARY",
+                        "title": "Survival",
+                        "analyses": [
+                            {
+                                "groupIds": ["OG000", "OG001"],
+                                "pValue": p,
+                                "paramType": "Hazard Ratio (HR)",
+                                "paramValue": "0.8",
+                                "ciLowerLimit": "0.7",
+                                "ciUpperLimit": "0.9",
+                                "nonInferiorityType": "SUPERIORITY",
+                            }
+                        ],
+                    }
+                ]
+                if p
+                else []
+            },
             "participantFlowModule": {
                 "groups": [{"id": "FG000", "title": "Everyone"}],
                 "periods": [
@@ -343,7 +375,6 @@ def test_who_took_part(storage: SQLiteStorage) -> None:
     assert tiles["trials"]["value"] == 7
     assert tiles["participants"]["value"] == 6 * 100 + 100
     assert tiles["women"] == {"key": "women", "label": "Women", "value": 0.6, "format": "percent"}
-    assert tiles["completed"]["value"] == pytest.approx(0.9)
 
     race = {row["key"]: row for row in chart(storage, composition("race", RACE))}
     assert race["black"]["participants"] == pytest.approx(0.2)
@@ -477,3 +508,50 @@ def test_an_event_takes_the_organ_system_most_trials_give(storage: SQLiteStorage
         "Injury, poisoning and procedural",
         3,
     )
+
+
+def test_did_it_work(storage: SQLiteStorage) -> None:
+    storage.upsert_batch(
+        [record(f"NCT0000000{i}", study(p="0.01" if i < 3 else "0.30")) for i in range(6)]
+        + [record("NCT00000009", study(p=None), phase="PHASE2")]
+    )
+    build(storage)
+
+    tiles = {row["key"]: row["value"] for row in chart(storage, efficacy)}
+    assert tiles == {"analysed": 6, "significant": 0.5, "estimate": 1.0, "non_inferiority": 0.0}
+    assert chart(storage, success_by_phase) == [
+        {"key": "PHASE3", "label": "Phase 3", "value": 0.5, "trials": 6}
+    ]
+    assert chart(storage, success_by_sponsor)[0]["value"] == 0.5
+    assert chart(storage, success_by_year) == [{"year": "2021", "value": 0.5, "trials": 6}]
+    bins = {row["bin"]: row["value"] for row in chart(storage, p_values)}
+    assert (len(bins), bins["0.01 to 0.02"], sum(bins.values())) == (20, 0.5, 0.5)
+    assert chart(storage, hypotheses)[0] == {
+        "key": "superiority",
+        "label": "Superiority",
+        "value": 1.0,
+        "trials": 6,
+    }
+    largest = chart(storage, effects(3))
+    assert len(largest) == 3
+    assert largest[0]["detail"] == "NCT00000000 · Hazard ratio"
+    assert (largest[0]["estimate"], largest[0]["low"], largest[0]["high"]) == (0.8, 0.7, 0.9)
+    assert largest[0]["p"] == "0.01"
+
+
+def test_who_finished(storage: SQLiteStorage) -> None:
+    storage.upsert_batch(trials())
+    build(storage)
+
+    tiles = {row["key"]: row["value"] for row in chart(storage, flow)}
+    assert tiles["started"] == 700
+    assert tiles["completed"] == pytest.approx(0.9)
+    assert tiles["average"] == pytest.approx(0.9)
+    assert tiles["withdrew"] == pytest.approx(0.04)
+    assert tiles["lost"] == 0
+    (phase3,) = chart(storage, completion_by_phase)
+    assert (phase3["label"], phase3["trials"]) == ("Phase 3", 6)
+    assert phase3["value"] == pytest.approx(0.9)
+    (left,) = chart(storage, left_by_phase)
+    assert left["adverse_event"] == pytest.approx(0.06)
+    assert left["lack_of_efficacy"] == 0

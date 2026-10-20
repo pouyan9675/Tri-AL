@@ -498,6 +498,115 @@ def _safety(ae: AdverseEvents) -> dict[str, Any]:
     }
 
 
+# --- outcome analyses, for the tables ------------------------------------------------------
+
+ESTIMATES: Mapping[str, str] = {
+    "hazard_ratio": "Hazard ratio",
+    "odds_ratio": "Odds ratio",
+    "risk_ratio": "Risk ratio",
+    "risk_difference": "Risk difference",
+    "mean_difference": "Mean difference",
+    "other": "Other",
+}
+"""Kinds of effect estimate; trials name them 6,600 ways ("LS Mean Difference", ...)."""
+
+HYPOTHESES: Mapping[str, str] = {
+    "superiority": "Superiority",
+    "superiority_or_other": "Superiority or other",
+    "non_inferiority": "Non-inferiority",
+    "equivalence": "Equivalence",
+    "other": "Other",
+}
+RATIOS = ("hazard_ratio", "odds_ratio", "risk_ratio")
+
+
+@dataclass(frozen=True, slots=True)
+class AnalysisSum:
+    """One statistical analysis of an outcome, in numbers."""
+
+    outcome: int  # the outcome's place among the trial's outcome measures
+    analysis: int  # its place among the outcome's analyses
+    kind: str  # PRIMARY, SECONDARY, OTHER_PRE_SPECIFIED, POST_HOC
+    p: float | None = None
+    p_bound: str | None = None  # "<" or ">" when the p-value is a bound ("<0.001")
+    estimate_type: str | None = None  # a key of ESTIMATES
+    estimate: float | None = None
+    ci_lower: float | None = None
+    ci_upper: float | None = None
+    hypothesis: str | None = None  # a key of HYPOTHESES
+
+
+def analyses(study: Json) -> tuple[AnalysisSum, ...]:
+    """Every analysis of the study's outcome measures, read straight from the JSON (much less
+    work than ``parse``)."""
+    module = _map(_map(study, "resultsSection"), "outcomeMeasuresModule")
+    out: list[AnalysisSum] = []
+    for i, measure in enumerate(_list(module, "outcomeMeasures")):
+        kind = _text(measure, "type") or "OTHER"
+        for j, analysis in enumerate(_list(measure, "analyses")):
+            p, bound = p_value(_text(analysis, "pValue"))
+            estimate_kind = _text(analysis, "paramType")
+            out.append(
+                AnalysisSum(
+                    outcome=i,
+                    analysis=j,
+                    kind=kind,
+                    p=p,
+                    p_bound=bound,
+                    estimate_type=estimate_key(estimate_kind) if estimate_kind else None,
+                    estimate=_float(analysis.get("paramValue")),
+                    ci_lower=_float(analysis.get("ciLowerLimit")),
+                    ci_upper=_float(analysis.get("ciUpperLimit")),
+                    hypothesis=hypothesis_key(_text(analysis, "nonInferiorityType")),
+                )
+            )
+    return tuple(out)
+
+
+def p_value(text: str | None) -> tuple[float | None, str | None]:
+    """A p-value as written ("<0.001", "0.032", "= .05", "≥0.99") as a number, and whether
+    it's an upper or lower bound; (None, None) if it isn't one."""
+    match = _P_VALUE.match(text or "")
+    if not match:
+        return None, None
+    value = float(match[2])
+    if not 0 <= value <= 1:
+        return None, None
+    sign = match[1]
+    return value, "<" if sign in ("<", "≤") else ">" if sign in (">", "≥") else None
+
+
+def estimate_key(name: str) -> str:
+    text = name.lower()
+    for pattern, key in _ESTIMATES:
+        if pattern.search(text):
+            return key
+    return "other"
+
+
+def hypothesis_key(code: str | None) -> str | None:
+    if not code:
+        return None
+    code = code.upper().removesuffix("_LEGACY")
+    if code.startswith("NON_INFERIORITY"):
+        return "non_inferiority"
+    return {
+        "SUPERIORITY": "superiority",
+        "SUPERIORITY_OR_OTHER": "superiority_or_other",
+        "EQUIVALENCE": "equivalence",
+    }.get(code, "other")
+
+
+_P_VALUE = re.compile(r"^\s*([<>≤≥=]?)\s*=?\s*(\d*\.?\d+(?:[eE]-?\d+)?)")
+_ESTIMATES: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"hazard"), "hazard_ratio"),
+    (re.compile(r"odds"), "odds_ratio"),
+    (re.compile(r"(risk|rate|incidence) ratio|relative risk"), "risk_ratio"),
+    (re.compile(r"risk difference|difference in (proportion|percent|rate)"), "risk_difference"),
+    (re.compile(r"mean|difference|slope|change"), "mean_difference"),
+)
+
+
 # --- normalizing names ---------------------------------------------------------------------
 
 
@@ -880,14 +989,18 @@ def _key(title: str) -> str:
 
 __all__ = [
     "DROPOUTS",
+    "ESTIMATES",
     "ETHNICITY",
+    "HYPOTHESES",
     "ORGANS",
     "ORGAN_CODES",
     "RACE",
+    "RATIOS",
     "REPORTING",
     "AdverseEvents",
     "Agreement",
     "Analysis",
+    "AnalysisSum",
     "Baseline",
     "Category",
     "Dropout",
@@ -906,9 +1019,13 @@ __all__ = [
     "Results",
     "Summary",
     "Value",
+    "analyses",
     "dropout_kind",
+    "estimate_key",
     "ethnicity_key",
+    "hypothesis_key",
     "organ_key",
+    "p_value",
     "parse",
     "race_key",
     "summary",

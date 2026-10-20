@@ -12,6 +12,8 @@ parser reads them all again.
 - ``results_dropouts``: participants who left, by kind of reason (``parse.DROPOUTS``)
 - ``results_events`` and ``results_terms``: each adverse event a trial lists, summed over its
   arms, with the placebo arms apart when it has both kinds
+- ``results_analyses``: each statistical analysis of an outcome: its p-value, effect estimate
+  with interval, and hypothesis (migration 2)
 """
 
 from collections.abc import Iterable, Iterator, Sequence
@@ -34,9 +36,17 @@ from sqlalchemy import (
 
 from tri_al.storage import Migration, docs
 from tri_al.storage import tables as t
-from tri_al_results.parse import ORGAN_CODES, Summary, parse, summary, term_key
+from tri_al_results.parse import (
+    ORGAN_CODES,
+    AnalysisSum,
+    Summary,
+    analyses,
+    parse,
+    summary,
+    term_key,
+)
 
-VERSION = 1
+VERSION = 2
 """Bump when ``parse`` or ``summary`` read results differently: every trial is read again."""
 
 SOURCE = "ctgov"  # the results format is ClinicalTrials.gov's
@@ -100,6 +110,26 @@ CREATE TABLE results_events (
     placebo_affected INTEGER,
     placebo_at_risk INTEGER,
     PRIMARY KEY (trial_id, serious, term_id)
+) WITHOUT ROWID;
+""",
+    ),
+    Migration(
+        2,
+        "outcome analyses",
+        """\
+CREATE TABLE results_analyses (
+    trial_id INTEGER NOT NULL REFERENCES trials (id) ON DELETE CASCADE,
+    outcome INTEGER NOT NULL,
+    analysis INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    p REAL,
+    p_bound TEXT,
+    estimate_type TEXT,
+    estimate REAL,
+    ci_lower REAL,
+    ci_upper REAL,
+    hypothesis TEXT,
+    PRIMARY KEY (trial_id, outcome, analysis)
 ) WITHOUT ROWID;
 """,
     ),
@@ -169,7 +199,22 @@ events = Table(
     Column("placebo_affected", Integer),
     Column("placebo_at_risk", Integer),
 )
-PER_TRIAL = (events, dropouts, demographics, trials)
+analyses_table = Table(
+    "results_analyses",
+    metadata,
+    Column("trial_id", Integer, primary_key=True),
+    Column("outcome", Integer, primary_key=True),
+    Column("analysis", Integer, primary_key=True),
+    Column("kind", String, nullable=False),
+    Column("p", Float),
+    Column("p_bound", String),
+    Column("estimate_type", String),
+    Column("estimate", Float),
+    Column("ci_lower", Float),
+    Column("ci_upper", Float),
+    Column("hypothesis", String),
+)
+PER_TRIAL = (analyses_table, events, dropouts, demographics, trials)
 
 
 def build_results(conn: Connection, data_version: int) -> None:
@@ -207,7 +252,12 @@ def build_results(conn: Connection, data_version: int) -> None:
     for chunk in _chunks(todo, BATCH):
         for trial_id, study in read_studies(conn, chunk):
             results = parse(study, outcomes=False)
-            writer.add(trial_id, current[trial_id], summary(results) if results else Summary())
+            writer.add(
+                trial_id,
+                current[trial_id],
+                summary(results) if results else Summary(),
+                analyses(study),
+            )
         writer.flush()
 
 
@@ -236,7 +286,13 @@ class _Writer:
         self.rows: dict[Table, list[tuple[Any, ...]]] = {table: [] for table in PER_TRIAL}
         self.new_terms: list[tuple[int, str, str]] = []
 
-    def add(self, trial_id: int, content_hash: bytes | None, s: Summary) -> None:
+    def add(
+        self,
+        trial_id: int,
+        content_hash: bytes | None,
+        s: Summary,
+        found: Sequence[AnalysisSum] = (),
+    ) -> None:
         self.rows[trials].append(
             (
                 trial_id,
@@ -265,6 +321,22 @@ class _Writer:
                 (trial_id, kind, category, n) for category, n in counts.items()
             ]
         self.rows[dropouts] += [(trial_id, kind, n) for kind, n in s.dropouts.items()]
+        self.rows[analyses_table] += [
+            (
+                trial_id,
+                a.outcome,
+                a.analysis,
+                a.kind,
+                a.p,
+                a.p_bound,
+                a.estimate_type,
+                a.estimate,
+                a.ci_lower,
+                a.ci_upper,
+                a.hypothesis,
+            )
+            for a in found
+        ]
         seen: dict[tuple[bool, int], int] = {}  # the same term twice in one list: summed
         for event in s.events:
             key = term_key(event.term)
@@ -328,6 +400,7 @@ def _chunks(values: Sequence[int], size: int) -> Iterable[Sequence[int]]:
 __all__ = [
     "MIGRATIONS",
     "VERSION",
+    "analyses_table",
     "build_results",
     "demographics",
     "dropouts",

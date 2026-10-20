@@ -13,7 +13,7 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any
 
-from sqlalchemy import ColumnElement, Select, case, func, select
+from sqlalchemy import ColumnElement, Select, and_, case, func, select
 
 from tri_al.filters import TrialFilter
 from tri_al.schema import labels
@@ -22,10 +22,21 @@ from tri_al.stats.methods import false_discovery
 from tri_al.storage import filtering
 from tri_al.storage import tables as t
 from tri_al_results import store
-from tri_al_results.parse import DROPOUTS, ETHNICITY, ORGANS, RACE, REPORTING
+from tri_al_results.parse import (
+    DROPOUTS,
+    ESTIMATES,
+    ETHNICITY,
+    HYPOTHESES,
+    ORGANS,
+    RACE,
+    RATIOS,
+    REPORTING,
+)
 
-PEOPLE = "Results: who took part"
-SAFETY = "Results: safety"
+PEOPLE = "Who took part"
+SAFETY = "Safety"
+EFFICACY = "Did it work"
+FLOW = "Who finished"
 
 MIN_TRIALS = 5
 """Trials a year or a phase needs before a chart shows it."""
@@ -71,9 +82,6 @@ def _ratio(part: float | None, whole: float | None) -> float | None:
 
 
 def people(ctx: ChartContext, filter: TrialFilter) -> Rows:
-    completion = case(
-        (_rt.c.started > 0, func.min(func.coalesce(_rt.c.completed, 0) * 1.0 / _rt.c.started, 1.0))
-    )
     row = ctx.conn.execute(
         select(
             func.count(),
@@ -81,10 +89,9 @@ def people(ctx: ChartContext, filter: TrialFilter) -> Rows:
             func.sum(_rt.c.female),
             func.sum(_rt.c.male),
             func.avg(_rt.c.age),
-            func.avg(completion),
         ).where(*_matching(filter, _rt.c.trial_id))
     ).one()
-    trials, participants, female, male, age, completed = row
+    trials, participants, female, male, age = row
     return [
         {"key": "trials", "label": "Trials with results", "value": trials},
         {"key": "participants", "label": "Participants", "value": participants or 0},
@@ -95,12 +102,6 @@ def people(ctx: ChartContext, filter: TrialFilter) -> Rows:
             "format": "percent",
         },
         {"key": "age", "label": "Mean age", "value": None if age is None else round(age, 1)},
-        {
-            "key": "completed",
-            "label": "Completed the trial",
-            "value": completed,
-            "format": "percent",
-        },
     ]
 
 
@@ -484,62 +485,327 @@ def dropouts(ctx: ChartContext, filter: TrialFilter) -> Rows:
     return sorted(rows, key=lambda row: -row["value"])
 
 
+# --- did it work ----------------------------------------------------------------------------
+
+_an = store.analyses_table
+_COMPLETION = case(
+    (_rt.c.started > 0, func.min(func.coalesce(_rt.c.completed, 0) * 1.0 / _rt.c.started, 1.0))
+)
+
+
+def _significant(p: float, bound: str | None) -> bool:
+    return p < 0.05 or (bound == "<" and p <= 0.05)
+
+
+def _first(filter: TrialFilter, *conditions: Any) -> Any:
+    """Each trial's first primary analysis meeting ``conditions``, in the registry's order (the
+    first primary outcome is usually the one the trial was built around)."""
+    rank = func.row_number().over(
+        partition_by=_an.c.trial_id, order_by=(_an.c.outcome, _an.c.analysis)
+    )
+    return (
+        select(_an, rank.label("rank"))
+        .where(_an.c.kind == "PRIMARY", *conditions, *_matching(filter, _an.c.trial_id))
+        .subquery()
+    )
+
+
+def _primary_results(ctx: ChartContext, filter: TrialFilter, *extra: Any) -> list[Any]:
+    """Each trial's first primary p-value: (significant, *extra), extra from ``trials``."""
+    first = _first(filter, _an.c.p.is_not(None))
+    found = ctx.conn.execute(
+        select(first.c.p, first.c.p_bound, *extra)
+        .join(t.trials, t.trials.c.id == first.c.trial_id)
+        .where(first.c.rank == 1)
+    ).all()
+    return [(_significant(p, bound), *rest) for p, bound, *rest in found]
+
+
+def efficacy(ctx: ChartContext, filter: TrialFilter) -> Rows:
+    has_estimate = and_(_an.c.estimate.is_not(None), _an.c.ci_lower.is_not(None))
+    tested = _an.c.hypothesis.in_(("non_inferiority", "equivalence"))
+    per_trial = (
+        select(
+            func.max(case((has_estimate, 1), else_=0)).label("estimated"),
+            func.max(case((tested, 1), else_=0)).label("non_inferior"),
+        )
+        .where(_an.c.kind == "PRIMARY", *_matching(filter, _an.c.trial_id))
+        .group_by(_an.c.trial_id)
+        .subquery()
+    )
+    trials, estimated, non_inferior = ctx.conn.execute(
+        select(func.count(), func.sum(per_trial.c.estimated), func.sum(per_trial.c.non_inferior))
+    ).one()
+    results = _primary_results(ctx, filter)
+    return [
+        {"key": "analysed", "label": "Trials with a primary analysis", "value": trials},
+        {
+            "key": "significant",
+            "label": "Primary result p < 0.05",
+            "value": _ratio(sum(1 for (hit,) in results if hit), len(results)),
+            "format": "percent",
+        },
+        {
+            "key": "estimate",
+            "label": "Gave an effect estimate",
+            "value": _ratio(estimated, trials),
+            "format": "percent",
+        },
+        {
+            "key": "non_inferiority",
+            "label": "Tested non-inferiority",
+            "value": _ratio(non_inferior, trials),
+            "format": "percent",
+        },
+    ]
+
+
+def _shares_by(
+    found: Iterable[tuple[bool, Any]], order: list[Any], name: Callable[[Any], str]
+) -> Rows:
+    counts: dict[Any, list[int]] = defaultdict(lambda: [0, 0])
+    for hit, key in found:
+        counts[key][0] += hit
+        counts[key][1] += 1
+    return [
+        {"key": key, "label": name(key), "value": hits / n, "trials": n}
+        for key in order
+        for hits, n in [counts[key]]
+        if n >= MIN_TRIALS
+    ]
+
+
+def success_by_phase(ctx: ChartContext, filter: TrialFilter) -> Rows:
+    found = [(hit, phase) for hit, phase in _primary_results(ctx, filter, t.trials.c.phase)]
+    return _shares_by(found, _phases(phase for _, phase in found), _phase)
+
+
+def success_by_sponsor(ctx: ChartContext, filter: TrialFilter) -> Rows:
+    column = t.trials.c.lead_sponsor_class
+    found = [(hit, kind) for hit, kind in _primary_results(ctx, filter, column)]
+    present = {kind for _, kind in found}
+    order: list[str | None] = [code for code in labels.SPONSOR_CLASS if code in present]
+    order += sorted(k for k in present if k is not None and k not in labels.SPONSOR_CLASS)
+    order += [None] if None in present else []
+    rows = _shares_by(found, order, lambda code: labels.label(labels.SPONSOR_CLASS, code))
+    return sorted(rows, key=lambda row: -row["trials"])
+
+
+def success_by_year(ctx: ChartContext, filter: TrialFilter) -> Rows:
+    year = func.strftime("%Y", t.trials.c.results_first_posted)
+    found = [(hit, when) for hit, when in _primary_results(ctx, filter, year) if when]
+    rows = _shares_by(found, sorted({when for _, when in found}), str)
+    return [{"year": row["label"], "value": row["value"], "trials": row["trials"]} for row in rows]
+
+
+def p_values(ctx: ChartContext, filter: TrialFilter) -> Rows:
+    """Every primary p-value given exactly, in bins of 0.01 up to 0.2."""
+    found = ctx.conn.execute(
+        select(_an.c.p).where(
+            _an.c.kind == "PRIMARY",
+            _an.c.p.is_not(None),
+            _an.c.p_bound.is_(None),
+            *_matching(filter, _an.c.trial_id),
+        )
+    ).scalars()
+    bins = [0] * 20
+    total = 0
+    for p in found:
+        total += 1
+        if p < 0.2:
+            bins[min(19, int(p * 100 + 1e-9))] += 1
+    if not total:
+        return []
+    return [
+        {"bin": f"{i / 100:.2f} to {(i + 1) / 100:.2f}", "value": n / total, "count": n}
+        for i, n in enumerate(bins)
+    ]
+
+
+def hypotheses(ctx: ChartContext, filter: TrialFilter) -> Rows:
+    first = _first(filter, _an.c.hypothesis.is_not(None))
+    found: dict[str, int] = dict(
+        ctx.conn.execute(
+            select(first.c.hypothesis, func.count())
+            .where(first.c.rank == 1)
+            .group_by(first.c.hypothesis)
+        ).all()
+    )
+    total = sum(found.values())
+    return [
+        {"key": key, "label": name, "value": found.get(key, 0) / total, "trials": found.get(key, 0)}
+        for key, name in HYPOTHESES.items()
+        if total
+    ]
+
+
+def effects(limit: int) -> Query:
+    """The largest trials' first primary ratio (hazard, odds or risk) with its interval."""
+
+    def query(ctx: ChartContext, filter: TrialFilter) -> Rows:
+        first = _first(
+            filter,
+            _an.c.estimate_type.in_(RATIOS),
+            _an.c.estimate > 0,
+            _an.c.ci_lower > 0,
+            _an.c.ci_upper > 0,
+        )
+        found = ctx.conn.execute(
+            select(
+                t.trials.c.source_id,
+                t.trials.c.title,
+                first.c.estimate_type,
+                first.c.estimate,
+                first.c.ci_lower,
+                first.c.ci_upper,
+                first.c.p,
+                first.c.p_bound,
+                _rt.c.participants,
+            )
+            .join(t.trials, t.trials.c.id == first.c.trial_id)
+            .join(_rt, _rt.c.trial_id == first.c.trial_id)
+            .where(first.c.rank == 1)
+            .order_by(func.coalesce(_rt.c.participants, 0).desc(), t.trials.c.source_id)
+            .limit(limit)
+        ).all()
+        return [
+            {
+                "label": title,
+                "detail": f"{source_id} · {ESTIMATES.get(kind, kind)}",
+                "source_id": source_id,
+                "estimate": estimate,
+                "low": low,
+                "high": high,
+                "participants": participants,
+                "p": None if p is None else f"{bound or ''}{p:g}",
+            }
+            for source_id, title, kind, estimate, low, high, p, bound, participants in found
+        ]
+
+    return query
+
+
+# --- who finished --------------------------------------------------------------------------
+
+
+def flow(ctx: ChartContext, filter: TrialFilter) -> Rows:
+    started, completed, average, withdrew, lost = ctx.conn.execute(
+        select(
+            func.sum(_rt.c.started),
+            func.sum(func.min(func.coalesce(_rt.c.completed, 0), _rt.c.started)),
+            func.avg(_COMPLETION),
+            func.avg(_left_for("withdrawal")),
+            func.avg(_left_for("lost")),
+        ).where(_rt.c.started > 0, *_matching(filter, _rt.c.trial_id))
+    ).one()
+    return [
+        {"key": "started", "label": "Started", "value": started or 0},
+        {
+            "key": "completed",
+            "label": "Completed",
+            "value": _ratio(completed, started),
+            "format": "percent",
+        },
+        {
+            "key": "average",
+            "label": "Completed, average trial",
+            "value": average,
+            "format": "percent",
+        },
+        {"key": "withdrew", "label": "Withdrew", "value": withdrew, "format": "percent"},
+        {"key": "lost", "label": "Lost to follow-up", "value": lost, "format": "percent"},
+    ]
+
+
+def _by_phase(ctx: ChartContext, filter: TrialFilter, **columns: Any) -> Rows:
+    """Averages of ``columns`` over the trials of each phase that report a participant flow."""
+    found = ctx.conn.execute(
+        select(t.trials.c.phase, func.count(), *(func.avg(c) for c in columns.values()))
+        .join(t.trials, t.trials.c.id == _rt.c.trial_id)
+        .where(_rt.c.started > 0, *filtering.where(filter))
+        .group_by(t.trials.c.phase)
+    ).all()
+    by_phase = {row[0]: row[1:] for row in found}
+    return [
+        {
+            "key": phase,
+            "label": _phase(phase),
+            **dict(zip(columns, values, strict=True)),
+            "trials": n,
+        }
+        for phase in _phases(by_phase)
+        for n, *values in [by_phase[phase]]
+        if n >= MIN_TRIALS
+    ]
+
+
+def completion_by_phase(ctx: ChartContext, filter: TrialFilter) -> Rows:
+    return _by_phase(ctx, filter, value=_COMPLETION)
+
+
+def left_by_phase(ctx: ChartContext, filter: TrialFilter) -> Rows:
+    return _by_phase(
+        ctx,
+        filter,
+        adverse_event=_left_for("adverse_event"),
+        lack_of_efficacy=_left_for("lack_of_efficacy"),
+    )
+
+
 # --- the specs -----------------------------------------------------------------------------
 
 
-def charts(*, top: int = 20) -> list[Chart]:
-    def results(order: int, **spec: Any) -> Chart:
-        return Chart(page="analysis", layout=spec.pop("layout", Layout(order=order)), **spec)
+def charts(*, top: int = 20, effects_shown: int = 15) -> list[Chart]:
+    def chart(order: int, width: int = 2, height: int = 1, **spec: Any) -> Chart:
+        return Chart(page="results", layout=Layout(width=width, height=height, order=order), **spec)
 
     percent = "percent"
+    both = (
+        Series("participants", "Share of participants"),
+        Series("average", "In the average trial"),
+    )
     return [
-        results(
-            300,
+        # --- who took part
+        chart(
+            100,
+            width=4,
             id="results_people",
             title="Trials with results",
             widget="stat",
             query=people,
             section=PEOPLE,
-            layout=Layout(width=4, order=300),
             description=(
                 "Trials whose results are posted, the participants they analysed, the share who "
-                "were women, their mean age (averaged over trials), and the share who "
-                "completed the trial (in the average trial)."
+                "were women, and their mean age (averaged over trials)."
             ),
         ),
-        results(
-            310,
+        chart(
+            110,
             id="results_race",
             title="Participants by race",
             widget="bar",
             query=composition("race", RACE),
             section=PEOPLE,
             format=percent,
-            series=(
-                Series("participants", "Share of participants"),
-                Series("average", "In the average trial"),
-            ),
+            series=both,
             description=(
                 "From trials that report the standard NIH/OMB categories. The average trial "
                 "counts each trial once, so a few very large studies don't outweigh the rest."
             ),
         ),
-        results(
-            320,
+        chart(
+            120,
             id="results_ethnicity",
             title="Participants by ethnicity",
             widget="bar",
             query=composition("ethnicity", ETHNICITY),
             section=PEOPLE,
             format=percent,
-            series=(
-                Series("participants", "Share of participants"),
-                Series("average", "In the average trial"),
-            ),
+            series=both,
             description="From trials that report the standard NIH/OMB categories.",
         ),
-        results(
-            330,
+        chart(
+            130,
             id="results_race_by_year",
             title="Participants over time",
             widget="line",
@@ -557,8 +823,8 @@ def charts(*, top: int = 20) -> list[Chart]:
                 f"with fewer than {MIN_TRIALS} trials reporting race are left out."
             ),
         ),
-        results(
-            340,
+        chart(
+            140,
             id="results_race_by_phase",
             title="Race by phase",
             widget="stacked",
@@ -569,8 +835,8 @@ def charts(*, top: int = 20) -> list[Chart]:
             series=tuple(Series(key, name) for key, name in RACE.items()),
             description="Participants by race in the average trial of each phase.",
         ),
-        results(
-            350,
+        chart(
+            150,
             id="results_representation",
             title="Trials that enrolled no one from a group",
             widget="bar",
@@ -582,14 +848,14 @@ def charts(*, top: int = 20) -> list[Chart]:
                 "categories, the share with no participants from each group."
             ),
         ),
-        results(
-            360,
+        chart(
+            160,
+            width=4,
             id="results_race_reporting",
             title="How trials report race",
             widget="stacked",
             query=race_reporting,
             section=PEOPLE,
-            layout=Layout(width=4, order=360),
             x="year",
             series=tuple(Series(key, name) for key, name in REPORTING.items()),
             description=(
@@ -599,22 +865,23 @@ def charts(*, top: int = 20) -> list[Chart]:
                 "since 2017."
             ),
         ),
-        results(
-            400,
+        # --- safety
+        chart(
+            200,
+            width=4,
             id="results_safety",
             title="Adverse events",
             widget="stat",
             query=safety,
             section=SAFETY,
-            layout=Layout(width=4, order=400),
             description=(
                 "Trials that report adverse events, the participants at risk, the share who had "
                 "a serious adverse event or died (over everyone at risk), and the share who left "
                 "because of an adverse event (in the average trial)."
             ),
         ),
-        results(
-            410,
+        chart(
+            210,
             id="results_serious_by_phase",
             title="Serious adverse events and deaths by phase",
             widget="bar",
@@ -624,40 +891,29 @@ def charts(*, top: int = 20) -> list[Chart]:
             series=(Series("serious", "Serious adverse event"), Series("deaths", "Died")),
             description="Share of participants at risk, pooled over the trials of each phase.",
         ),
-        results(
-            420,
+        chart(
+            220,
+            height=2,
             id="results_organ_systems",
             title="Serious adverse events by organ system",
             widget="bar",
             query=organ_systems,
             section=SAFETY,
-            layout=Layout(width=2, height=2, order=420),
             format=percent,
             description=(
                 "Participants with a serious event in each MedDRA organ system, per participant "
                 "at risk; someone with two events in a system counts twice."
             ),
         ),
-        results(
-            430,
-            id="results_dropouts",
-            title="Why participants left",
-            widget="bar",
-            query=dropouts,
-            section=SAFETY,
-            format=percent,
-            description=(
-                "Each reason's share of the participants who started, in the average trial."
-            ),
-        ),
-        results(
-            440,
+        chart(
+            230,
+            width=4,
+            height=2,
             id="results_signals",
             title="Adverse events more common than on placebo",
             widget="forest",
             query=signals,
             section=SAFETY,
-            layout=Layout(width=4, height=2, order=440),
             y="ratio",
             series=(
                 Series("trials", "Trials"),
@@ -670,14 +926,15 @@ def charts(*, top: int = 20) -> list[Chart]:
                 "when the difference holds after correcting for every event tested (q < 0.05)."
             ),
         ),
-        results(
-            450,
+        chart(
+            240,
+            width=4,
+            height=2,
             id="results_top_serious",
             title="Most reported serious adverse events",
             widget="table",
             query=top_serious(top),
             section=SAFETY,
-            layout=Layout(width=4, height=2, order=450),
             x="event",
             series=(
                 Series("trials", "Trials"),
@@ -689,16 +946,165 @@ def charts(*, top: int = 20) -> list[Chart]:
                 "risk in the trials shown."
             ),
         ),
+        # --- did it work
+        chart(
+            300,
+            width=4,
+            id="results_efficacy",
+            title="Primary outcomes",
+            widget="stat",
+            query=efficacy,
+            section=EFFICACY,
+            description=(
+                "Trials with a statistical analysis of a primary outcome; of those with a "
+                "p-value, the share whose first one is under 0.05; and the shares that gave an "
+                "effect estimate with an interval or tested non-inferiority or equivalence."
+            ),
+        ),
+        chart(
+            310,
+            id="results_success_by_phase",
+            title="Primary result p < 0.05, by phase",
+            widget="bar",
+            query=success_by_phase,
+            section=EFFICACY,
+            format=percent,
+            description=(
+                "Each trial's first primary p-value, in the registry's order; a p-value says "
+                "the result is unlikely by chance, not that the treatment helps."
+            ),
+        ),
+        chart(
+            320,
+            id="results_success_by_sponsor",
+            title="Primary result p < 0.05, by sponsor",
+            widget="bar",
+            query=success_by_sponsor,
+            section=EFFICACY,
+            format=percent,
+            description="By the lead sponsor's kind, largest first.",
+        ),
+        chart(
+            330,
+            id="results_success_by_year",
+            title="Primary result p < 0.05, over time",
+            widget="line",
+            query=success_by_year,
+            section=EFFICACY,
+            x="year",
+            format=percent,
+            description="By the year results were first posted.",
+        ),
+        chart(
+            340,
+            id="results_p_values",
+            title="Primary p-values",
+            widget="area",
+            query=p_values,
+            section=EFFICACY,
+            x="bin",
+            format=percent,
+            description=(
+                "Share of all exact primary p-values in each band of 0.01, up to 0.2; a pile "
+                "just under 0.05 against just over it would hint at selective reporting."
+            ),
+        ),
+        chart(
+            350,
+            id="results_hypotheses",
+            title="What primary analyses tested",
+            widget="bar",
+            query=hypotheses,
+            section=EFFICACY,
+            format=percent,
+            description="Each trial's first primary analysis that names its hypothesis.",
+        ),
+        chart(
+            360,
+            width=4,
+            height=2,
+            id="results_effects",
+            title="Effect estimates in the largest trials",
+            widget="forest",
+            query=effects(effects_shown),
+            section=EFFICACY,
+            y="estimate",
+            series=(Series("participants", "Participants"), Series("p", "p-value")),
+            description=(
+                "The first primary hazard, odds or risk ratio of the largest trials, with its "
+                "95% interval, as each trial reports it: which arm is the reference varies."
+            ),
+        ),
+        # --- who finished
+        chart(
+            400,
+            width=4,
+            id="results_flow",
+            title="Participant flow",
+            widget="stat",
+            query=flow,
+            section=FLOW,
+            description=(
+                "Participants who started, the share who completed (pooled, and in the average "
+                "trial), and the shares who withdrew or were lost to follow-up (average trial)."
+            ),
+        ),
+        chart(
+            410,
+            id="results_completion_by_phase",
+            title="Completion by phase",
+            widget="bar",
+            query=completion_by_phase,
+            section=FLOW,
+            format=percent,
+            description="Share of those who started who completed, in the average trial.",
+        ),
+        chart(
+            420,
+            id="results_left_by_phase",
+            title="Left for safety or for lack of effect, by phase",
+            widget="bar",
+            query=left_by_phase,
+            section=FLOW,
+            format=percent,
+            series=(
+                Series("adverse_event", "Adverse event"),
+                Series("lack_of_efficacy", "Lack of efficacy"),
+            ),
+            description="Share of those who started, in the average trial.",
+        ),
+        chart(
+            430,
+            height=2,
+            id="results_dropouts",
+            title="Why participants left",
+            widget="bar",
+            query=dropouts,
+            section=FLOW,
+            format=percent,
+            description=(
+                "Each reason's share of the participants who started, in the average trial."
+            ),
+        ),
     ]
 
 
 __all__ = [
+    "EFFICACY",
+    "FLOW",
     "PEOPLE",
     "SAFETY",
     "charts",
+    "completion_by_phase",
     "composition",
     "dropouts",
+    "effects",
+    "efficacy",
+    "flow",
+    "hypotheses",
+    "left_by_phase",
     "organ_systems",
+    "p_values",
     "people",
     "race_by_phase",
     "race_by_year",
@@ -707,5 +1113,8 @@ __all__ = [
     "safety",
     "serious_by_phase",
     "signals",
+    "success_by_phase",
+    "success_by_sponsor",
+    "success_by_year",
     "top_serious",
 ]
