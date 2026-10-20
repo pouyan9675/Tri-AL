@@ -14,8 +14,10 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "budget": "node scripts/budget.mjs",
-    "api": "uv run python -m tri_al.api.openapi > openapi.json && openapi-typescript openapi.json -o src/api/schema.gen.ts",
-    "api:check": "npm run api && git diff --exit-code -- openapi.json src/api/schema.gen.ts"
+    "api": "npm run api:core && npm run api:results",
+    "api:core": "uv run python -m tri_al.api.openapi > openapi.json && openapi-typescript openapi.json -o src/api/schema.gen.ts",
+    "api:results": "uv run python -m tri_al.api.openapi --plugin results > openapi.results.json && openapi-typescript openapi.results.json -o src/api/results.gen.ts",
+    "api:check": "npm run api && git diff --exit-code -- openapi.json openapi.results.json src/api/schema.gen.ts src/api/results.gen.ts && git ls-files --error-unmatch openapi.results.json src/api/results.gen.ts > /dev/null"
   },
   "dependencies": {
     "@fontsource-variable/geist": "5.3.0",

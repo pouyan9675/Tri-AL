@@ -12,21 +12,19 @@ import {
   ChartLegendContent,
   ChartTooltip,
 } from "@/components/ui/chart";
-import { formatDate, formatShortDate } from "@/lib/format";
-import { axisNumber, points, type WidgetProps } from "./common";
+import { formatDate, formatShortDate, type NumberFormat } from "@/lib/format";
+import {
+  axisNumber,
+  axisPercent,
+  formatted,
+  points,
+  seriesColors,
+  seriesOf,
+  type WidgetProps,
+} from "./common";
 import { MultiTooltip, SingleTooltip } from "./tooltip";
 
 const DATE = /^\d{4}-\d{2}-\d{2}/;
-
-/**
- * Two series stay in the app's blue: the brand blue and the deepest step of the blue ramp
- * (navy on light, pale on dark, far enough apart to tell even with color blindness). More
- * need hues of their own, in the chart palette's order.
- */
-function colors(count: number): string[] {
-  if (count === 2) return ["var(--chart-1)", "var(--seq-700)"];
-  return Array.from({ length: count }, (_, i) => `var(--chart-${(i % 8) + 1})`);
-}
 
 /**
  * The points, each with a number per series under `keys`: `value` for one series, or
@@ -34,30 +32,47 @@ function colors(count: number): string[] {
  */
 function useSeries({ spec, rows }: WidgetProps) {
   return useMemo(() => {
-    const series = spec.series.length > 0 ? spec.series : [{ key: spec.y, label: spec.title }];
+    const series = seriesOf(spec);
     const several = series.length > 1;
-    const palette = colors(series.length);
+    const palette = seriesColors(series.length);
     const lines = series.map((one, i) => ({
       key: several ? `series${i}` : "value",
       label: one.label,
       color: palette[i],
-      values: points({ ...spec, y: one.key }, rows).map((point) => point.value),
+      format: one.format,
+      // A missing number is a gap in the line, not a zero.
+      values: rows.map((row) => {
+        const value = row[one.key];
+        const number = value === null || value === undefined ? Number.NaN : Number(value);
+        return Number.isFinite(number) ? number : null;
+      }),
     }));
     const data = points(spec, rows).map(({ label, row }, i) => ({
       label,
       row,
-      ...Object.fromEntries(lines.map((line) => [line.key, line.values[i] ?? 0])),
+      ...Object.fromEntries(lines.map((line) => [line.key, line.values[i] ?? null])),
     }));
     const config: ChartConfig = Object.fromEntries(
       lines.map(({ key, label, color }) => [key, { label, color }]),
     );
     const dates = data.length > 0 && data.every((point) => DATE.test(point.label));
-    return { data, keys: lines.map((line) => line.key), config, dates };
+    const formats = new Map(lines.map((line) => [line.key, line.format]));
+    const percent = lines.every((line) => line.format === "percent");
+    return { data, keys: lines.map((line) => line.key), config, dates, formats, percent };
   }, [spec, rows]);
 }
 
-function axes(dates: boolean, keys: string[]) {
+type Axes = {
+  dates: boolean;
+  keys: string[];
+  formats: Map<string, NumberFormat>;
+  percent: boolean;
+};
+
+function axes({ dates, keys, formats, percent }: Axes) {
   const formatLabel = dates ? formatDate : undefined;
+  const formatValue = (value: number, key: string) =>
+    formatted(value, formats.get(key) ?? "number");
   const inOrder = (item: { dataKey?: unknown }) => keys.indexOf(String(item.dataKey));
   return [
     <CartesianGrid key="grid" vertical={false} stroke="var(--chart-grid)" />,
@@ -76,17 +91,17 @@ function axes(dates: boolean, keys: string[]) {
       axisLine={false}
       tickMargin={4}
       width={44}
-      tickFormatter={axisNumber}
-      allowDecimals={false}
+      tickFormatter={percent ? axisPercent : axisNumber}
+      allowDecimals={percent}
     />,
     <ChartTooltip
       key="tooltip"
       cursor={{ stroke: "var(--border)", strokeWidth: 1 }}
       content={
         keys.length > 1 ? (
-          <MultiTooltip formatLabel={formatLabel} order={inOrder} />
+          <MultiTooltip formatLabel={formatLabel} formatValue={formatValue} order={inOrder} />
         ) : (
-          <SingleTooltip formatLabel={formatLabel} />
+          <SingleTooltip formatLabel={formatLabel} formatValue={formatValue} />
         )
       }
     />,
@@ -100,7 +115,7 @@ function axes(dates: boolean, keys: string[]) {
 const backToFront = (keys: string[]) => [...keys].reverse();
 
 export function AreaWidget(props: WidgetProps) {
-  const { data, keys, config, dates } = useSeries(props);
+  const { data, keys, config, dates, formats, percent } = useSeries(props);
   const gradient = `fill-${useId().replace(/:/g, "")}`;
   return (
     <ChartContainer config={config} className="aspect-auto w-full" style={{ height: props.height }}>
@@ -113,7 +128,7 @@ export function AreaWidget(props: WidgetProps) {
             </linearGradient>
           ))}
         </defs>
-        {axes(dates, keys)}
+        {axes({ dates, keys, formats, percent })}
         {backToFront(keys).map((key) => (
           <Area
             key={key}
@@ -133,11 +148,11 @@ export function AreaWidget(props: WidgetProps) {
 }
 
 export function LineWidget(props: WidgetProps) {
-  const { data, keys, config, dates } = useSeries(props);
+  const { data, keys, config, dates, formats, percent } = useSeries(props);
   return (
     <ChartContainer config={config} className="aspect-auto w-full" style={{ height: props.height }}>
       <LineChart accessibilityLayer data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-        {axes(dates, keys)}
+        {axes({ dates, keys, formats, percent })}
         {backToFront(keys).map((key) => (
           <Line
             key={key}

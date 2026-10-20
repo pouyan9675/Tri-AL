@@ -135,7 +135,14 @@ export const trialsRoute = createRoute({
   component: lazyRouteComponent(() => import("@/pages/trials"), "TrialsPage"),
 });
 
-export const TRIAL_TABS = ["overview", "eligibility", "outcomes", "locations", "changes"] as const;
+export const TRIAL_TABS = [
+  "overview",
+  "eligibility",
+  "outcomes",
+  "results",
+  "locations",
+  "changes",
+] as const;
 export type TrialTab = (typeof TRIAL_TABS)[number];
 
 export const trialRoute = createRoute({

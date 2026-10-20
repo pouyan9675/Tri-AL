@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, Blocks, CircleAlert, Table2 } from "lucide-react";
+import { BarChart3, Blocks, CircleAlert, Inbox, Table2 } from "lucide-react";
 import { Suspense, useState } from "react";
 import type { ChartSpec } from "@/api/client";
 import { chartQuery } from "@/api/queries";
@@ -62,6 +62,14 @@ export function WidgetCard({ spec, filter }: { spec: ChartSpec; filter: TrialFil
         className="w-full rounded-lg"
         style={{ height: spec.widget === "stat" ? 92 : height }}
       />
+    ) : query.data.rows.length === 0 && spec.widget !== "stat" ? (
+      <div
+        className="flex h-full min-h-32 flex-col items-center justify-center gap-1 text-center text-sm text-muted-foreground"
+        data-testid="widget-empty"
+      >
+        <Inbox className="size-5" />
+        Nothing to show for these trials.
+      </div>
     ) : view === "table" ? (
       <TableWidget spec={spec} rows={query.data.rows} height={height} />
     ) : (
@@ -114,7 +122,7 @@ export function WidgetCard({ spec, filter }: { spec: ChartSpec; filter: TrialFil
         {spec.description && (
           <CardDescription className="text-xs">{spec.description}</CardDescription>
         )}
-        {definition?.table && state === "ready" && (
+        {definition?.table && state === "ready" && query.data?.rows.length !== 0 && (
           <CardAction>
             <Tooltip>
               <TooltipTrigger asChild>

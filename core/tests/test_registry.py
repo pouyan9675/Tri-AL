@@ -44,8 +44,13 @@ def test_chart_specs_are_checked() -> None:
         Chart(id="x", title="X", widget="radar", query=rows)  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="1 to 4"):
         Layout(width=5)
-    with pytest.raises(ValueError, match="only line and area"):
-        Chart(id="x", title="X", widget="bar", query=rows, series=(Series("a", "A"),))
+    with pytest.raises(ValueError, match="'pie' charts have no series"):
+        Chart(id="x", title="X", widget="pie", query=rows, series=(Series("a", "A"),))
+    assert Chart(id="x", title="X", widget="bar", query=rows, series=(Series("a", "A"),))
+    with pytest.raises(ValueError, match="unknown format"):
+        Chart(id="x", title="X", widget="bar", query=rows, format="money")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="unknown format"):
+        Series("a", "A", "money")  # type: ignore[arg-type]
     assert Chart(id="x", title="X", widget="bar", query=rows).page == "dashboard"
     with pytest.raises(ValueError, match="unknown page"):
         Chart(id="x", title="X", widget="bar", query=rows, page="report")  # type: ignore[arg-type]

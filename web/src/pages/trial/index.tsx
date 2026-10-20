@@ -3,7 +3,8 @@ import { getRouteApi, Link } from "@tanstack/react-router";
 import { ArrowUpRight, Copy, MapPin, UserRound, Users } from "lucide-react";
 import { useEffect } from "react";
 import type { Change, TrialDetail } from "@/api/client";
-import { changesQuery, trialQuery } from "@/api/queries";
+import { changesQuery, metaQuery, trialQuery } from "@/api/queries";
+import { RESULTS_PLUGIN } from "@/api/results";
 import { ErrorState } from "@/components/route-states";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +17,7 @@ import { notify } from "@/lib/notify";
 import type { TrialTab } from "@/router";
 import { ChangesTab } from "./changes";
 import { LocationsTab } from "./locations";
+import { ResultsTab } from "./results";
 import { EligibilityTab, OutcomesTab, OverviewTab } from "./sections";
 import { TrialTimeline } from "./timeline";
 
@@ -31,6 +33,7 @@ export function TrialPage() {
   const navigate = route.useNavigate();
   const trial = useQuery(trialQuery(sourceId));
   const changes = useQuery(changesQuery(sourceId));
+  const meta = useQuery(metaQuery());
   // The API finds an ID in small letters too (/trials/nct04437511); show the trial's own.
   const canonical = trial.data?.source_id;
   useEffect(() => {
@@ -48,6 +51,8 @@ export function TrialPage() {
     return <ErrorState error={trial.error} onRetry={() => void trial.refetch()} />;
   }
   const data = trial.data;
+  // Results come from the results plugin, so the tab is there only when it's on.
+  const results = Boolean(data?.has_results && meta.data?.plugins.includes(RESULTS_PLUGIN));
 
   return (
     <main
@@ -73,6 +78,7 @@ export function TrialPage() {
             <TabsTrigger value="outcomes">
               Outcomes <Count value={data?.outcomes.length} />
             </TabsTrigger>
+            {results && <TabsTrigger value="results">Results</TabsTrigger>}
             <TabsTrigger value="locations">
               Locations <Count value={data?.locations.length} />
             </TabsTrigger>
@@ -91,6 +97,17 @@ export function TrialPage() {
             </TabsContent>
             <TabsContent value="outcomes">
               <OutcomesTab trial={data} />
+            </TabsContent>
+            <TabsContent value="results">
+              {results ? (
+                <ResultsTab sourceId={data.source_id} />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {data.has_results
+                    ? "Turn on the results plugin in Settings to see this trial's results."
+                    : "This trial has no results posted."}
+                </p>
+              )}
             </TabsContent>
             <TabsContent value="locations">
               <LocationsTab trial={data} />
@@ -156,8 +173,18 @@ function Header({ trial, changes }: { trial: TrialDetail; changes?: Change[] }) 
             </Badge>
           )}
           {trial.has_results && (
-            <Badge variant="outline" className="h-6 rounded-full border-good/30 bg-good/8 px-2">
-              Has results
+            <Badge
+              asChild
+              variant="outline"
+              className="h-6 rounded-full border-good/30 bg-good/8 px-2"
+            >
+              <Link
+                to="/trials/$sourceId"
+                params={{ sourceId: trial.source_id }}
+                search={{ tab: "results" }}
+              >
+                Has results
+              </Link>
             </Badge>
           )}
         </div>

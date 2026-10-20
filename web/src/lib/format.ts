@@ -29,6 +29,22 @@ export function formatNumber(value: number | null | undefined): string {
   return value === null || value === undefined ? "—" : integer.format(value);
 }
 
+const percent = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 1 });
+
+/** A fraction as a percentage: 0.124 is "12.4%"; a little above zero is "<0.1%", not "0%". */
+export function formatPercent(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  if (value > 0 && value < 0.0005) return "<0.1%";
+  return percent.format(value);
+}
+
+/** How a chart's numbers read (a chart spec's `format`). */
+export type NumberFormat = "number" | "percent";
+
+export function formatValue(value: number | null | undefined, format?: NumberFormat | null) {
+  return format === "percent" ? formatPercent(value) : formatNumber(value);
+}
+
 export function formatCompact(value: number): string {
   return value < 10_000 ? integer.format(value) : compactNumber.format(value);
 }

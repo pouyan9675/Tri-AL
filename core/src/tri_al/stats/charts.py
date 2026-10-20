@@ -23,6 +23,15 @@ the rows' ``x`` and ``y`` keys:
   first, then a ``type: "cluster"`` row per cluster (``cluster``, ``label``, ``size`` under the
   filter, ``color``: 0 to 7 or null), then a ``type: "point"`` row per trial (``x``, ``y``,
   ``z``, ``cluster``, ``title``, ``source_id``)
+- ``stacked``: one bar per row (``x``), split into its ``series``, each part shown as its
+  share of the bar: what a whole is made of, such as participants by race in each phase
+- ``forest``: estimates with confidence intervals, one row each: ``x`` names it, ``y`` is the
+  estimate, ``low`` and ``high`` its interval, drawn on a log scale around 1 (ratios); its
+  ``series`` are columns of numbers beside each row
+
+A chart's ``format`` says how its numbers read: ``number``, or ``percent`` for fractions (0.25
+is 25%). A series can have its own, and a ``stat`` row its own ``format`` key; ``bar`` and
+``table`` take ``series`` too, for bars side by side and the table's number columns.
 
 A chart's ``page`` says where it's shown: the dashboard, or the analysis page for larger,
 interactive views.
@@ -41,7 +50,18 @@ from tri_al.filters import TrialFilter
 from tri_al.stats.counts import Count, Counts
 
 type Widget = Literal[
-    "bar", "line", "area", "pie", "stat", "table", "map", "trends", "scatter", "scatter3d"
+    "bar",
+    "line",
+    "area",
+    "pie",
+    "stat",
+    "table",
+    "map",
+    "trends",
+    "scatter",
+    "scatter3d",
+    "stacked",
+    "forest",
 ]
 WIDGETS: tuple[Widget, ...] = (
     "bar",
@@ -54,7 +74,13 @@ WIDGETS: tuple[Widget, ...] = (
     "trends",
     "scatter",
     "scatter3d",
+    "stacked",
+    "forest",
 )
+SERIES_WIDGETS: tuple[Widget, ...] = ("line", "area", "bar", "table", "stacked", "forest")
+
+type Format = Literal["number", "percent"]
+FORMATS: tuple[Format, ...] = ("number", "percent")
 
 type Page = Literal["dashboard", "analysis"]
 PAGES: tuple[Page, ...] = ("dashboard", "analysis")
@@ -77,10 +103,16 @@ class Layout:
 
 @dataclass(frozen=True, slots=True)
 class Series:
-    """One of several lines or areas in a chart: the row key for its number, and its name."""
+    """One of several lines, areas, bars or columns in a chart: the row key for its number,
+    its name, and how it reads (None: as the chart's ``format``)."""
 
     key: str
     label: str
+    format: Format | None = None
+
+    def __post_init__(self) -> None:
+        if self.format is not None and self.format not in FORMATS:
+            raise ValueError(f"unknown format {self.format!r}; use one of {', '.join(FORMATS)}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,7 +140,8 @@ class Chart:
     page: Page = "dashboard"
     x: str = "label"  # the row key for categories, points or tiles
     y: str = "value"  # the row key for the number
-    series: tuple[Series, ...] = ()  # line and area: several numbers per point, not just ``y``
+    series: tuple[Series, ...] = ()  # several numbers per row, not just ``y``
+    format: Format = "number"  # how the numbers read: "percent" for fractions
     plugin: str = ""  # set by the registry
 
     def __post_init__(self) -> None:
@@ -116,8 +149,12 @@ class Chart:
             raise ValueError(f"unknown widget {self.widget!r}; use one of {', '.join(WIDGETS)}")
         if self.page not in PAGES:
             raise ValueError(f"unknown page {self.page!r}; use one of {', '.join(PAGES)}")
-        if self.series and self.widget not in ("line", "area"):
-            raise ValueError(f"only line and area charts have series, not {self.widget!r}")
+        if self.series and self.widget not in SERIES_WIDGETS:
+            raise ValueError(
+                f"{self.widget!r} charts have no series; {', '.join(SERIES_WIDGETS)} do"
+            )
+        if self.format not in FORMATS:
+            raise ValueError(f"unknown format {self.format!r}; use one of {', '.join(FORMATS)}")
 
 
 @dataclass(frozen=True, slots=True, kw_only=True, eq=False)

@@ -12,6 +12,7 @@ members = [
     "tri-al-charts",
     "tri-al-ctgov",
     "tri-al-insights",
+    "tri-al-results",
     "tri-al-sample",
 ]
 
@@ -26,6 +27,7 @@ dev = [
     { name = "tri-al-charts", editable = "plugins/charts" },
     { name = "tri-al-ctgov", editable = "plugins/ctgov" },
     { name = "tri-al-insights", editable = "plugins/insights" },
+    { name = "tri-al-results", editable = "plugins/results" },
     { name = "tri-al-sample", editable = "plugins/sample" },
 ]
 
@@ -1865,6 +1867,17 @@ requires-dist = [
     { name = "tri-al", editable = "core" },
     { name = "umap-learn", specifier = ">=0.5.12" },
 ]
+
+[[package]]
+name = "tri-al-results"
+version = "0.1.0"
+source = { editable = "plugins/results" }
+dependencies = [
+    { name = "tri-al" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "tri-al", editable = "core" }]
 
 [[package]]
 name = "tri-al-sample"

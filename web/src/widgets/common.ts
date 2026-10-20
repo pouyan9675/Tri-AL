@@ -1,7 +1,7 @@
 /** What every widget shares: the rows a chart spec's `x` and `y` keys point at. */
 import type { ChartRow, ChartSpec } from "@/api/client";
 import type { TrialFilter } from "@/lib/filters";
-import { formatCompact, formatNumber } from "@/lib/format";
+import { formatCompact, formatNumber, formatValue, type NumberFormat } from "@/lib/format";
 
 export type WidgetProps = {
   spec: ChartSpec;
@@ -27,7 +27,37 @@ export function points(spec: ChartSpec, rows: ChartRow[]): Point[] {
   });
 }
 
+export type SeriesInfo = { key: string; label: string; format: NumberFormat };
+
+/** The numbers each row has: the spec's series, or its one number, `y`. */
+export function seriesOf(spec: ChartSpec): SeriesInfo[] {
+  const series = spec.series.length > 0 ? spec.series : [{ key: spec.y, label: spec.title }];
+  return series.map((one) => ({
+    key: one.key,
+    label: one.label,
+    format: ("format" in one && one.format) || spec.format,
+  }));
+}
+
+/** A number as its series or chart reads it; null is "—". */
+export function formatted(value: unknown, format: NumberFormat): string {
+  if (value === null || value === undefined) return "—";
+  const number = Number(value);
+  return Number.isFinite(number) ? formatValue(number, format) : String(value);
+}
+
+/**
+ * Two series stay in the app's blue: the brand blue and the deepest step of the blue ramp
+ * (navy on light, pale on dark, far enough apart to tell even with color blindness). More
+ * need hues of their own, in the chart palette's order.
+ */
+export function seriesColors(count: number): string[] {
+  if (count === 2) return ["var(--chart-1)", "var(--seq-700)"];
+  return Array.from({ length: count }, (_, i) => `var(--chart-${(i % 8) + 1})`);
+}
+
 export const axisNumber = (value: number) => formatCompact(value);
+export const axisPercent = (value: number) => `${Math.round(value * 100)}%`;
 export const fullNumber = (value: unknown) =>
   typeof value === "number" ? formatNumber(value) : String(value ?? "");
 

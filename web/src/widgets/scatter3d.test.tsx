@@ -76,6 +76,7 @@ const SPEC: ChartSpec = {
   x: "x",
   y: "y",
   series: [],
+  format: "number",
   layout: { width: 4, height: 3, order: 100 },
   page: "analysis",
   plugin: "insights",

@@ -23,6 +23,7 @@ const SPEC: ChartSpec = {
   x: "label",
   y: "value",
   series: [],
+  format: "number",
   layout: { width: 4, height: 2, order: 200 },
   page: "dashboard",
   plugin: "insights",

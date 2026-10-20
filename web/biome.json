@@ -9,7 +9,9 @@
     "includes": [
       "**",
       "!src/api/schema.gen.ts",
+      "!src/api/results.gen.ts",
       "!openapi.json",
+      "!openapi.results.json",
       "!dist",
       "!playwright-report",
       "!test-results"

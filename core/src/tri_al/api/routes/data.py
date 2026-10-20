@@ -427,6 +427,7 @@ def get_dashboard(request: Request, state: State) -> Response:
                     "x": chart.x,
                     "y": chart.y,
                     "series": chart.series,
+                    "format": chart.format,
                     "layout": chart.layout,
                     "plugin": chart.plugin,
                     "precomputed": chart.precompute,

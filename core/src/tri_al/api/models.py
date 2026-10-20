@@ -264,13 +264,27 @@ class LayoutOut(_Out):
 class SeriesOut(_Out):
     key: str
     label: str
+    format: Literal["number", "percent"] | None = Field(
+        description="How its numbers read; null: as the chart's `format`."
+    )
 
 
 class ChartSpecOut(_Out):
     id: str
     title: str
     widget: Literal[
-        "bar", "line", "area", "pie", "stat", "table", "map", "trends", "scatter", "scatter3d"
+        "bar",
+        "line",
+        "area",
+        "pie",
+        "stat",
+        "table",
+        "map",
+        "trends",
+        "scatter",
+        "scatter3d",
+        "stacked",
+        "forest",
     ]
     description: str
     section: str = Field(description="The page section; empty for the first, untitled one.")
@@ -280,8 +294,11 @@ class ChartSpecOut(_Out):
     x: str
     y: str
     series: list[SeriesOut] = Field(
-        description="Line and area charts with several series: each one's row key and name. "
-        "Empty: one series, `y`."
+        description="Charts with several numbers per row (line, area, bar, table, stacked, "
+        "forest): each one's row key and name. Empty: one series, `y`."
+    )
+    format: Literal["number", "percent"] = Field(
+        description="How the numbers read: `percent` for fractions (0.25 is 25%)."
     )
     layout: LayoutOut
     plugin: str

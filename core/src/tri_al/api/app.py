@@ -37,7 +37,8 @@ GZIP_LEVEL = 5
 """Level 5 compresses JSON nearly as well as 9 at a fraction of the time."""
 
 
-def _operation_id(route: APIRoute) -> str:
+def operation_id(route: APIRoute) -> str:
+    """A route's name is its OpenAPI operation id, which the typed clients use."""
     return route.name
 
 
@@ -79,7 +80,7 @@ def create_app(
         summary="ClinicalTrials.gov in a fast local dashboard.",
         lifespan=lifespan,
         default_response_class=JSONBytes,
-        generate_unique_id_function=_operation_id,
+        generate_unique_id_function=operation_id,
         openapi_url="/api/openapi.json",
         docs_url="/api/docs",
         redoc_url=None,

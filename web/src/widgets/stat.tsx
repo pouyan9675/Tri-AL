@@ -1,17 +1,43 @@
-/** Stat tiles: one per row, its label and its value. */
-import { Activity, Globe2, type LucideIcon, Pill, Sigma, Syringe, TestTubes } from "lucide-react";
+/**
+ * Stat tiles: one per row, its label and its value. A row's own `format` key ("percent")
+ * overrides the chart's; a missing value shows as "—".
+ */
+import {
+  Activity,
+  CalendarClock,
+  CircleCheck,
+  DoorOpen,
+  Globe2,
+  HeartCrack,
+  type LucideIcon,
+  Pill,
+  Sigma,
+  Syringe,
+  TestTubes,
+  TriangleAlert,
+  UserRound,
+  Users,
+} from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { formatNumber } from "@/lib/format";
+import type { NumberFormat } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { points, type WidgetProps } from "./common";
+import { formatted, points, type WidgetProps } from "./common";
 
-/** Icons for the default charts' tiles; any other tile gets a generic one. */
+/** Icons for the tiles the bundled plugins send; any other tile gets a generic one. */
 const ICONS: Record<string, LucideIcon> = {
   trials: TestTubes,
   interventions: Syringe,
   drugs: Pill,
   conditions: Activity,
   countries: Globe2,
+  participants: Users,
+  at_risk: Users,
+  women: UserRound,
+  age: CalendarClock,
+  completed: CircleCheck,
+  serious: TriangleAlert,
+  deaths: HeartCrack,
+  left: DoorOpen,
 };
 
 export function StatWidget({ spec, rows }: WidgetProps) {
@@ -39,8 +65,13 @@ export function StatWidget({ spec, rows }: WidgetProps) {
               <span className="truncate text-[0.8rem] font-medium">{tile.label}</span>
               <Icon className="size-4 shrink-0 opacity-70" />
             </div>
-            <div className="text-2xl font-semibold tracking-tight sm:text-[1.7rem]">
-              {formatNumber(tile.value)}
+            <div className="text-2xl font-semibold tracking-tight tabular sm:text-[1.7rem]">
+              {formatted(
+                tile.row[spec.y],
+                tile.row.format === "percent" || tile.row.format === "number"
+                  ? (tile.row.format as NumberFormat)
+                  : spec.format,
+              )}
             </div>
           </Card>
         );

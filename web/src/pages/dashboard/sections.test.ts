@@ -13,6 +13,7 @@ function chart(id: string, section: string, page: ChartSpec["page"] = "dashboard
     x: "label",
     y: "value",
     series: [],
+    format: "number",
     layout: { width: 2, height: 1, order: 0 },
     page,
     plugin: "charts",

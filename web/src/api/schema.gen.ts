@@ -1039,7 +1039,7 @@ export interface components {
              * Widget
              * @enum {string}
              */
-            widget: "bar" | "line" | "area" | "pie" | "stat" | "table" | "map" | "trends" | "scatter" | "scatter3d";
+            widget: "bar" | "line" | "area" | "pie" | "stat" | "table" | "map" | "trends" | "scatter" | "scatter3d" | "stacked" | "forest";
             /** Description */
             description: string;
             /**
@@ -1059,9 +1059,15 @@ export interface components {
             y: string;
             /**
              * Series
-             * @description Line and area charts with several series: each one's row key and name. Empty: one series, `y`.
+             * @description Charts with several numbers per row (line, area, bar, table, stacked, forest): each one's row key and name. Empty: one series, `y`.
              */
             series: components["schemas"]["SeriesOut"][];
+            /**
+             * Format
+             * @description How the numbers read: `percent` for fractions (0.25 is 25%).
+             * @enum {string}
+             */
+            format: "number" | "percent";
             layout: components["schemas"]["LayoutOut"];
             /** Plugin */
             plugin: string;
@@ -1803,6 +1809,11 @@ export interface components {
             key: string;
             /** Label */
             label: string;
+            /**
+             * Format
+             * @description How its numbers read; null: as the chart's `format`.
+             */
+            format: ("number" | "percent") | null;
         };
         /** SimilarTermOut */
         SimilarTermOut: {

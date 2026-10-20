@@ -3,10 +3,12 @@ import { formatNumber } from "@/lib/format";
 
 type Props = Partial<TooltipContentProps<number, string>> & {
   formatLabel?: (label: string) => string;
+  /** A value as its series reads it (by the series' data key); plain numbers otherwise. */
+  formatValue?: (value: number, dataKey: string) => string;
 };
 
 /** One series' tooltip: the value first and strong, then what it's for. */
-export function SingleTooltip({ active, payload, label, formatLabel }: Props) {
+export function SingleTooltip({ active, payload, label, formatLabel, formatValue }: Props) {
   const item = payload?.[0];
   if (!active || !item) return null;
   const name = String(label ?? item.payload?.label ?? "");
@@ -15,7 +17,9 @@ export function SingleTooltip({ active, payload, label, formatLabel }: Props) {
       <div className="flex items-center gap-2">
         <span className="h-3 w-1 shrink-0 rounded-full bg-(--color-value)" />
         <span className="text-sm font-semibold tabular text-popover-foreground">
-          {formatNumber(Number(item.value))}
+          {formatValue
+            ? formatValue(Number(item.value), String(item.dataKey))
+            : formatNumber(Number(item.value))}
         </span>
       </div>
       <span className="max-w-64 text-muted-foreground">
@@ -31,6 +35,7 @@ export function MultiTooltip({
   payload,
   label,
   formatLabel,
+  formatValue,
   order,
 }: Props & { order?: (item: { dataKey?: unknown }) => number }) {
   if (!active || !payload?.length) return null;
@@ -46,7 +51,11 @@ export function MultiTooltip({
           <span className="h-3 w-1 shrink-0 rounded-full" style={{ background: item.color }} />
           <span className="text-popover-foreground">{item.name}</span>
           <span className="ml-auto pl-4 text-sm font-semibold tabular text-popover-foreground">
-            {formatNumber(Number(item.value))}
+            {item.value === null || item.value === undefined
+              ? "—"
+              : formatValue
+                ? formatValue(Number(item.value), String(item.dataKey))
+                : formatNumber(Number(item.value))}
           </span>
         </div>
       ))}

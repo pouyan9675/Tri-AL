@@ -1,0 +1,16 @@
+[project]
+name = "tri-al-results"
+version = "0.1.0"
+description = "Results posted to ClinicalTrials.gov for Tri-AL: participants, safety and the trial page's results."
+requires-python = ">=3.13"
+dependencies = ["tri-al"]
+
+[project.entry-points."tri_al.plugins"]
+results = "tri_al_results:plugin"
+
+[tool.uv.sources]
+tri-al = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.9.5,<0.10.0"]
+build-backend = "uv_build"

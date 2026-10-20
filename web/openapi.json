@@ -8511,7 +8511,9 @@
               "map",
               "trends",
               "scatter",
-              "scatter3d"
+              "scatter3d",
+              "stacked",
+              "forest"
             ],
             "title": "Widget"
           },
@@ -8547,7 +8549,16 @@
             },
             "type": "array",
             "title": "Series",
-            "description": "Line and area charts with several series: each one's row key and name. Empty: one series, `y`."
+            "description": "Charts with several numbers per row (line, area, bar, table, stacked, forest): each one's row key and name. Empty: one series, `y`."
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "number",
+              "percent"
+            ],
+            "title": "Format",
+            "description": "How the numbers read: `percent` for fractions (0.25 is 25%)."
           },
           "layout": {
             "$ref": "#/components/schemas/LayoutOut"
@@ -8573,6 +8584,7 @@
           "x",
           "y",
           "series",
+          "format",
           "layout",
           "plugin",
           "precomputed"
@@ -10600,13 +10612,30 @@
           "label": {
             "type": "string",
             "title": "Label"
+          },
+          "format": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "number",
+                  "percent"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format",
+            "description": "How its numbers read; null: as the chart's `format`."
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
           "key",
-          "label"
+          "label",
+          "format"
         ],
         "title": "SeriesOut"
       },

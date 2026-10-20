@@ -6,9 +6,11 @@
 import { type ComponentType, lazy } from "react";
 import { BarWidget } from "./bar";
 import type { WidgetProps } from "./common";
+import { ForestWidget } from "./forest";
 import { PieWidget } from "./pie";
 import { ScatterWidget } from "./scatter";
 import { AreaWidget, LineWidget } from "./series";
+import { StackedWidget } from "./stacked";
 import { StatWidget } from "./stat";
 import { TableWidget } from "./table";
 import { TrendsWidget } from "./trends";
@@ -36,6 +38,8 @@ export const WIDGETS: Record<string, WidgetDefinition> = {
   trends: { component: TrendsWidget, card: true, table: false },
   scatter: { component: ScatterWidget, card: true, table: false },
   scatter3d: { component: Scatter3DWidget, card: true, table: false },
+  stacked: { component: StackedWidget, card: true, table: true },
+  forest: { component: ForestWidget, card: true, table: true },
 };
 
 export function widgetFor(type: string): WidgetDefinition | undefined {
